@@ -1,0 +1,10 @@
+[package]
+name = "btckeyslib"
+version = "0.0.1"
+edition = "2018"
+
+[dependencies]
+secp256k1 = {version="0.20.3", features = ["rand"]}
+bs58 = "0.4.0"
+rand = {version = "0.6", features = ["std"]}
+bitcoin_hashes = { version = "0.10", features = ["std"] }
