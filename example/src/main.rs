@@ -1,9 +1,12 @@
-use btc_keyaddress;
+use btc_keyaddress::key::{PubKey, PrivKey};
 
 fn main() {
-    print_private_key();
+    gen_key_pair_and_print();
 }
 
-fn print_private_key() {
-    println!("Random Private Key: {}", btc_keyaddress::new_random_priv_key());
+fn gen_key_pair_and_print() {
+    let k = PrivKey::new_rand();
+    let K = PubKey::from_priv_key(&k);
+
+    println!("Priv: {}\nPub: {}\n", k, K);
 }
