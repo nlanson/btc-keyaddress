@@ -10,28 +10,26 @@
 */
 
 pub mod key;
+pub mod address;
 
 pub use secp256k1::rand::rngs::OsRng;
 pub use secp256k1::{PublicKey, Secp256k1, SecretKey};
+pub use sha2::{Sha256, Digest};
+pub use ripemd160::Ripemd160;
 pub use bs58;
-pub use bitcoin_hashes::{sha256, ripemd160};
 
 
+/**
+    Tests aren't implemented yet.
+*/
 #[cfg(test)]
 mod tests {
-    use sha2::{Sha256, Digest}; //Temporary
-
-    use crate::key::{
-        PrivKey, PubKey
+    use sha2::{Sha256, Digest};
+    use crate::{
+        key::PubKey,
+        key::PrivKey,
+        address::Address
     };
-    
-    #[test]
-    fn keys_test() {
-        let k: PrivKey = PrivKey::new_rand();
-        let pk: PubKey = PubKey::from_priv_key(&k);
-
-        assert_eq!(pk.0, PubKey::from_priv_key(&k).0);
-    }
 
     //This test was written to check if a uncompressed public key in form [u8; 65] can be hashed
     //similarly to a compressed public key in form string. 
@@ -39,30 +37,28 @@ mod tests {
     fn hash_identical_test() {
         let k: PrivKey = PrivKey::new_rand();
         let pk: PubKey = PubKey::from_priv_key(&k);
-        
 
-        //String from serialized.
-        let serialised = pk.0.serialize();
-        let s = serialised.iter().map(|x| format!("{:02x}", x)).collect::<String>();
-
-        //String from mehtod
-        let a = pk.0.to_string();
-
-        //Should be equal
-        assert_eq!(s, a);
-
-
-        //Hash of serialised to string
+        //Hash of public key as bytes array
         let mut hasher1 = Sha256::new();
-        hasher1.update(a);
+        hasher1.update(pk.as_bytes());
         let result1 = hasher1.finalize();
-        
-        //Hash of string method
+
+        //Hash of public key as bytes array
         let mut hasher2 = Sha256::new();
-        hasher2.update(s);
+        hasher2.update(pk.as_hex());
         let result2 = hasher2.finalize();
 
-        //Should be equal
+        //Hashing the byte array and hashing the hex string is not identical in this case.
         assert_eq!(result1, result2);
+    }
+
+    //Test doesn't work yet.
+    #[test]
+    fn test_hash160_from_pubkey() {
+        let k: PrivKey = PrivKey::new_rand();
+        let pk: PubKey = PubKey::from_priv_key(&k);
+        let hash160: String = Address::from_pub_key(&pk);
+
+        assert!(1==1);
     }
 }

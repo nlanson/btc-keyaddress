@@ -1,7 +1,12 @@
-use btc_keyaddress::key::{PubKey, PrivKey};
+use btc_keyaddress::{
+    key::PubKey,
+    key::PrivKey,
+    address::Address
+};
 
 fn main() {
-    gen_key_pair_and_print();
+    //gen_key_pair_and_print();
+    create_hash160();
 }
 
 fn gen_key_pair_and_print() {
@@ -9,4 +14,12 @@ fn gen_key_pair_and_print() {
     let K = PubKey::from_priv_key(&k);
 
     println!("Priv: {}\nPub: {}\n", k, K);
+}
+
+fn create_hash160() {
+    let k: PrivKey = PrivKey::new_rand();
+    let pk: PubKey = PubKey::from_priv_key(&k);
+    let hash160: String = Address::from_pub_key(&pk);
+
+    println!("Priv: {}\n Pub:  {}\n 160: {}", k, pk, hash160);
 }
