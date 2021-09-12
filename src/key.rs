@@ -2,9 +2,14 @@ use crate::{
     Secp256k1,
     PublicKey,
     SecretKey,
-    OsRng
+    OsRng,
+    bs58check,
+    util::decode_02x,
+    util::encode_02x
 };
 use std::fmt;
+use bitcoin_hashes::hex::ToHex;
+use bs58::encode;
 
 pub struct PrivKey(SecretKey);
 
@@ -23,6 +28,29 @@ impl PrivKey {
     */
     pub fn from_slice(byte_array: &[u8]) -> Self {
         Self(SecretKey::from_slice(byte_array).expect("Invalid slice"))
+    }
+
+    //Todo: add from_hex() and from_wid() methods to create private key from hex string or WIF
+
+    /**
+        Serializes the private key into a Vector of bytes.
+    */
+    fn serialize(&self) -> Vec<u8> {
+        let hex = self.0.to_hex();
+        decode_02x(&hex[..])
+    }
+
+    /*
+        Export the private key a wallet-import-format (Base58Check Encoded with prefix)
+        * Use the parameter to indicate if WIF should include the compression byte.
+    */
+    pub fn export_as_wif(&self, compressed: bool) -> String {
+        let mut key: Vec<u8> = self.serialize();
+        if compressed {
+            key.append(&mut vec![0x01]);
+        }
+        
+        bs58check::check_encode(bs58check::VersionPrefix::PrivateKeyWIF, key)
     }
 }
 
@@ -51,8 +79,9 @@ impl PubKey {
     /**
         Returns the compressed public key as a byte array.
     */
-    pub fn as_bytes(&self) -> [u8; 33] {
-        self.0.serialize()
+    pub fn as_bytes(&self) -> Vec<u8> {
+        //Len should be 33
+        self.0.serialize().to_vec()
     }
 
     /**
@@ -60,34 +89,23 @@ impl PubKey {
 
         Returns a byte aray.
     */
-    pub fn decompressed_bytes(&self) -> [u8; 65] {
+    pub fn decompressed_bytes(&self) -> Vec<u8>{
         let bytes_array: [u8; 65] = self.0.serialize_uncompressed();
-        println!("{:?}", bytes_array);
-        bytes_array
-        //unimplemented!();
-        //Need to check if a hashed values are the same for a byte array, hex string and PubKey struct
+        bytes_array.to_vec()
     }
 
     /**
        Return the compressed public key as a hex string.
     */
     pub fn as_hex(&self) -> String {
-        // self.0.serialize()
-        // .iter().map(|x| 
-        //     format!("{:02x}", x)
-        // ).collect::<String>()
-        self.0.to_string()
+        encode_02x(&self.as_bytes())
     }
 
     /**
-       Takes in an uncompressed public key as a byte array and returns it's hex form as a string.
-
-       Uncompressed key can be created using the method Self::decompressed_bytes().
+       Returns the uncompressed  public key as a hex string.
     */
-    pub fn decompressed_hex(bytes: [u8; 65]) -> String {
-        bytes.iter().map( |x| 
-            format!("{:02x}", x)
-        ).collect::<String>()
+    pub fn decompressed_hex(&self) -> String {
+        encode_02x(&self.decompressed_bytes())
     }
 }
 

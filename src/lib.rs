@@ -12,6 +12,8 @@
 pub mod key;
 pub mod address;
 pub mod hash;
+pub mod bs58check;
+pub mod util;
 
 pub use secp256k1::rand::rngs::OsRng;
 pub use secp256k1::{PublicKey, Secp256k1, SecretKey};
@@ -55,10 +57,10 @@ mod tests {
 
     //Test doesn't work yet.
     #[test]
-    fn test_hash160_from_pubkey() {
+    fn test_address_from_pubkey() {
         let k: PrivKey = PrivKey::new_rand();
         let pk: PubKey = PubKey::from_priv_key(&k);
-        let hash160: String = Address::from_pub_key(&pk);
+        let add: String = Address::from_pub_key(&pk, true);
 
         assert!(1==1);
     }
