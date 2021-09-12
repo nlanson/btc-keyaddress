@@ -14,7 +14,7 @@ impl Address {
     */
     pub fn from_pub_key(pk: &PubKey, compressed: bool) -> String {
         let mut pubkey_bytes = pk.as_bytes();
-        if compressed { pubkey_bytes = pk.decompressed_bytes(); }
+        if !compressed { pubkey_bytes = pk.decompressed_bytes(); }
         
         let mut hash: Vec<u8> = hash::sha256(&pubkey_bytes); //Initialise variable hash as mutable Vec<u8> and assign the sha256 hash of the public key.
         hash = hash::ripemd160(hash); //hash now equals the ripemd160 hash of itself. Ripemd160(Sha256(PublicKey))
