@@ -11,6 +11,7 @@
 
 pub mod key;
 pub mod address;
+pub mod hash;
 
 pub use secp256k1::rand::rngs::OsRng;
 pub use secp256k1::{PublicKey, Secp256k1, SecretKey};

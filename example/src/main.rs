@@ -19,7 +19,7 @@ fn gen_key_pair_and_print() {
 fn create_hash160() {
     let k: PrivKey = PrivKey::new_rand();
     let pk: PubKey = PubKey::from_priv_key(&k);
-    let hash160: String = Address::from_pub_key(&pk);
+    let a: String = Address::from_pub_key(&pk);
 
-    println!("Priv: {}\n Pub:  {}\n 160: {}", k, pk, hash160);
+    println!("Priv: {}\n Pub:  {}\n Add: {}", k, pk, a);
 }
