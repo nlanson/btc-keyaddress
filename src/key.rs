@@ -5,11 +5,11 @@ use crate::{
     OsRng,
     bs58check,
     util::decode_02x,
-    util::encode_02x
+    util::encode_02x,
+    util::try_into
 };
 use std::fmt;
 use bitcoin_hashes::hex::ToHex;
-use bs58::encode;
 
 pub struct PrivKey(SecretKey);
 
@@ -30,14 +30,13 @@ impl PrivKey {
         Self(SecretKey::from_slice(byte_array).expect("Invalid slice"))
     }
 
-    //Todo: add from_hex() and from_wid() methods to create private key from hex string or WIF
 
     /**
-        Serializes the private key into a Vector of bytes.
+        Serializes the private key into a array of bytes.
     */
-    fn serialize(&self) -> Vec<u8> {
+    fn serialize(&self) -> [u8; 32] {
         let hex = self.0.to_hex();
-        decode_02x(&hex[..])
+        try_into(decode_02x(&hex[..]))
     }
 
     /*
@@ -45,7 +44,7 @@ impl PrivKey {
         * Use the parameter to indicate if WIF should include the compression byte.
     */
     pub fn export_as_wif(&self, compressed: bool) -> String {
-        let mut key: Vec<u8> = self.serialize();
+        let mut key: Vec<u8> = self.serialize().to_vec();
         if compressed {
             key.append(&mut vec![0x01]);
         }
@@ -79,9 +78,9 @@ impl PubKey {
     /**
         Returns the compressed public key as a byte array.
     */
-    pub fn as_bytes(&self) -> Vec<u8> {
-        //Len should be 33
-        self.0.serialize().to_vec()
+    pub fn as_bytes(&self) -> [u8; 33] {
+        //Len should be 33 (32bytes + sign identifier)
+        self.0.serialize()
     }
 
     /**
@@ -89,9 +88,9 @@ impl PubKey {
 
         Returns a byte aray.
     */
-    pub fn decompressed_bytes(&self) -> Vec<u8>{
-        let bytes_array: [u8; 65] = self.0.serialize_uncompressed();
-        bytes_array.to_vec()
+    pub fn decompressed_bytes(&self) -> [u8; 65] {
+        //(65 byte size = 64byte key + 1 byte uncompressed identofier)
+        self.0.serialize_uncompressed()
     }
 
     /**

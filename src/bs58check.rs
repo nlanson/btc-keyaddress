@@ -14,7 +14,7 @@ pub enum VersionPrefix {
     * Prefix is based on use case as degined in the VersionPrefix enum
 */
 pub fn check_encode(prefix: VersionPrefix, data: Vec<u8>) -> String {
-    //Reassing data as mutable vec
+    //Reassigning data as mutable vec
     let mut data = data;
     
     //Set the prefix based on use
@@ -36,4 +36,12 @@ pub fn check_encode(prefix: VersionPrefix, data: Vec<u8>) -> String {
 
     //Return the Base58Check encoded value of the data
     bs58::encode(data).into_string()
+}
+
+/*
+    Decodes a given Base58 string into a Byte vector
+*/
+pub fn decode(encoded: String) -> Result<Vec<u8>, bs58::decode::Error> {
+    bs58::decode(encoded).into_vec()
+
 }

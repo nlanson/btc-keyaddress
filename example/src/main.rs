@@ -6,6 +6,7 @@ use btc_keyaddress::{
 
 fn main() {
     print_vals();
+    println!("{}", Address::is_valid("178HdxifjhjWtg7w5qHavDp4JEz1o4wSrc".to_string()));
 }
 
 fn gen_key_pair_and_print() {

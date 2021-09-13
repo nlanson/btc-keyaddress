@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 /*
     Decodes hex strings into a byte vector
 */
@@ -9,10 +11,18 @@ pub fn decode_02x(hex: &str) -> Vec<u8> {
 }
 
 /*
-    Encodes byte vectors into hex string
+    Encodes byte slices into hex string
 */
-pub fn encode_02x(bytes: &Vec<u8>) -> String {
+pub fn encode_02x(bytes: &[u8]) -> String {
     bytes.iter().map(|x| {
         format!("{:02x}", x)
     }).collect::<String>()
+}
+
+/**
+    Converts a vector into an array
+*/
+pub fn try_into<T, const N: usize>(v: Vec<T>) -> [T; N] {
+    v.try_into()
+        .unwrap_or_else(|v: Vec<T>| panic!("Expected a Vec of length {} but it was {}", N, v.len()))
 }
