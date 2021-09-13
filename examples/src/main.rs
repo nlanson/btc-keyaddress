@@ -4,15 +4,8 @@ use btc_keyaddress::{
     address::Address
 };
 
-use btc_mnemonic::{
-    mnemonic::Mnemonic,
-    mnemonic::PhraseLength,
-    lang::Language
-};
-
 fn main() {
     print_vals();
-    println!("{:?}", Mnemonic::new(PhraseLength::Twelve, Language::English));
 }
 
 fn gen_key_pair_and_print() {
