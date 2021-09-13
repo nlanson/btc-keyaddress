@@ -19,7 +19,7 @@ impl Address {
         
         let mut hash: Vec<u8> = hash::sha256(&pubkey_bytes).to_vec(); //Initialise variable hash as mutable Vec<u8> and assign the sha256 hash of the public key.
         hash = hash::ripemd160(hash).to_vec(); //hash now equals the ripemd160 hash of itself. Ripemd160(Sha256(PublicKey))
-        bs58check::check_encode(bs58check::VersionPrefix::BTCAddress, hash) //Return the Bas58Check Encoded string of the hash
+        bs58check::check_encode(bs58check::VersionPrefix::BTCAddress, &hash) //Return the Bas58Check Encoded string of the hash
     }
 
     /**

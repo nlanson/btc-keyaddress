@@ -49,7 +49,7 @@ impl PrivKey {
             key.append(&mut vec![0x01]);
         }
         
-        bs58check::check_encode(bs58check::VersionPrefix::PrivateKeyWIF, key)
+        bs58check::check_encode(bs58check::VersionPrefix::PrivateKeyWIF, &key)
     }
 }
 

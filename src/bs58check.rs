@@ -13,9 +13,9 @@ pub enum VersionPrefix {
     Returns the Base58Check encoded value of the input data.
     * Prefix is based on use case as degined in the VersionPrefix enum
 */
-pub fn check_encode(prefix: VersionPrefix, data: Vec<u8>) -> String {
+pub fn check_encode(prefix: VersionPrefix, data: &[u8]) -> String {
     //Reassigning data as mutable vec
-    let mut data = data;
+    let mut data = data.to_vec();
     
     //Set the prefix based on use
     let p: Vec<u8> = match prefix {
