@@ -9,7 +9,8 @@
     Based on chapter 4 of the bitcoin book. (https://github.com/bitcoinbook/bitcoinbook/)
 
     Todo:
-     - bip39::mnemonic::Mnemonic::new() -> return Self instead of Vec<String>
+     - bip39::mnemonic::Mnemonic::new() -> return Self instead of Vec<String> (Hash mnemonic)
+     - mnemonic phrase to entropy verification
 */
 
 pub mod key;
