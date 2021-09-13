@@ -9,8 +9,11 @@
     Based on chapter 4 of the bitcoin book. (https://github.com/bitcoinbook/bitcoinbook/)
 
     Todo:
-     - bip39::mnemonic::Mnemonic::new() -> return Self instead of Vec<String> (Hash mnemonic)
-     - mnemonic phrase to entropy verification
+     - bip39::mnemonic::Mnemonic::new() -> return Self instead of Vec<String> (Hash mnemonic).
+        Need to look into PBKDF2 with HMAC-SHA512 and how to implement it
+        Notes:
+        //https://bitcointalk.org/index.php?topic=5302621.0
+        //https://learnmeabitcoin.com/technical/mnemonic
 */
 
 pub mod key;

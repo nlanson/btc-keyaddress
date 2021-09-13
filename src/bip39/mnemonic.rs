@@ -1,3 +1,4 @@
+use std::fmt;
 use crate::{
     hash,
     util,
@@ -20,7 +21,18 @@ pub enum PhraseLength {
     TwentyFour
 }
 
+pub enum MnemonicErr {
+    InvalidWord(String),
+    InvalidBits(String),
+    ChecksumUnequal()
+}
+
+
 impl Mnemonic {
+    /**
+        Creates a mnemonic struct that includes the phrase and derived seed.
+        * CURRENTLY ONLY RETURNS A NEW SEED AS A VECTOR
+    */
     pub fn new(length: PhraseLength, lang: lang::Language) -> Vec<String> {
         //Create random byte arrays of variable length based on selected phrase length
         let (bytes, checksum_len) = match length {
@@ -43,9 +55,11 @@ impl Mnemonic {
         //Every step, extract the string at index i to i+11 (representing the 11 bits to index the word list)
         //Convert the 11 bit string to an integer and push the seed phrase at that index into a vec.
         let mut phrase: Vec<String> = Vec::with_capacity(bit_string.len()/11);
-        for i in 0..bit_string.len()/11 {
+        let mut i: usize = 0;
+        while phrase.len() != bit_string.len()/11 {
             let bits = &bit_string[i..i+11];
             phrase.push(lang.word_list()[util::decode_binary_string(&bits.to_string())].to_string());
+            i += 11;
         }
         phrase
 
@@ -102,7 +116,15 @@ impl Mnemonic {
         }
     }
 
-    pub fn from_phrase() -> Self {
+    pub fn from_phrase(phrase: String, lang: lang::Language) -> Result<Self, MnemonicErr> {
+        let words: Vec<&str> = phrase.split_whitespace().collect();
+         match Self::verify_phrase(&words, &lang) {
+             Ok(()) => {
+                //Continue to hash the seed and construct Mnemonic struct
+             },
+             Err(x) => return Err(x)
+         }
+        
         unimplemented!();
         /*
             This function will take in a string of words, split it by whitespace and convert
@@ -124,30 +146,63 @@ impl Mnemonic {
     /*
         Verifies that a seed phrase is valid
     */
-    pub fn verify_phrase(phrase: String, lang: lang::Language) -> bool {
-        let words: Vec<&str> = phrase.split_whitespace().collect();
+    pub fn verify_phrase(words: &Vec<&str>, lang: &lang::Language) -> Result<(), MnemonicErr> {
         let word_list = lang.word_list();
-
+        
         //Iterate over the split phrase, and find the index of the word in the word list.
         //If the word list does not contain a word, return false.
         let indexes: Vec<usize> = words.iter().map(|x| {
-            if word_list.contains(x) {
+            if word_list.contains(&x) {
                 return word_list.iter().position(|i| i == x).unwrap();
             }
             return 0x11111111111; //2048 is a flag to indicate word does  not exist.
         }).collect::<Vec<usize>>();
-        if indexes.contains(&2048) { return false }
-
+        if indexes.contains(&2048) { return Err(MnemonicErr::InvalidWord("INSERT WRONG WORD HERE".to_string())) }
+        
         //Convert the indexes into a bit string. If the bit string divided by 11 has a remainder return false
-        let bit_string: String = indexes.iter().map(|x| {
+        let mut bit_string: String = indexes.iter().map(|x| {
             format!("{:011b}", x)
         }).collect::<String>();
-        if bit_string.len()%11 != 0 { return false }
+        if bit_string.len()%11 != 0 { return Err(MnemonicErr::InvalidBits(format!("{} is not a valid bit length", bit_string.len()))) }
+        
+        //Remove the checksum from the bit string and store it to cross check later.
+        let checksum_len: usize = match bit_string.len() {
+            132 => 4,
+            165 => 5,
+            198 => 6,
+            231 => 7,
+            264 => 8,
+            _ => return Err(MnemonicErr::InvalidBits(format!("{} is not a valid bit length", bit_string.len())))
+        };
+        let extracted_checksum: u8  = util::decode_binary_string(&bit_string[bit_string.len()-checksum_len..bit_string.len()].to_string()) as u8;
+        bit_string.replace_range(bit_string.len()-checksum_len..bit_string.len(), "");
 
-        todo!();
-        //Continue verifying phrase
+        //Collect the bit string into a byte vector
+        let mut bytes: Vec<u8> = vec![];
+        for i in (0..bit_string.len()).step_by(8) {
+            bytes.push(util::decode_binary_string(&bit_string[i..i+8].to_string()) as u8)
+        }
 
+        //Hash the bytes and calculate the checksum
+        let unmasked_checksum = hash::sha256(&bytes)[0];
+        let calculated_checksum: u8 = Self::mask_checksum(unmasked_checksum, checksum_len as u8);
 
-        true
+        //Compare the calculated and extracted checksums
+        if calculated_checksum == extracted_checksum { return Ok(()) }
+
+        Err(MnemonicErr::ChecksumUnequal())
+    }
+}
+
+impl fmt::Display for MnemonicErr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let val: String = match self {
+            Self::ChecksumUnequal() => "Bad checksum".to_string(),
+            Self::InvalidBits(x) => x.to_string(),
+            Self::InvalidWord(x) => x.to_string()
+
+        };
+        
+        write!(f, "{}", val)
     }
 }
