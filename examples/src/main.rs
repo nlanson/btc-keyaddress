@@ -5,13 +5,16 @@ use btc_keyaddress::{
     },
     address::Address,
     bip39::{
-        mnemonic, lang
+        mnemonic::Mnemonic,
+        mnemonic::PhraseLength,
+        lang::Language
     }
 };
 
 fn main() {
     //print_vals();
     bip39();
+    verify_mnemonic_phrase();
 }
 
 fn print_vals() {
@@ -35,6 +38,12 @@ fn print_vals() {
 }
 
 fn bip39() {
-    let mnemonic = mnemonic::Mnemonic::new(mnemonic::PhraseLength::Twelve, lang::Language::English);
+    let mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English);
     println!("{:?}", mnemonic);
+}
+
+fn verify_mnemonic_phrase() {
+    let phrase: String = "pet egg mirror brand curtain hobby suffer rally glance shell memory beyond".to_string();
+    let t = Mnemonic::verify_phrase(phrase, Language::English);
+    println!("{}", t);
 }

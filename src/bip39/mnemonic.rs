@@ -37,7 +37,7 @@ impl Mnemonic {
 
         //Create a string to store the binary bits of each byte generated earlier
         let mut bit_string = bytes.iter().map(|x| format!("{:08b}", x)).collect::<String>();
-        bit_string = format!("{}{:b}", bit_string, checksum); //Add the checksum at the end of the bit string
+        bit_string = Self::append_checksum_to_bitstring(&bit_string, &checksum); //Add the checksum at the end of the bit string
 
         //Iterate over the bite string, step by 11.
         //Every step, extract the string at index i to i+11 (representing the 11 bits to index the word list)
@@ -86,5 +86,68 @@ impl Mnemonic {
         };
 
         checksum
+    }
+
+    /**
+        Add the required amount of bits from the checksum to the bit string provided.
+    */
+    fn append_checksum_to_bitstring(bit_string: &String, checksum: &u8) -> String {
+        match bit_string.len() {
+            128 => format!("{}{:04b}", bit_string, checksum),
+            160 => format!("{}{:05b}", bit_string, checksum),
+            192 => format!("{}{:06b}", bit_string, checksum),
+            224 => format!("{}{:07b}", bit_string, checksum),
+            256 => format!("{}{:08b}", bit_string, checksum),
+            _ => panic!("Invalid bit string length")
+        }
+    }
+
+    pub fn from_phrase() -> Self {
+        unimplemented!();
+        /*
+            This function will take in a string of words, split it by whitespace and convert
+            the phrase list back to entropy.
+
+            Steps:
+                - split string by whitespace.
+                - find index value of each word in word list
+                - for each index, convert it to binary and push into a single string
+                - Remove and store the last however many bits from the bit string to use later (based on word count)
+                - Loop over the bit string, stepping by 8 converting each section of the string
+                  to hex and collecting it in a byte array.
+                - Hash the byte array and compare the first however many bits to the previously stored
+                  and removed bits. If they are the same then the phrase is valid
+
+        */
+    }
+
+    /*
+        Verifies that a seed phrase is valid
+    */
+    pub fn verify_phrase(phrase: String, lang: lang::Language) -> bool {
+        let words: Vec<&str> = phrase.split_whitespace().collect();
+        let word_list = lang.word_list();
+
+        //Iterate over the split phrase, and find the index of the word in the word list.
+        //If the word list does not contain a word, return false.
+        let indexes: Vec<usize> = words.iter().map(|x| {
+            if word_list.contains(x) {
+                return word_list.iter().position(|i| i == x).unwrap();
+            }
+            return 0x11111111111; //2048 is a flag to indicate word does  not exist.
+        }).collect::<Vec<usize>>();
+        if indexes.contains(&2048) { return false }
+
+        //Convert the indexes into a bit string. If the bit string divided by 11 has a remainder return false
+        let bit_string: String = indexes.iter().map(|x| {
+            format!("{:011b}", x)
+        }).collect::<String>();
+        if bit_string.len()%11 != 0 { return false }
+
+        todo!();
+        //Continue verifying phrase
+
+
+        true
     }
 }
