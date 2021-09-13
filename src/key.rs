@@ -2,7 +2,7 @@ use crate::{
     Secp256k1,
     PublicKey,
     SecretKey,
-    OsRng,
+    SecpOsRng,
     bs58check,
     util::decode_02x,
     util::encode_02x,
@@ -19,7 +19,7 @@ impl PrivKey {
         Generates an random number of entropic source using OsRng and uses it to create a secret key in the form of a u8 array.
     */
     pub fn new_rand() -> Self {
-        let mut rng = OsRng::new().expect("OsRng");
+        let mut rng = SecpOsRng::new().expect("OsRng");
         Self(SecretKey::new(&mut rng))
     }
 

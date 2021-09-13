@@ -1,18 +1,17 @@
 use btc_keyaddress::{
-    key::PubKey,
-    key::PrivKey,
-    address::Address
+    key::{
+        PubKey,
+        PrivKey
+    },
+    address::Address,
+    bip39::{
+        mnemonic, lang
+    }
 };
 
 fn main() {
-    print_vals();
-}
-
-fn gen_key_pair_and_print() {
-    let k = PrivKey::new_rand();
-    let K = PubKey::from_priv_key(&k);
-
-    println!("Priv: {}\nPub: {}\n", k, K);
+    //print_vals();
+    bip39();
 }
 
 fn print_vals() {
@@ -33,4 +32,9 @@ fn print_vals() {
         Uncompressed Address: {}
         ", private_key, compressed_wif, uncompressed_wif, public_key, compressed_address, uncompressed_address
     );
+}
+
+fn bip39() {
+    let mnemonic = mnemonic::Mnemonic::new(mnemonic::PhraseLength::Twelve, lang::Language::English);
+    println!("{:?}", mnemonic);
 }

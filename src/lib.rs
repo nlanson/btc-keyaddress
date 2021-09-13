@@ -9,6 +9,7 @@
     Based on chapter 4 of the bitcoin book. (https://github.com/bitcoinbook/bitcoinbook/)
 
     Todo:
+     - bip39::mnemonic::Mnemonic::new() -> return Self instead of Vec<String>
 */
 
 pub mod key;
@@ -16,8 +17,11 @@ pub mod address;
 pub mod hash;
 pub mod bs58check;
 pub mod util;
+pub mod entropy;
+pub mod bip39;
 
-pub use secp256k1::rand::rngs::OsRng;
+pub use secp256k1::rand::rngs::OsRng as SecpOsRng;
+pub use rand::rngs::OsRng;
 pub use secp256k1::{PublicKey, Secp256k1, SecretKey};
 pub use sha2::{Sha256, Digest};
 pub use ripemd160::Ripemd160;

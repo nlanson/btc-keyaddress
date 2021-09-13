@@ -20,6 +20,13 @@ pub fn encode_02x(bytes: &[u8]) -> String {
 }
 
 /**
+    Takes in a binary integer as a string and returns it integer value.
+*/
+pub fn decode_binary_string(b: &String) -> usize {
+    usize::from_str_radix(b, 2).unwrap()
+}
+
+/**
     Converts a vector into an array
 */
 pub fn try_into<T, const N: usize>(v: Vec<T>) -> [T; N] {
