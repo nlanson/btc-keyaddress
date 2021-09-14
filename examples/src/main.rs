@@ -8,14 +8,15 @@ use btc_keyaddress::{
         mnemonic::Mnemonic,
         mnemonic::PhraseLength,
         lang::Language
-    }
+    },
+    util::encode_02x
 };
 
 fn main() {
     //print_vals();
-    //bip39();
+    bip39();
     //verify_mnemonic_phrase();
-    verify_bad_phrase();
+    //sverify_bad_phrase();
 }
 
 fn print_vals() {
@@ -39,13 +40,15 @@ fn print_vals() {
 }
 
 fn bip39() {
-    let mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English);
-    println!("{:?}", mnemonic);
+    let mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
+    println!("Phrase: {}", mnemonic.phrase.join(" "));
+    println!("Seed:   {}", encode_02x(&mnemonic.seed));
 }
 
 fn verify_mnemonic_phrase() {
     let correct_phrase: Vec<&str> = vec!["forget", "arrow", "shadow", "era", "gap", "pretty", "have", "fire", "street", "law", "valve", "sunset"];
-    let t = Mnemonic::verify_phrase(&correct_phrase, &Language::English);
+    let phrase: Vec<String> = correct_phrase.iter().map(|x| x.to_string()).collect();
+    let t = Mnemonic::verify_phrase(&phrase, &Language::English);
     match t {
         Ok(()) => println!("Checksum successful. Your seed is valid"),
         Err(x) => println!("{}", x)
@@ -53,8 +56,9 @@ fn verify_mnemonic_phrase() {
 }
 
 fn verify_bad_phrase() {
-    let correct_phrase: Vec<&str> = vec!["arrow", "shadow", "era", "gap", "pretty", "have", "fire", "street", "law", "valve", "sunset", "forget"];
-    let t = Mnemonic::verify_phrase(&correct_phrase, &Language::English);
+    let bad_phrase: Vec<&str> = vec!["arrow", "shadow", "era", "gap", "pretty", "have", "fire", "street", "law", "valve", "sunset", "forget"];
+    let phrase: Vec<String> = bad_phrase.iter().map(|x| x.to_string()).collect();
+    let t = Mnemonic::verify_phrase(&phrase, &Language::English);
     match t {
         Ok(()) => println!("Checksum successful. Your seed is valid"),
         Err(x) => println!("{}", x)

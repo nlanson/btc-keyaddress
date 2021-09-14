@@ -9,11 +9,10 @@
     Based on chapter 4 of the bitcoin book. (https://github.com/bitcoinbook/bitcoinbook/)
 
     Todo:
-     - bip39::mnemonic::Mnemonic::new() -> return Self instead of Vec<String> (Hash mnemonic).
-        Need to look into PBKDF2 with HMAC-SHA512 and how to implement it
+     - Create master private key from mnemonic seed.
         Notes:
-        //https://bitcointalk.org/index.php?topic=5302621.0
-        //https://learnmeabitcoin.com/technical/mnemonic
+            https://learnmeabitcoin.com/technical/hd-wallets
+            
 */
 
 pub mod key;
@@ -24,12 +23,14 @@ pub mod util;
 pub mod entropy;
 pub mod bip39;
 
-pub use secp256k1::rand::rngs::OsRng as SecpOsRng;
-pub use rand::rngs::OsRng;
-pub use secp256k1::{PublicKey, Secp256k1, SecretKey};
-pub use sha2::{Sha256, Digest};
-pub use ripemd160::Ripemd160;
-pub use bs58;
+use secp256k1::rand::rngs::OsRng as SecpOsRng; //Seperate rand 0.6.0 OsRng used by Secp256k from rand 0.8.0 OsRng
+use rand::rngs::OsRng;
+use secp256k1::{PublicKey, Secp256k1, SecretKey};
+use hmac::Hmac;
+use pbkdf2::pbkdf2;
+use sha2::{Sha256, Sha512, Digest};
+use ripemd160::Ripemd160;
+use bs58;
 
 
 /**
