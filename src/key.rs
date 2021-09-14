@@ -34,7 +34,7 @@ impl PrivKey {
     /**
         Serializes the private key into a array of bytes.
     */
-    fn serialize(&self) -> [u8; 32] {
+    pub fn serialize(&self) -> [u8; 32] {
         let hex = self.0.to_hex();
         try_into(decode_02x(&hex[..]))
     }

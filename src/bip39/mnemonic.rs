@@ -10,7 +10,7 @@ use super::{
 
 pub struct Mnemonic {
     pub phrase: Vec<String>,     //The mnemonic phrase
-    pub seed: [u8; 64]        //The seed key (512 bits)
+    pub seed: [u8; 64]           //The seed key (512 bits)
 }
 
 pub enum PhraseLength {

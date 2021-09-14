@@ -4,9 +4,9 @@
 */
 
 use crate::{
-    Ripemd160, Sha256, 
-    Hmac, Sha512, pbkdf2,
     Digest,
+    Ripemd160, Sha256, Sha512, pbkdf2,
+    NewMac, Hmac, Mac, 
     util::try_into
 };
 
@@ -54,4 +54,17 @@ pub fn pbkdf2_hmacsha512(phrase: &Vec<String>, passphrase: &str) -> [u8; 64] {
         &mut res
     );
     res
+}
+
+/**
+    Takes in an byte array input and returns the HMAC-SHA512 hash of it.
+*/
+pub fn hmac_sha512(input: &[u8]) -> [u8; 64] {
+    try_into(
+        HmacSha512::new_from_slice(input)
+        .expect("Hmac error")
+        .finalize()
+        .into_bytes()
+        .to_vec()
+    )
 }

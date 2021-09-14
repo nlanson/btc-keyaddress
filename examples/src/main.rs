@@ -9,14 +9,16 @@ use btc_keyaddress::{
         mnemonic::PhraseLength,
         lang::Language
     },
+    hdwallet::HDWallet,
     util::encode_02x
 };
 
 fn main() {
     //print_vals();
-    bip39();
+    //bip39();
     //verify_mnemonic_phrase();
     //sverify_bad_phrase();
+    hdwallet();
 }
 
 fn print_vals() {
@@ -39,10 +41,11 @@ fn print_vals() {
     );
 }
 
-fn bip39() {
+fn bip39() -> Mnemonic {
     let mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
-    println!("Phrase: {}", mnemonic.phrase.join(" "));
-    println!("Seed:   {}", encode_02x(&mnemonic.seed));
+    // println!("Phrase: {}", mnemonic.phrase.join(" "));
+    // println!("Seed:   {:?}", &mnemonic.seed);
+    mnemonic
 }
 
 fn verify_mnemonic_phrase() {
@@ -63,4 +66,10 @@ fn verify_bad_phrase() {
         Ok(()) => println!("Checksum successful. Your seed is valid"),
         Err(x) => println!("{}", x)
     }
+}
+
+fn hdwallet() {
+    let mnemonic = bip39();
+    let phrase = mnemonic.phrase.join(" ");
+    let hdwallet = HDWallet::new(mnemonic);
 }

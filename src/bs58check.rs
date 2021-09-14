@@ -5,8 +5,10 @@ pub enum VersionPrefix {
     P2ScriptAddress,
     BTCTestNetAddress,
     PrivateKeyWIF,
-    //BIP38,
     //BIP32
+    ExtendedPrivateKey,
+    //ExtendedPublicKey
+    None
 }
 
 /**
@@ -22,7 +24,9 @@ pub fn check_encode(prefix: VersionPrefix, data: &[u8]) -> String {
         VersionPrefix::BTCAddress => vec![0x00],
         VersionPrefix::BTCTestNetAddress => vec![0x05],
         VersionPrefix::P2ScriptAddress => vec![0x6F],
-        VersionPrefix::PrivateKeyWIF => vec![0x80]
+        VersionPrefix::PrivateKeyWIF => vec![0x80],
+        VersionPrefix::ExtendedPrivateKey => vec![4, 136, 173, 228],
+        VersionPrefix::None => vec![]
     };
 
     //Prepend the prefix to data.
@@ -38,7 +42,14 @@ pub fn check_encode(prefix: VersionPrefix, data: &[u8]) -> String {
     bs58::encode(data).into_string()
 }
 
-/*
+/**
+    Encodes a given u8 slice into base 58 wihtout a checksum
+*/
+pub fn encode(data: &[u8]) -> String {
+    bs58::encode(data).into_string()
+}
+
+/**
     Decodes a given Base58 string into a Byte vector
 */
 pub fn decode(encoded: String) -> Result<Vec<u8>, bs58::decode::Error> {

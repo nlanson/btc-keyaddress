@@ -9,24 +9,31 @@
     Based on chapter 4 of the bitcoin book. (https://github.com/bitcoinbook/bitcoinbook/)
 
     Todo:
-     - Create master private key from mnemonic seed.
+     - Start implementing HD wallets
         Notes:
             https://learnmeabitcoin.com/technical/hd-wallets
             
+     - Investigate why Base58 module does not encode ExtendedKey prefixes correctly
+            
 */
 
+//Outward facing modules
 pub mod key;
 pub mod address;
-pub mod hash;
-pub mod bs58check;
-pub mod util;
-pub mod entropy;
 pub mod bip39;
+pub mod hdwallet;
 
+//Modules for internal use
+mod hash;
+mod bs58check;
+pub mod util;
+mod entropy;
+
+//Dependencies
 use secp256k1::rand::rngs::OsRng as SecpOsRng; //Seperate rand 0.6.0 OsRng used by Secp256k from rand 0.8.0 OsRng
 use rand::rngs::OsRng;
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
-use hmac::Hmac;
+use hmac::{Mac, NewMac, Hmac};
 use pbkdf2::pbkdf2;
 use sha2::{Sha256, Sha512, Digest};
 use ripemd160::Ripemd160;
