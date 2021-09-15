@@ -9,14 +9,12 @@
     Based on chapter 4 of the bitcoin book. (https://github.com/bitcoinbook/bitcoinbook/)
 
     Todo:
-     - Start implementing HD wallets
+     - Start implementing HD wallets, specifically the deriveration of child keys.
         Notes:
             https://learnmeabitcoin.com/technical/hd-wallets
             https://github.com/bitcoinbook/bitcoinbook/blob/develop/ch05.asciidoc
             https://learnmeabitcoin.com/technical/extended-keys
-            
-     - Investigate why Base58 module does not encode ExtendedKey prefixes correctly
-            
+     
 */
 
 //Outward facing modules

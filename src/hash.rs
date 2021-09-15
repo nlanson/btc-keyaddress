@@ -59,9 +59,9 @@ pub fn pbkdf2_hmacsha512(phrase: &Vec<String>, passphrase: &str) -> [u8; 64] {
 /**
     Takes in an byte array input and returns the HMAC-SHA512 hash of it.
 */
-pub fn hmac_sha512(input: &[u8]) -> [u8; 64] {
+pub fn hmac_sha512(data: &[u8], key: &[u8]) -> [u8; 64] {
     let mut hmac = HmacSha512::new_from_slice(b"Bitcoin seed").expect("Hmac error");
-    hmac.update(input);
+    hmac.update(data);
     try_into(hmac.finalize().into_bytes().to_vec())
 }
 
@@ -78,7 +78,7 @@ mod tests {
         let expected_privkey_hex: &str = "24c13dbb3dc8eeec336b1f815fbd7dfd6d346e1f7b6e05df75d631a3cf90eca6";
         let expected_chaincode_hex: &str = "38baff3d60afe4a6da62c7bde576c0e564b9735aa89c46bebb14af48a86f9417";
 
-        let extended_key: [u8; 64] = hmac_sha512(&root_seed);
+        let extended_key: [u8; 64] = hmac_sha512(&root_seed, b"Bitcoin seed");
         let pk: [u8; 32] = util::try_into(extended_key[0..32].to_vec());
         let pk_hex: &str = &util::encode_02x(&pk);
         let cc: [u8; 32] = util::try_into(extended_key[32..64].to_vec());

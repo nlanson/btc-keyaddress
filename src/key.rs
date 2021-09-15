@@ -11,7 +11,29 @@ use crate::{
 use std::fmt;
 use bitcoin_hashes::hex::ToHex;
 
+/**
+    Define methods shared by Public and Private keys.
+*/
+pub trait Key {
+    /**
+        Create a new instance of Self from a u8 slice.
+    */
+    fn from_slice(byte_array: &[u8]) -> Self;
+
+    /**
+        Return self as a byte array.
+    */
+    fn as_bytes<const N: usize>(&self) -> [u8; N];
+}
+
+/*
+    Define the tuple structs PrivKey and PubKey.
+
+    The structs are essentially a wrapper for SecretKey and PublicKey
+    structs in the Secp256k1 lirabry.
+*/
 pub struct PrivKey(SecretKey);
+pub struct PubKey(PublicKey);
 
 impl PrivKey {
     
@@ -23,29 +45,12 @@ impl PrivKey {
         Self(SecretKey::new(&mut rng))
     }
 
-    /**
-        Use a predefined byte array as a secret key.
-    */
-    pub fn from_slice(byte_array: &[u8]) -> Self {
-        Self(SecretKey::from_slice(byte_array).expect("Invalid slice"))
-    }
-
-
-    /**
-        Serializes the private key into a array of bytes.
-        Does not include the decompression byte.
-    */
-    pub fn serialize(&self) -> [u8; 32] {
-        let hex = self.0.to_hex();
-        try_into(decode_02x(&hex[..]))
-    }
-
     /*
         Export the private key a wallet-import-format (Base58Check Encoded with prefix)
         * Use the parameter to indicate if WIF should include the compression byte.
     */
     pub fn export_as_wif(&self, compressed: bool) -> String {
-        let mut key: Vec<u8> = self.serialize().to_vec();
+        let mut key: Vec<u8> = self.as_bytes::<32>().to_vec();
         if compressed {
             key.append(&mut vec![0x01]);
         }
@@ -54,7 +59,20 @@ impl PrivKey {
     }
 }
 
-pub struct PubKey(PublicKey);
+impl Key for PrivKey {
+    fn from_slice(byte_array: &[u8]) -> Self {
+        Self(SecretKey::from_slice(byte_array).expect("Invalid slice"))
+    }
+
+
+    /**
+        32 bytes
+    */
+    fn as_bytes<const N: usize>(&self) -> [u8; N] {
+        let hex = self.0.to_hex();
+        try_into(decode_02x(&hex[..]))
+    }
+}
 
 impl PubKey {
     
@@ -67,22 +85,6 @@ impl PubKey {
         Self(PublicKey::from_secret_key(&Secp256k1::new(),&k.0))
     }
 
-    /**
-        Use a predefined byte array as a public key.
-        
-        Make sure you know the private key!
-    */
-    pub fn from_slice(byte_array: &[u8]) -> Self {
-        Self(PublicKey::from_slice(byte_array).expect("Invalid slice"))
-    }
-
-    /**
-        Returns the compressed public key as a byte array.
-    */
-    pub fn as_bytes(&self) -> [u8; 33] {
-        //Len should be 33 (32bytes + sign identifier)
-        self.0.serialize()
-    }
 
     /**
         Extracts the uncompressed public key given the compressed (x-coord + prefix) public key.
@@ -93,19 +95,18 @@ impl PubKey {
         //(65 byte size = 64byte key + 1 byte uncompressed identifier)
         self.0.serialize_uncompressed()
     }
+}
 
-    /**
-       Return the compressed public key as a hex string.
-    */
-    pub fn as_hex(&self) -> String {
-        encode_02x(&self.as_bytes())
+impl Key for PubKey {
+    fn from_slice(byte_array: &[u8]) -> Self {
+        Self(PublicKey::from_slice(byte_array).expect("Invalid slice"))
     }
 
     /**
-       Returns the uncompressed  public key as a hex string.
+        33 bytes
     */
-    pub fn decompressed_hex(&self) -> String {
-        encode_02x(&self.decompressed_bytes())
+    fn as_bytes<const N: usize>(&self) -> [u8; N] {
+        try_into(self.0.serialize()[0..N].to_vec())
     }
 }
 
@@ -124,8 +125,8 @@ impl fmt::Display for PubKey {
 #[cfg(test)]
 mod tests {
     use super::{
-        PrivKey, PubKey,
-        decode_02x
+        PrivKey, PubKey, Key,
+        encode_02x, decode_02x
     };
 
     //The private key to use in tests
@@ -150,7 +151,7 @@ mod tests {
         
 
         //Is the derived public key the same as the expected public key?
-        assert_eq!(derived_public_key.as_hex(), TEST_PUB_KEY_HEX);
+        assert_eq!(encode_02x(&derived_public_key.as_bytes::<33>()), TEST_PUB_KEY_HEX);
 
         //Is the decompressed derived key the same as the decompressed expected key?
         assert_eq!(expected_public_key.decompressed_bytes(), derived_public_key.decompressed_bytes());
@@ -166,7 +167,7 @@ mod tests {
         let expected_compression_prefix = 0x02;
         let expected_uncompressed_prefix = 0x04;
 
-        let derived_compression_prefix = test_key.as_bytes()[0];
+        let derived_compression_prefix = test_key.as_bytes::<33>()[0];
         let derived_uncompressed_prefix = test_key.decompressed_bytes()[0];
 
         //Are the expected prefixes the same for derived uncompressed and compressed test keys.
@@ -181,7 +182,7 @@ mod tests {
 
         //Is the first byte of the compressed key the compression prefix?
         assert!(
-            match test_key.as_bytes()[0] {
+            match test_key.as_bytes::<33>()[0] {
             0x02 => true,
             0x03 => true,
             _ => false

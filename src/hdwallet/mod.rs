@@ -11,22 +11,27 @@
         - Setup the deriveration of child keys
 */
 
+pub mod extended_keys;
+use extended_keys::{
+    ExtendedKey,
+    ExtendedPrivateKey,
+    ExtendedPublicKey
+};
+
 use crate::{
     bip39::mnemonic::Mnemonic as Mnemonic,
     key::{
         PrivKey,
-        PubKey
+        PubKey,
+        Key
     },
-    hash,
-    bs58check,
-    util::try_into
+    hash
 };
 
-pub struct HDWallet {                  //////////////////
-    mnemonic: Mnemonic,                // STRUCTURE IS //
-    pub master_priv_key: PrivKey,      //   NOT FINAL  //
-    pub master_pub_key: PubKey,        //////////////////
-    pub master_chaincode: [u8; 32]
+
+pub struct HDWallet {
+    pub mnemonic: Mnemonic,
+    pub mpriv_key: ExtendedPrivateKey
 }
 
 impl HDWallet {
@@ -34,16 +39,28 @@ impl HDWallet {
         Creates a new HD Wallet structure from mnemonic
     */
     pub fn new(mnemonic: Mnemonic) -> Self {
-        let mprivkey_bytes: [u8; 64] = hash::hmac_sha512(&mnemonic.seed());
-        let master_priv_key: PrivKey = PrivKey::from_slice(&mprivkey_bytes[0..32]);
-        let master_chaincode: [u8; 32] = try_into(mprivkey_bytes[32..64].to_vec());
-        let master_pub_key: PubKey = PubKey::from_priv_key(&master_priv_key);
+        let mprivkey_bytes: [u8; 64] = hash::hmac_sha512(&mnemonic.seed(), b"Bitcoin seed");
+        let mpriv_key: ExtendedPrivateKey = ExtendedPrivateKey::construct(
+        PrivKey::from_slice(&mprivkey_bytes[0..32]),
+        &mprivkey_bytes[32..64]
+        );
 
         Self {
             mnemonic,
-            master_priv_key,
-            master_pub_key,
-            master_chaincode
+            mpriv_key
         }
     }
-}   
+
+    /**
+        Get the master extended public key derived from the master extended private key
+    */
+    pub fn mpub_key(&self) -> ExtendedPublicKey {
+        let privk: PrivKey = PrivKey::from_slice(&self.mpriv_key.key::<32>());
+        let chaincode: [u8; 32] = self.mpriv_key.chaincode();
+        let pubk: PubKey = PubKey::from_priv_key(&privk);
+
+        ExtendedPublicKey::construct(pubk, &chaincode)
+    }
+}
+
+

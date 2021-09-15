@@ -9,7 +9,10 @@ use btc_keyaddress::{
         mnemonic::PhraseLength,
         lang::Language
     },
-    hdwallet::HDWallet,
+    hdwallet::{
+        HDWallet,
+        extended_keys::ExtendedKey
+    } ,
     util::encode_02x
 };
 
@@ -69,9 +72,17 @@ fn verify_bad_phrase() {
 }
 
 fn hdwallet() {
-    let correct_phrase: Vec<&str> = vec!["forget", "arrow", "shadow", "era", "gap", "pretty", "have", "fire", "street", "law", "valve", "sunset"];
-    let phrase: Vec<String> = correct_phrase.iter().map(|x| x.to_string()).collect();
-    let mnemonic = Mnemonic::from_phrase(phrase.join(" "), Language::English, "").unwrap(); //bip39();
-    println!("BIP39 Seed = {}", encode_02x(&mnemonic.seed()));
-    let hdwallet = HDWallet::new(mnemonic);
+    let phrase: String = "glow laugh acquire menu anchor evil occur put hover renew calm purpose".to_string();
+    let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
+    let hdw: HDWallet = HDWallet::new(mnemonic);
+
+    let mpriv_hex = encode_02x(&hdw.mpriv_key.key::<32>());
+    let mpub_hex = encode_02x(&hdw.mpub_key().key::<33>());
+    let mcc_hex = encode_02x(&hdw.mpriv_key.chaincode());
+
+    println!("
+    mpriv: {}\n
+    mpub:  {}\n
+    mcc:   {}\n
+    ", mpriv_hex, mpub_hex, mcc_hex);
 }

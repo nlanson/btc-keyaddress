@@ -1,5 +1,5 @@
 use crate:: {
-    key::PubKey,
+    key::PubKey, key::Key,
     hash,
     bs58check,
     util::try_into
@@ -14,7 +14,7 @@ impl Address {
         * Base58Check( Riped160( Sha256( Public Key ) ) )
     */
     pub fn from_pub_key(pk: &PubKey, compressed: bool) -> String {
-        let mut pubkey_bytes: Vec<u8> = pk.as_bytes().to_vec();
+        let mut pubkey_bytes: Vec<u8> = pk.as_bytes::<33>().to_vec();
         if !compressed { pubkey_bytes = pk.decompressed_bytes().to_vec(); }
         
         let mut hash: Vec<u8> = hash::sha256(&pubkey_bytes).to_vec(); //Initialise variable hash as mutable Vec<u8> and assign the sha256 hash of the public key.
@@ -56,7 +56,7 @@ impl fmt::Display for Address {
 #[cfg(test)]
 mod tests {
     use super::{
-        Address, PubKey
+        Address, PubKey, Key
     };
     use crate::{
         key::PrivKey,
