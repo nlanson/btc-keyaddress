@@ -60,13 +60,9 @@ pub fn pbkdf2_hmacsha512(phrase: &Vec<String>, passphrase: &str) -> [u8; 64] {
     Takes in an byte array input and returns the HMAC-SHA512 hash of it.
 */
 pub fn hmac_sha512(input: &[u8]) -> [u8; 64] {
-    try_into(
-        HmacSha512::new_from_slice(input)
-        .expect("Hmac error")
-        .finalize()
-        .into_bytes()
-        .to_vec()
-    )
+    let mut hmac = HmacSha512::new_from_slice(b"Bitcoin seed").expect("Hmac error");
+    hmac.update(input);
+    try_into(hmac.finalize().into_bytes().to_vec())
 }
 
 #[cfg(test)]

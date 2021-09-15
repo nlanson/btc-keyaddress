@@ -9,7 +9,6 @@
     Based on chapter 4 of the bitcoin book. (https://github.com/bitcoinbook/bitcoinbook/)
 
     Todo:
-     - HMAC-SHA512 tests are not passing.
      - Start implementing HD wallets
         Notes:
             https://learnmeabitcoin.com/technical/hd-wallets
