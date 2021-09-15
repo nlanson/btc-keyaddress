@@ -6,8 +6,8 @@ pub enum VersionPrefix {
     BTCTestNetAddress,
     PrivateKeyWIF,
     //BIP32
-    ExtendedPrivateKey,
-    ExtendedPublicKey,
+    Xprv,
+    Xpub,
     None
 }
 
@@ -25,8 +25,8 @@ pub fn check_encode(prefix: VersionPrefix, data: &[u8]) -> String {
         VersionPrefix::BTCTestNetAddress => vec![0x05],
         VersionPrefix::P2ScriptAddress => vec![0x6F],
         VersionPrefix::PrivateKeyWIF => vec![0x80],
-        VersionPrefix::ExtendedPrivateKey => vec![0x04, 0x88, 0xAD, 0xE4],
-        VersionPrefix::ExtendedPublicKey => vec![0x04, 0x88, 0xB2, 0x1E],
+        VersionPrefix::Xprv => vec![0x04, 0x88, 0xAD, 0xE4],
+        VersionPrefix::Xpub => vec![0x04, 0x88, 0xB2, 0x1E],
         VersionPrefix::None => vec![]
     };
 

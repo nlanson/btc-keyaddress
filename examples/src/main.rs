@@ -76,13 +76,8 @@ fn hdwallet() {
     let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
     let hdw: HDWallet = HDWallet::new(mnemonic);
 
-    let mpriv_hex = encode_02x(&hdw.mpriv_key.key::<32>());
-    let mpub_hex = encode_02x(&hdw.mpub_key().key::<33>());
-    let mcc_hex = encode_02x(&hdw.mpriv_key.chaincode());
-
     println!("
     mpriv: {}\n
-    mpub:  {}\n
-    mcc:   {}\n
-    ", mpriv_hex, mpub_hex, mcc_hex);
+    m/0:   {}\n
+    ", hdw.mpriv_key().serialize(), hdw.mpriv_key().get_child(0, true).serialize());
 }

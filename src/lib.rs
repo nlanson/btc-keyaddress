@@ -14,6 +14,8 @@
             https://learnmeabitcoin.com/technical/hd-wallets
             https://github.com/bitcoinbook/bitcoinbook/blob/develop/ch05.asciidoc
             https://learnmeabitcoin.com/technical/extended-keys
+        
+        Need to investigate why derived keys are not equalling the expected derived key.
      
 */
 
@@ -33,6 +35,7 @@ mod entropy;
 use secp256k1::rand::rngs::OsRng as SecpOsRng; //Seperate rand 0.6.0 OsRng used by Secp256k from rand 0.8.0 OsRng
 use rand::rngs::OsRng;
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
+use num_bigint::{BigInt, Sign};
 use hmac::{Mac, NewMac, Hmac};
 use pbkdf2::pbkdf2;
 use sha2::{Sha256, Sha512, Digest};

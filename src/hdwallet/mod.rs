@@ -12,10 +12,11 @@
 */
 
 pub mod extended_keys;
+pub mod derive_children;
 use extended_keys::{
     ExtendedKey,
-    ExtendedPrivateKey,
-    ExtendedPublicKey
+    Xprv,
+    Xpub
 };
 
 use crate::{
@@ -31,7 +32,7 @@ use crate::{
 
 pub struct HDWallet {
     pub mnemonic: Mnemonic,
-    pub mpriv_key: ExtendedPrivateKey
+    mpriv_key: Xprv
 }
 
 impl HDWallet {
@@ -40,9 +41,12 @@ impl HDWallet {
     */
     pub fn new(mnemonic: Mnemonic) -> Self {
         let mprivkey_bytes: [u8; 64] = hash::hmac_sha512(&mnemonic.seed(), b"Bitcoin seed");
-        let mpriv_key: ExtendedPrivateKey = ExtendedPrivateKey::construct(
+        let mpriv_key: Xprv = Xprv::construct(
         PrivKey::from_slice(&mprivkey_bytes[0..32]),
-        &mprivkey_bytes[32..64]
+        &mprivkey_bytes[32..64],
+        0x00,
+        [0x00; 4],
+        [0x00; 4]
         );
 
         Self {
@@ -52,14 +56,26 @@ impl HDWallet {
     }
 
     /**
+        Returns the stored extended master private key. Wrapped in a method for consistency.
+    */
+    pub fn mpriv_key(&self) -> Xprv {
+        self.mpriv_key.clone()
+    }
+
+    /**
         Get the master extended public key derived from the master extended private key
     */
-    pub fn mpub_key(&self) -> ExtendedPublicKey {
+    pub fn mpub_key(&self) -> Xpub {
         let privk: PrivKey = PrivKey::from_slice(&self.mpriv_key.key::<32>());
         let chaincode: [u8; 32] = self.mpriv_key.chaincode();
         let pubk: PubKey = PubKey::from_priv_key(&privk);
 
-        ExtendedPublicKey::construct(pubk, &chaincode)
+        Xpub::construct(
+            pubk, &chaincode,
+            0x00,
+            [0x00; 4],
+            [0x00; 4]
+        )
     }
 }
 
