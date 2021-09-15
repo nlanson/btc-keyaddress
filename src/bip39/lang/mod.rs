@@ -11,3 +11,14 @@ impl Language {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Language;
+
+    #[test]
+    fn en_word_list_is_2048() {
+        //Tests if the word list consists of 2048 words.
+        assert_eq!(2048, Language::English.word_list().len());
+    }
+}

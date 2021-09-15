@@ -236,5 +236,61 @@ impl fmt::Display for Mnemonic {
 
 #[cfg(test)]
 mod tests {
-    //Need to write unit tests for generating mnemonics and verifying mnemonics
+    use crate::bip39::mnemonic::MnemonicErr;
+
+    use super::{
+        Mnemonic,
+        PhraseLength,
+        lang::Language,
+        util::decode_02x,
+        util::try_into
+    };
+
+    //Test data to use in non-random tests
+    const TEST_PHRASE: &str = "health maximum alcohol orange sugar spin era wash rely abuse liar purse";
+    const TEST_SEED_HEX: &str = "f8b18c71fa530949aa6fba2414777e4c2185dbf7881b878b761a692121a558b9be1ff6a741be7bf6673e5442a72915670afa290a2bfb772d21c3c3e6e0400d81";
+
+    //Create new Mnemonic struct from test data
+    fn test_mnemonic() -> Mnemonic {
+        Mnemonic::from_phrase(TEST_PHRASE.to_string(), Language::English, "").unwrap()
+    }
+
+    #[test]
+    fn mnemonic_tests() {
+        let mnemonic: Mnemonic = test_mnemonic();
+        let expected_seed: [u8;64] = try_into(decode_02x(TEST_SEED_HEX));
+
+        //Check if the seed is 64 bytes and derives properly.
+        assert_eq!(mnemonic.seed.len(), 64);
+        assert_eq!(mnemonic.seed, expected_seed);
+    }
+
+    #[test]
+    fn mnemonic_bad_checksum() {
+        let bad_phrase: Vec<String> = "health maximum alcohol orange sugar spin era wash rely abuse liar govern"
+            .to_string().split_whitespace().collect::<Vec<&str>>().iter().map(|x| x.to_string()).collect();
+        
+        //Verify that the bad_phrase returns ChecksumUnequal
+        let result = match Mnemonic::verify_phrase(&bad_phrase, &Language::English) {
+            Err(MnemonicErr::ChecksumUnequal()) => true,
+            _ => false
+        };
+        
+        assert!(result);
+    }
+
+    #[test]
+    fn random_mnemonic_tests() {
+        //Creates and verifies 5 random mnemonics.
+        //Test fails if one of the random mnemonics fails verification
+        for _i in 0..5 {
+            let mnemonic = Mnemonic::new(PhraseLength::TwentyFour, Language::English, "").unwrap();
+            assert_eq!(
+                Mnemonic::verify_phrase(
+                    &mnemonic.phrase,
+                    &Language::English
+                ).unwrap(), ()
+            )
+        }
+    }
 }
