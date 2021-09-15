@@ -13,6 +13,7 @@
         Notes:
             https://learnmeabitcoin.com/technical/hd-wallets
             https://github.com/bitcoinbook/bitcoinbook/blob/develop/ch05.asciidoc
+            https://learnmeabitcoin.com/technical/extended-keys
             
      - Investigate why Base58 module does not encode ExtendedKey prefixes correctly
             

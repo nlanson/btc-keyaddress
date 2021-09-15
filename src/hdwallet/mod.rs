@@ -5,6 +5,10 @@
     Not for use with the bitcoin main network.
 
     Based on chapter 5 of the bitcoin book. (https://github.com/bitcoinbook/bitcoinbook/)
+
+    Todo:
+        - Think about the structure of the HD Wallet.
+        - Setup the deriveration of child keys
 */
 
 use crate::{
@@ -14,6 +18,7 @@ use crate::{
         PubKey
     },
     hash,
+    bs58check,
     util::try_into
 };
 
@@ -29,7 +34,7 @@ impl HDWallet {
         Creates a new HD Wallet structure from mnemonic
     */
     pub fn new(mnemonic: Mnemonic) -> Self {
-        let mprivkey_bytes: [u8; 64] = hash::hmac_sha512(&mnemonic.seed);
+        let mprivkey_bytes: [u8; 64] = hash::hmac_sha512(&mnemonic.seed());
         let master_priv_key: PrivKey = PrivKey::from_slice(&mprivkey_bytes[0..32]);
         let master_chaincode: [u8; 32] = try_into(mprivkey_bytes[32..64].to_vec());
         let master_pub_key: PubKey = PubKey::from_priv_key(&master_priv_key);

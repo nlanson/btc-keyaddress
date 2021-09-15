@@ -69,7 +69,9 @@ fn verify_bad_phrase() {
 }
 
 fn hdwallet() {
-    let mnemonic = bip39();
-    let phrase = mnemonic.phrase.join(" ");
+    let correct_phrase: Vec<&str> = vec!["forget", "arrow", "shadow", "era", "gap", "pretty", "have", "fire", "street", "law", "valve", "sunset"];
+    let phrase: Vec<String> = correct_phrase.iter().map(|x| x.to_string()).collect();
+    let mnemonic = Mnemonic::from_phrase(phrase.join(" "), Language::English, "").unwrap(); //bip39();
+    println!("BIP39 Seed = {}", encode_02x(&mnemonic.seed()));
     let hdwallet = HDWallet::new(mnemonic);
 }

@@ -10,7 +10,7 @@ use super::{
 
 pub struct Mnemonic {
     pub phrase: Vec<String>,     //The mnemonic phrase
-    pub seed: [u8; 64]           //The seed key (512 bits)
+    pub passphrase: String       //The passphrase
 }
 
 pub enum PhraseLength {
@@ -72,7 +72,7 @@ impl Mnemonic {
         Ok(
             Self {
             phrase: phrase.clone(),
-            seed: hash::pbkdf2_hmacsha512(&phrase, &passphrase)
+            passphrase: passphrase.to_string()
             }
         )
     }
@@ -95,7 +95,7 @@ impl Mnemonic {
          Ok(
             Self {
                 phrase: words,
-                seed
+                passphrase: passphrase.to_string()
             }
         )
     }
@@ -151,6 +151,18 @@ impl Mnemonic {
         if calculated_checksum == extracted_checksum { return Ok(()) }
 
         Err(MnemonicErr::ChecksumUnequal())
+    }
+
+    /**
+        This method returns the seed of the mnemonic phrase.
+
+        This is done by passing the phrase and passphrase through
+        a key stretching function PBKDF2.
+
+        This seed is used by BIP32 as the root seed.
+    */
+    pub fn seed(&self) -> [u8; 64] {
+        hash::pbkdf2_hmacsha512(&self.phrase, &self.passphrase)
     }
 
     /**
@@ -265,9 +277,9 @@ mod tests {
         let expected_seed_with_passphrase: [u8; 64] = try_into(decode_02x(TEST_SEED_HEX_WITH_PASS));
 
         //Check if the seed is 64 bytes and derives properly.
-        assert_eq!(mnemonic_no_passphrase.seed.len(), 64);
-        assert_eq!(mnemonic_no_passphrase.seed, expected_seed_without_passphrase);
-        assert_eq!(mnemonic_with_passphrase.seed, expected_seed_with_passphrase);
+        assert_eq!(mnemonic_no_passphrase.seed().len(), 64);
+        assert_eq!(mnemonic_no_passphrase.seed(), expected_seed_without_passphrase);
+        assert_eq!(mnemonic_with_passphrase.seed(), expected_seed_with_passphrase);
     }
 
     #[test]
