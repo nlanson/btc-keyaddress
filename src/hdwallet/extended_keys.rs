@@ -17,7 +17,7 @@ use crate::{
         check_encode,
         VersionPrefix
     },
-    hdwallet::derive_children,
+    hdwallet::child_key_deriveration,
     util::try_into
 };
 
@@ -27,7 +27,7 @@ pub struct Xprv {
     chaincode: [u8; 32],
     pub depth: u8,
     pub parent_fingerprint: [u8; 4],
-    pub child_number: [u8; 4]
+    pub index: [u8; 4]
 }
 
 #[derive(Clone)]
@@ -36,14 +36,14 @@ pub struct Xpub {
     chaincode: [u8; 32],
     pub depth: u8,
     pub parent_fingerprint: [u8; 4],
-    pub child_number: [u8; 4]
+    pub index: [u8; 4]
 }
 
 pub trait ExtendedKey {
     /**
         Constructs the Extended Key.
     */
-    fn construct<T: 'static>(key: T, chaincode: &[u8], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self
+    fn construct<T: 'static>(key: T, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self
     where T: Key;
 
     /**
@@ -63,17 +63,17 @@ pub trait ExtendedKey {
 }
 
 impl ExtendedKey for Xprv {
-    fn construct<T: 'static>(key: T, chaincode: &[u8], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self 
+    fn construct<T: 'static>(key: T, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self 
     where T: Key
     {
         if TypeId::of::<T>() == TypeId::of::<PrivKey>() {
             return Self {
                 key: PrivKey::from_slice(&key.as_bytes::<32>()),
-                chaincode: try_into(chaincode.to_vec()),
+                chaincode: chaincode,
                 //Serialisation info
                 depth: depth,
                 parent_fingerprint: pf,
-                child_number: index
+                index: index
             }
         } else { panic!("Tried to create extended private key without using PrivKey") }
     }
@@ -91,12 +91,12 @@ impl ExtendedKey for Xprv {
 
     fn serialize(&self) -> String {
         let mut payload: Vec<u8> = vec![];
-        payload.push(self.depth);
-        self.parent_fingerprint.iter().for_each(|x| payload.push(*x));
-        self.child_number.iter().for_each(|x| payload.push(*x));
-        self.chaincode().iter().for_each(|x| payload.push(*x));
-        payload.push(0x00);
-        self.key::<32>().iter().for_each(|x| payload.push(*x));
+        payload.push(self.depth); //depth
+        self.parent_fingerprint.iter().for_each(|x| payload.push(*x)); //fingerprint
+        self.index.iter().for_each(|x| payload.push(*x)); //index
+        self.chaincode().iter().for_each(|x| payload.push(*x)); //chaincode
+        payload.push(0x00); //private key append 0x00
+        self.key::<32>().iter().for_each(|x| payload.push(*x)); //private key
         
         check_encode(VersionPrefix::Xprv,&payload)
     }
@@ -115,22 +115,22 @@ impl Xprv {
         Gets the child key of Self
     */
     pub fn get_child(&self, index: u32, harden: bool) -> Xprv {
-        derive_children::derive_xprv(self, index, harden)
+        child_key_deriveration::derive_xprv(self, index, harden)
     }
 }
 
 impl ExtendedKey for Xpub {
-    fn construct<T: 'static>(key: T, chaincode: &[u8], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self 
+    fn construct<T: 'static>(key: T, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self 
     where T: Key
     {
         if TypeId::of::<T>() == TypeId::of::<PubKey>() {
             return Self {
                 key: PubKey::from_slice(&key.as_bytes::<33>()),
-                chaincode: try_into(chaincode.to_vec()),
+                chaincode: chaincode,
                 //Serialisation info
                 depth: depth,
                 parent_fingerprint: pf,
-                child_number: index
+                index: index
             }
         } else { panic!("Tried to create extended public key without using PubKey") }
     }
@@ -148,11 +148,11 @@ impl ExtendedKey for Xpub {
 
     fn serialize(&self) -> String {
         let mut payload: Vec<u8> = vec![];
-        payload.push(self.depth);
-        self.parent_fingerprint.iter().for_each(|x| payload.push(*x));
-        self.child_number.iter().for_each(|x| payload.push(*x));
-        self.chaincode().iter().for_each(|x| payload.push(*x));
-        self.key::<33>().iter().for_each(|x| payload.push(*x));
+        payload.push(self.depth); //depth
+        self.parent_fingerprint.iter().for_each(|x| payload.push(*x)); //parent fingerprint
+        self.index.iter().for_each(|x| payload.push(*x)); //index
+        self.chaincode().iter().for_each(|x| payload.push(*x)); //chaincode
+        self.key::<33>().iter().for_each(|x| payload.push(*x)); //public key
         
         check_encode(VersionPrefix::Xpub,&payload)
     }
@@ -165,6 +165,7 @@ mod tests {
             decode_02x
         }};
 
+    //Data generated on leanrmeabitcoin.com/technical/hd-wallets
     const TEST_MNEMONIC: &str = "glow laugh acquire menu anchor evil occur put hover renew calm purpose";
     const TEST_MPRIV: &str = "081549973bafbba825b31bcc402a3c4ed8e3185c2f3a31c75e55f423e9629aa3";
     const TEST_MCC: &str = "1d7d2a4c940be028b945302ad79dd2ce2afe5ed55e1a2937a5af57f8401e73dd";

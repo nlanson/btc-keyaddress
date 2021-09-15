@@ -8,6 +8,7 @@ use super::{
     lang
 };
 
+#[derive(Clone)]
 pub struct Mnemonic {
     pub phrase: Vec<String>,     //The mnemonic phrase
     pub passphrase: String       //The passphrase

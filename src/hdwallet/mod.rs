@@ -12,7 +12,7 @@
 */
 
 pub mod extended_keys;
-pub mod derive_children;
+pub mod child_key_deriveration;
 use extended_keys::{
     ExtendedKey,
     Xprv,
@@ -26,7 +26,8 @@ use crate::{
         PubKey,
         Key
     },
-    hash
+    hash,
+    util::try_into
 };
 
 
@@ -43,7 +44,7 @@ impl HDWallet {
         let mprivkey_bytes: [u8; 64] = hash::hmac_sha512(&mnemonic.seed(), b"Bitcoin seed");
         let mpriv_key: Xprv = Xprv::construct(
         PrivKey::from_slice(&mprivkey_bytes[0..32]),
-        &mprivkey_bytes[32..64],
+        try_into(mprivkey_bytes[32..64].to_vec()),
         0x00,
         [0x00; 4],
         [0x00; 4]
@@ -71,7 +72,7 @@ impl HDWallet {
         let pubk: PubKey = PubKey::from_priv_key(&privk);
 
         Xpub::construct(
-            pubk, &chaincode,
+            pubk, chaincode,
             0x00,
             [0x00; 4],
             [0x00; 4]

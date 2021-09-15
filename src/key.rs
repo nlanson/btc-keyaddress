@@ -9,7 +9,6 @@ use crate::{
     util::try_into
 };
 use std::fmt;
-use bitcoin_hashes::hex::ToHex;
 
 /**
     Define methods shared by Public and Private keys.
@@ -71,7 +70,7 @@ impl Key for PrivKey {
         32 bytes
     */
     fn as_bytes<const N: usize>(&self) -> [u8; N] {
-        let hex = self.0.to_hex();
+        let hex = self.0.to_string();
         try_into(decode_02x(&hex[..]))
     }
 }

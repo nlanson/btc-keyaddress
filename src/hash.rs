@@ -10,7 +10,16 @@ use crate::{
     util::try_into
 };
 
-/*
+/**
+    Takes in a byte array and returns ripemd160(sha256(input)) 
+*/
+pub fn hash160<T>(input: T) -> [u8; 20] 
+where T: AsRef<[u8]>
+{
+    ripemd160(sha256(input))
+}
+
+/**
     Takes in an byte array and returns the ripemd160 hash of it as a byte array of length 20
 */
 pub fn ripemd160<T>(input: T) -> [u8; 20]
@@ -21,7 +30,7 @@ where T: AsRef<[u8]>
     try_into(r.finalize().to_vec())
 }
 
-/*
+/**
     Takes in a byte array and returns the sha256 hash of it as a byte array of length 32
 */
 pub fn sha256<T>(input: T) -> [u8; 32]
@@ -32,7 +41,7 @@ where T: AsRef<[u8]>
     try_into(r.finalize().to_vec())
 }
 
-/*
+/**
     Key deriveration function that takes in a mnemonic phrase and passphrase to produce
     a 512 bit seed.
 */ 

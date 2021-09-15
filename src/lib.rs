@@ -14,8 +14,12 @@
             https://learnmeabitcoin.com/technical/hd-wallets
             https://github.com/bitcoinbook/bitcoinbook/blob/develop/ch05.asciidoc
             https://learnmeabitcoin.com/technical/extended-keys
+     
+     -  When applying the addition arithmatic in deriving child private keys,
+        if the sum of the addition is 33 bytes, the resulting private key is
+        incorrect.
         
-        Need to investigate why derived keys are not equalling the expected derived key.
+        
      
 */
 
