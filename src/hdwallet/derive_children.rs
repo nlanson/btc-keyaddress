@@ -25,17 +25,15 @@ use crate::{
 
     *NOT WORKING
 */
-pub fn derive_xprv(parent: &Xprv, index: u32,  hardened: bool) -> Xprv {
+pub fn derive_xprv(parent: &Xprv, index: u32,  harden: bool) -> Xprv {
     //If hardend, use private key as data. Else use public key as data.
     let mut index = index;
-    let mut data = parent.get_pub().as_bytes(); //use public key bytes
-    if hardened {
-        data = parent.key::<32>(); //use private key bytes
+    let mut data: Vec<u8> = parent.get_pub().as_bytes::<33>().to_vec(); //use public key bytes
+    if harden {
+        data = parent.key::<32>().to_vec(); //use private key bytes
         index += 2147483648;       //add 2^31 to index
     }
-    
     let index = index.to_be_bytes(); //convert index back into byte array.
-    let mut data = data.to_vec();
     index.iter().for_each(|x| data.push(*x));
 
     //Run data and key through HMAC-SHA512

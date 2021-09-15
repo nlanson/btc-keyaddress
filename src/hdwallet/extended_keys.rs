@@ -115,7 +115,7 @@ impl Xprv {
         Gets the child key of Self
     */
     pub fn get_child(&self, index: u32, harden: bool) -> Xprv {
-        derive_children::derive_xprv(self, 0, false)
+        derive_children::derive_xprv(self, index, harden)
     }
 }
 
@@ -198,5 +198,21 @@ mod tests {
             );
             assert_eq!(hdw.mpub_key().chaincode().len(), 32);
         }
+    }
+
+    #[test]
+    fn serialize_extended_keys() {
+        let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
+        let hdw: HDWallet = HDWallet::new(mnemonic);
+
+        //master xprv serialization test
+        assert_eq!(hdw.mpriv_key().serialize(), 
+        "xprv9s21ZrQH143K2MPKHPWh91wRxLKehoCNsRrwizj2xNaj9zD5SHMNiHJesDEYgJAavgNE1fDWLgYNneHeSA8oVeVXVYomhP1wxdzZtKsLJbc".to_string()
+        );
+
+        //master xpub serialization test
+        assert_eq!(hdw.mpub_key().serialize(),
+        "xpub661MyMwAqRbcEqTnPR3hW9tAWNA97FvEEenYXP8eWi7i2nYDypfdG5d8iWfK8YgesKi2EE5mk9THcTqnveDWwZVMuctjmxeEaUKgtg7CEEc".to_string()
+        );
     }
 }

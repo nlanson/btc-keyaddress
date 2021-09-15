@@ -79,5 +79,5 @@ fn hdwallet() {
     println!("
     mpriv: {}\n
     m/0:   {}\n
-    ", hdw.mpriv_key().serialize(), hdw.mpriv_key().get_child(0, true).serialize());
+    ", hdw.mpriv_key().serialize(), hdw.mpriv_key().get_child(0, false).serialize());
 }
