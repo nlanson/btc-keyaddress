@@ -9,16 +9,16 @@
     Based on chapter 4 of the bitcoin book. (https://github.com/bitcoinbook/bitcoinbook/)
 
     Todo:
-     - Start implementing HD wallets, specifically the deriveration of child keys.
+     - Derive child public keys
         Notes:
-            https://learnmeabitcoin.com/technical/hd-wallets
-            https://github.com/bitcoinbook/bitcoinbook/blob/develop/ch05.asciidoc
-            https://learnmeabitcoin.com/technical/extended-keys
-     
-     -  When applying the addition arithmatic in deriving child private keys,
-        if the sum of the addition is 33 bytes, the resulting private key is
-        incorrect.
-        
+            https://github.com/rust-bitcoin/rust-bitcoin/blob/master/src/util/bip32.rs
+   
+     - Make the following files cleaner and error handling easier: (Error enums etc...)
+            - key.rs
+            - child_key_deriveration.rs
+            - extended_keys.rs
+            - hdwallet/mod.rs
+            - bs58check.rs
         
      
 */
@@ -39,7 +39,7 @@ mod entropy;
 use secp256k1::rand::rngs::OsRng as SecpOsRng; //Seperate rand 0.6.0 OsRng used by Secp256k from rand 0.8.0 OsRng
 use rand::rngs::OsRng;
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
-use num_bigint::{BigInt, Sign};
+use num_bigint::BigUint;
 use hmac::{Mac, NewMac, Hmac};
 use pbkdf2::pbkdf2;
 use sha2::{Sha256, Sha512, Digest};

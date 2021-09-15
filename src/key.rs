@@ -25,6 +25,10 @@ pub trait Key {
     fn as_bytes<const N: usize>(&self) -> [u8; N];
 }
 
+enum Error {
+    KeyError(String)
+}
+
 /*
     Define the tuple structs PrivKey and PubKey.
 
@@ -57,6 +61,10 @@ impl PrivKey {
         }
         
         bs58check::check_encode(bs58check::VersionPrefix::PrivateKeyWIF, &key)
+    }
+
+    pub fn add_assign(&mut self, other: &[u8]) {
+        self.0.add_assign(other);
     }
 }
 
