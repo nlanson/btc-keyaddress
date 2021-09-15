@@ -52,3 +52,56 @@ impl fmt::Display for Address {
         write!(f, "{}", self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        Address, PubKey
+    };
+    use crate::{
+        key::PrivKey,
+        util::decode_02x
+    };
+
+    const TEST_PUB_KEY_HEX: &str = "0204664c60ceabd82967055ccbd0f56a1585dfbd42032656efa501c463b16fbdfe";
+
+    fn test_pub_key() -> PubKey {
+        PubKey::from_slice(&decode_02x(TEST_PUB_KEY_HEX))
+    }
+
+    #[test]
+    fn bitcoin_address_tests() {
+        let test_pubk: PubKey = test_pub_key();
+        let expected_compressed_address: &str =  "124ERAK4SqHMNWXycHPautn5zDYRKr3b2E";
+        let expected_uncompressed_address: &str = "1GK8NbKAtt6QvqeVMGkdbXVu9qtw74oxPz";
+
+        let derived_compressed_address = Address::from_pub_key(&test_pubk, true);
+        let derived_uncompressed_address = Address::from_pub_key(&test_pubk, false);
+
+        //Test if the expeted and derived keys are equal
+        assert_eq!(expected_compressed_address, derived_compressed_address);
+        assert_eq!(expected_uncompressed_address, derived_uncompressed_address);
+    }
+
+    #[test]
+    fn random_bitcoin_address_tests() {
+        let rand_k:PrivKey = PrivKey::new_rand();
+        let pubk: PubKey = PubKey::from_priv_key(&rand_k);
+        let compressed_address = Address::from_pub_key(&pubk, true);
+        let uncompressed_address = Address::from_pub_key(&pubk, false);
+
+        //Test if the leading prefix of the address is '1'
+        assert!(
+            match compressed_address.chars().nth(0) {
+                Some('1') => true,
+                _ => false
+            }
+        );
+        assert!(
+            match uncompressed_address.chars().nth(0) {
+                Some('1') => true,
+                _ => false
+            }
+        );
+    }
+}

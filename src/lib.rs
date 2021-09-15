@@ -9,9 +9,12 @@
     Based on chapter 4 of the bitcoin book. (https://github.com/bitcoinbook/bitcoinbook/)
 
     Todo:
+     - Check if Mnemonic root seed is correct (Is PBKDF2 working?)
+     - Check if master private key and it's chain code is correct (is HMAC-SHA512 working?)
      - Start implementing HD wallets
         Notes:
             https://learnmeabitcoin.com/technical/hd-wallets
+            https://github.com/bitcoinbook/bitcoinbook/blob/develop/ch05.asciidoc
             
      - Investigate why Base58 module does not encode ExtendedKey prefixes correctly
             
@@ -51,10 +54,4 @@ mod tests {
     //     key::PrivKey,
     //     address::Address
     // };
-
-    //Tests unimplemented
-    #[test]
-    fn tests_work() {
-        assert!(2+2 == 4)
-    }
 }
