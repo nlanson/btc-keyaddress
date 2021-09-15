@@ -9,8 +9,7 @@
     Based on chapter 4 of the bitcoin book. (https://github.com/bitcoinbook/bitcoinbook/)
 
     Todo:
-     - Check if Mnemonic root seed is correct (Is PBKDF2 working?)
-     - Check if master private key and it's chain code is correct (is HMAC-SHA512 working?)
+     - HMAC-SHA512 tests are not passing.
      - Start implementing HD wallets
         Notes:
             https://learnmeabitcoin.com/technical/hd-wallets
@@ -41,17 +40,3 @@ use pbkdf2::pbkdf2;
 use sha2::{Sha256, Sha512, Digest};
 use ripemd160::Ripemd160;
 use bs58;
-
-
-/**
-    Tests aren't implemented yet.
-*/
-#[cfg(test)]
-mod tests {
-    // use sha2::{Sha256, Digest};
-    // use crate::{
-    //     key::PubKey,
-    //     key::PrivKey,
-    //     address::Address
-    // };
-}

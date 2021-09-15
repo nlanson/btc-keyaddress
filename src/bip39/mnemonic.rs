@@ -247,22 +247,27 @@ mod tests {
     };
 
     //Test data to use in non-random tests
-    const TEST_PHRASE: &str = "health maximum alcohol orange sugar spin era wash rely abuse liar purse";
-    const TEST_SEED_HEX: &str = "f8b18c71fa530949aa6fba2414777e4c2185dbf7881b878b761a692121a558b9be1ff6a741be7bf6673e5442a72915670afa290a2bfb772d21c3c3e6e0400d81";
+    const TEST_PHRASE: &str = "army van defense carry jealous true garbage claim echo media make crunch";
+    const PASSPHRASE: &str = "SuperDuperSecret";
+    const TEST_SEED_HEX_NO_PASS: &str = "5b56c417303faa3fcba7e57400e120a0ca83ec5a4fc9ffba757fbe63fbd77a89a1a3be4c67196f57c39a88b76373733891bfaba16ed27a813ceed498804c0570";
+    const TEST_SEED_HEX_WITH_PASS: &str = "3b5df16df2157104cfdd22830162a5e170c0161653e3afe6c88defeefb0818c793dbb28ab3ab091897d0715861dc8a18358f80b79d49acf64142ae57037d1d54";
 
     //Create new Mnemonic struct from test data
-    fn test_mnemonic() -> Mnemonic {
-        Mnemonic::from_phrase(TEST_PHRASE.to_string(), Language::English, "").unwrap()
+    fn test_mnemonic(passphrase: &str) -> Mnemonic {
+        Mnemonic::from_phrase(TEST_PHRASE.to_string(), Language::English, passphrase).unwrap()
     }
 
     #[test]
     fn mnemonic_tests() {
-        let mnemonic: Mnemonic = test_mnemonic();
-        let expected_seed: [u8;64] = try_into(decode_02x(TEST_SEED_HEX));
+        let mnemonic_no_passphrase: Mnemonic = test_mnemonic("");
+        let mnemonic_with_passphrase: Mnemonic = test_mnemonic(PASSPHRASE);
+        let expected_seed_without_passphrase: [u8; 64] = try_into(decode_02x(TEST_SEED_HEX_NO_PASS));
+        let expected_seed_with_passphrase: [u8; 64] = try_into(decode_02x(TEST_SEED_HEX_WITH_PASS));
 
         //Check if the seed is 64 bytes and derives properly.
-        assert_eq!(mnemonic.seed.len(), 64);
-        assert_eq!(mnemonic.seed, expected_seed);
+        assert_eq!(mnemonic_no_passphrase.seed.len(), 64);
+        assert_eq!(mnemonic_no_passphrase.seed, expected_seed_without_passphrase);
+        assert_eq!(mnemonic_with_passphrase.seed, expected_seed_with_passphrase);
     }
 
     #[test]

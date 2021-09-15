@@ -25,7 +25,7 @@ pub fn check_encode(prefix: VersionPrefix, data: &[u8]) -> String {
         VersionPrefix::BTCTestNetAddress => vec![0x05],
         VersionPrefix::P2ScriptAddress => vec![0x6F],
         VersionPrefix::PrivateKeyWIF => vec![0x80],
-        VersionPrefix::ExtendedPrivateKey => vec![4, 136, 173, 228],
+        VersionPrefix::ExtendedPrivateKey => vec![0x04, 0x88, 0xAD, 0xE4],
         VersionPrefix::None => vec![]
     };
 

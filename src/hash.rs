@@ -68,3 +68,27 @@ pub fn hmac_sha512(input: &[u8]) -> [u8; 64] {
         .to_vec()
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util;
+
+    #[test]
+    fn root_seed_to_master_private_key_hmacsha512() {
+        let root_seed: [u8; 64] = util::try_into(
+            util::decode_02x("2e0adf79611c4e090ce5447b49dd7c77d0c1d40817ff648003cb873476f066385bf2284f041f4f06b27721675d84dfca3e0f68626b237aa68cd6be59376afb8c")
+        );
+        let expected_privkey_hex: &str = "24c13dbb3dc8eeec336b1f815fbd7dfd6d346e1f7b6e05df75d631a3cf90eca6";
+        let expected_chaincode_hex: &str = "38baff3d60afe4a6da62c7bde576c0e564b9735aa89c46bebb14af48a86f9417";
+
+        let extended_key: [u8; 64] = hmac_sha512(&root_seed);
+        let pk: [u8; 32] = util::try_into(extended_key[0..32].to_vec());
+        let pk_hex: &str = &util::encode_02x(&pk);
+        let cc: [u8; 32] = util::try_into(extended_key[32..64].to_vec());
+        let cc_hex: &str = &util::encode_02x(&cc);
+
+        assert_eq!(expected_privkey_hex, pk_hex);
+        assert_eq!(expected_chaincode_hex, cc_hex);
+    }
+}
