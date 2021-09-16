@@ -25,8 +25,7 @@ pub trait Key {
         Create a new instance of Self from a u8 slice.
     */
     fn from_slice(byte_array: &[u8]) -> Result<Self, Error>
-    where Self: Sized
-    ;
+    where Self: Sized;
 
     /**
         Return self as a byte array.
@@ -120,6 +119,16 @@ impl PubKey {
     pub fn decompressed_bytes(&self) -> [u8; 65] {
         //(65 byte size = 64byte key + 1 byte uncompressed identifier)
         self.0.serialize_uncompressed()
+    }
+
+    pub fn add_assign(&mut self, other: &[u8]) -> Result<(), Error> {
+        //self.0.combine(&PubKey::from_slice(&other).unwrap().raw()).unwrap();
+        self.0.add_exp_assign(&Secp256k1::new(), other).unwrap();
+        Ok(())
+    }
+
+    fn raw(&self) -> PublicKey {
+        self.0
     }
 }
 

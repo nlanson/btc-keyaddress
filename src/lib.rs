@@ -1,12 +1,18 @@
 /*
-    Wrapper around the rust-secp256k1 library to 
-    create random private keys, public keys and
-    addresses in both compressed and uncompressed
-    format.
+    Library to create non-deterministic and 
+    deterministic keys and addresses for Bitcoin.
 
     Not for use with the bitcoin main network.
 
-    Based on chapter 4 of the bitcoin book. (https://github.com/bitcoinbook/bitcoinbook/)
+    References:
+        - The Bitcoin Book (https://github.com/bitcoinbook/bitcoinbook/)
+            most of the general concepts come from here
+        
+        - learn me a bitcoin (https://learnmeabitcoin.com/)
+            for great visualisation of the concepts inroduced in the book
+
+        - The Rust-Bitcoin repository (https://github.com/rust-bitcoin/rust-bitcoin)
+            for providing clear reference code to work against, especially with bip32.
 
     Todo:
      - Derive child public keys

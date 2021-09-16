@@ -35,14 +35,18 @@ pub enum ChildOptions {
 /**
     Enum for handling deriveration errors
 */
+#[derive(Debug)]
 pub enum Error {
     IndexTooLarge(String),
-    IndexReserved(String)
+    IndexReserved(String),
+    CantHarden()
 }
 
 /**
     Function to derive new child xprv keys from parent xprv keys.
     Use the hardened bool to generated hardened child xprv.
+
+    Xprv -> Xprv
 */
 pub fn derive_xprv(parent: &Xprv, options: ChildOptions) -> Result<Xprv, Error> {
     //Assign the index and data based on ChildOptions
@@ -99,6 +103,60 @@ pub fn derive_xprv(parent: &Xprv, options: ChildOptions) -> Result<Xprv, Error> 
     //Return the new Xpriv
     Ok(
         Xprv::construct(
+            child_key,
+            child_chaincode,
+            depth,
+            fingerprint,
+            index
+        )
+    )
+}
+
+/** 
+    Function to derive new chilc xpub keys from parnent xpub keys.
+
+    Xpub -> Xpub
+*/
+pub fn derive_xpub(parent: &Xpub, options: ChildOptions) -> Result<Xpub, Error> {
+    //Extract the index from the options.
+    //if the options specify hardened, then return an error
+    let index: u32 = match options {
+        ChildOptions::Hardened(x) => return Err(Error::CantHarden()),
+        ChildOptions::Normal(x) => {
+            if x >= (2 as u32).pow(31) {
+                return Err(Error::IndexTooLarge(
+                    format!("Expected provided index to be less than 2^31. Found {}", x)
+                ));
+            }
+            x
+        }
+    };
+
+    //Create the data Vec from the parent public key and index
+    let mut data: Vec<u8> = vec![];
+    parent.key::<33>().iter().for_each(|x| data.push(*x));
+    index.to_be_bytes().iter().for_each(|x| data.push(*x));
+
+    //hash the data with the parent chaincode as the key
+    let hash: [u8; 64] = hmac_sha512(&data, &parent.chaincode());
+
+    //split the hash into two halves. The right half is the child chaincode.
+    let left_bytes: [u8; 32] = try_into(hash[0..32].to_vec());
+    let child_chaincode: [u8; 32] = try_into(hash[32..64].to_vec());
+
+    //Add the parent public key to the left bytes to get the final child key
+    let mut child_key: PubKey = PubKey::from_slice(&parent.key::<33>()).unwrap();
+    let sk: PrivKey = PrivKey::from_slice(&left_bytes).unwrap();
+    child_key.add_assign(&sk.as_bytes::<32>()[..]).unwrap();
+
+
+    //Set the remaining meta data
+    let depth = parent.depth + 1;
+    let fingerprint: [u8; 4] = try_into(hash160(&parent.key::<33>())[0..4].to_vec());
+    let index = index.to_be_bytes();
+
+    Ok(
+        Xpub::construct(
             child_key,
             child_chaincode,
             depth,

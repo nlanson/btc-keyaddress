@@ -6,7 +6,7 @@
     are the keys and the last 32 bytes is the chaincode.
 */
 
-use std::any::TypeId;
+use std::{any::TypeId, process::Child};
 use crate::{
     key::{
         PrivKey,
@@ -17,9 +17,13 @@ use crate::{
         check_encode,
         VersionPrefix
     },
-    hdwallet::ckd::{
-        derive_xprv,
-        ChildOptions
+    hdwallet::{
+        ckd::{
+            derive_xprv,
+            derive_xpub,
+            ChildOptions
+        },
+        ckd
     },
     util::try_into
 };
@@ -28,6 +32,7 @@ use crate::{
 pub struct Xprv {
     key: PrivKey,
     chaincode: [u8; 32],
+    //parent: Option<&'static Xprv>,
     pub depth: u8,
     pub parent_fingerprint: [u8; 4],
     pub index: [u8; 4]
@@ -63,6 +68,12 @@ pub trait ExtendedKey {
         Base58 check encode the extended key with serialisation info.
     */
     fn serialize(&self) -> String;
+
+    /**
+        Derives the child key of self
+    */
+    fn get_xchild(&self, options: ChildOptions) -> Result<Self, ckd::Error>
+    where Self: Sized;
 }
 
 impl ExtendedKey for Xprv {
@@ -103,6 +114,13 @@ impl ExtendedKey for Xprv {
         
         check_encode(VersionPrefix::Xprv,&payload)
     }
+
+    fn get_xchild(&self, options: ChildOptions) -> Result<Xprv, ckd::Error> {
+        match derive_xprv(self, options) {
+            Ok(x) => Ok(x),
+            Err(x) => Err(x)
+        }
+    }
     
 }
 
@@ -113,16 +131,7 @@ impl Xprv {
     pub fn get_pub(&self) -> PubKey {
         PubKey::from_priv_key(&PrivKey::from_slice(&self.key::<32>()).unwrap())
     }
-
-    /**
-        Gets the child key of Self
-    */
-    pub fn get_child(&self, options: ChildOptions) -> Xprv {
-        match derive_xprv(self, options) {
-            Ok(x) => x,
-            Err(x) => panic!("{}", x)
-        }
-    }
+    
 }
 
 impl ExtendedKey for Xpub {
@@ -161,6 +170,13 @@ impl ExtendedKey for Xpub {
         self.key::<33>().iter().for_each(|x| payload.push(*x)); //public key
         
         check_encode(VersionPrefix::Xpub,&payload)
+    }
+
+    fn get_xchild(&self, options: ChildOptions) -> Result<Xpub, ckd::Error> {
+        match derive_xpub(self, options) {
+            Ok(x) => Ok(x),
+            Err(x) => Err(x)
+        }
     }
 }
 

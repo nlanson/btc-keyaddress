@@ -76,7 +76,8 @@ impl fmt::Display for ckd::Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let val = match self {
             Self::IndexTooLarge(x) => x,
-            Self::IndexReserved(x) => x
+            Self::IndexReserved(x) => x,
+            Self::CantHarden() => "cannot produce hardened child public key"
         };
         
         write!(f, "{}", val)
