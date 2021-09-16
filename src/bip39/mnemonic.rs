@@ -1,4 +1,3 @@
-use std::fmt;
 use crate::{
     hash,
     util,
@@ -214,36 +213,6 @@ impl Mnemonic {
         };
 
         Ok(appended)
-    }
-}
-
-/*
-    Trait implementations for MnemonicErr and Mnemonic to display and debug.
-*/
-impl fmt::Display for MnemonicErr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let val: String = match self {
-            Self::ChecksumUnequal() => "Bad checksum".to_string(),
-            Self::InvalidBits(x) => x.to_string(),
-            Self::InvalidWord(x) => x.to_string(),
-            Self::InvalidChecksumLen(x) => x.to_string()
-        };
-        
-        write!(f, "{}", val)
-    }
-}
-
-impl fmt::Debug for MnemonicErr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MnemonicErr")
-         .field("Err:", &self)
-         .finish()
-    }
-}
-
-impl fmt::Display for Mnemonic {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {        
-        write!(f, "{}", self)
     }
 }
 

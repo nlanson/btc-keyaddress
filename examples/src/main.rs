@@ -11,9 +11,9 @@ use btc_keyaddress::{
     },
     hdwallet::{
         HDWallet,
+        ckd::ChildOptions,
         extended_keys::ExtendedKey
-    } ,
-    util::encode_02x
+    }
 };
 
 fn main() {
@@ -73,8 +73,8 @@ fn verify_bad_phrase() {
 
 fn hdwallet() {
     let phrase: String = "glow laugh acquire menu anchor evil occur put hover renew calm purpose".to_string();
-    //let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
-    let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
+    let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
+    //let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
     let hdw: HDWallet = HDWallet::new(mnemonic.clone());
 
     println!("
@@ -84,7 +84,7 @@ fn hdwallet() {
     m/0':  {}\n
     ", mnemonic.phrase.join(" "),
        hdw.mpriv_key().serialize(),
-       hdw.mpriv_key().get_child(0, false).serialize(),
-       hdw.mpriv_key().get_child(0, true).serialize()
+       hdw.mpriv_key().get_child(ChildOptions::Normal(0)).serialize(),
+       hdw.mpriv_key().get_child(ChildOptions::Hardened(0)).serialize()
     );
 }

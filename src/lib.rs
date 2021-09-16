@@ -14,11 +14,8 @@
             https://github.com/rust-bitcoin/rust-bitcoin/blob/master/src/util/bip32.rs
    
      - Make the following files cleaner and error handling easier: (Error enums etc...)
-            - key.rs
-            - child_key_deriveration.rs
             - extended_keys.rs
             - hdwallet/mod.rs
-            - bs58check.rs
         
      
 */
@@ -34,12 +31,12 @@ mod hash;
 mod bs58check;
 pub mod util;
 mod entropy;
+mod impls;
 
 //Dependencies
 use secp256k1::rand::rngs::OsRng as SecpOsRng; //Seperate rand 0.6.0 OsRng used by Secp256k from rand 0.8.0 OsRng
 use rand::rngs::OsRng;
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
-use num_bigint::BigUint;
 use hmac::{Mac, NewMac, Hmac};
 use pbkdf2::pbkdf2;
 use sha2::{Sha256, Sha512, Digest};

@@ -17,7 +17,10 @@ use crate::{
         check_encode,
         VersionPrefix
     },
-    hdwallet::child_key_deriveration,
+    hdwallet::ckd::{
+        derive_xprv,
+        ChildOptions
+    },
     util::try_into
 };
 
@@ -68,7 +71,7 @@ impl ExtendedKey for Xprv {
     {
         if TypeId::of::<T>() == TypeId::of::<PrivKey>() {
             return Self {
-                key: PrivKey::from_slice(&key.as_bytes::<32>()),
+                key: PrivKey::from_slice(&key.as_bytes::<32>()).unwrap(),
                 chaincode: chaincode,
                 //Serialisation info
                 depth: depth,
@@ -108,14 +111,17 @@ impl Xprv {
         Return the public key of the private key in the Xprv.
     */
     pub fn get_pub(&self) -> PubKey {
-        PubKey::from_priv_key(&PrivKey::from_slice(&self.key::<32>()))
+        PubKey::from_priv_key(&PrivKey::from_slice(&self.key::<32>()).unwrap())
     }
 
     /**
         Gets the child key of Self
     */
-    pub fn get_child(&self, index: u32, harden: bool) -> Xprv {
-        child_key_deriveration::derive_xprv(self, index, harden)
+    pub fn get_child(&self, options: ChildOptions) -> Xprv {
+        match derive_xprv(self, options) {
+            Ok(x) => x,
+            Err(x) => panic!("{}", x)
+        }
     }
 }
 
@@ -125,7 +131,7 @@ impl ExtendedKey for Xpub {
     {
         if TypeId::of::<T>() == TypeId::of::<PubKey>() {
             return Self {
-                key: PubKey::from_slice(&key.as_bytes::<33>()),
+                key: PubKey::from_slice(&key.as_bytes::<33>()).unwrap(),
                 chaincode: chaincode,
                 //Serialisation info
                 depth: depth,

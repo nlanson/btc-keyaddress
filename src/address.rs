@@ -4,7 +4,6 @@ use crate:: {
     bs58check,
     util::try_into
 };
-use std::fmt;
 
 pub struct Address;
 
@@ -47,12 +46,6 @@ impl Address {
     }
 }
 
-impl fmt::Display for Address {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
@@ -66,7 +59,7 @@ mod tests {
     const TEST_PUB_KEY_HEX: &str = "0204664c60ceabd82967055ccbd0f56a1585dfbd42032656efa501c463b16fbdfe";
 
     fn test_pub_key() -> PubKey {
-        PubKey::from_slice(&decode_02x(TEST_PUB_KEY_HEX))
+        PubKey::from_slice(&decode_02x(TEST_PUB_KEY_HEX)).unwrap()
     }
 
     #[test]

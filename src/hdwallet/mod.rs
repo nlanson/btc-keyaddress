@@ -12,7 +12,7 @@
 */
 
 pub mod extended_keys;
-pub mod child_key_deriveration;
+pub mod ckd;
 use extended_keys::{
     ExtendedKey,
     Xprv,
@@ -43,7 +43,7 @@ impl HDWallet {
     pub fn new(mnemonic: Mnemonic) -> Self {
         let mprivkey_bytes: [u8; 64] = hash::hmac_sha512(&mnemonic.seed(), b"Bitcoin seed");
         let mpriv_key: Xprv = Xprv::construct(
-        PrivKey::from_slice(&mprivkey_bytes[0..32]),
+        PrivKey::from_slice(&mprivkey_bytes[0..32]).unwrap(),
         try_into(mprivkey_bytes[32..64].to_vec()),
         0x00,
         [0x00; 4],
@@ -67,7 +67,7 @@ impl HDWallet {
         Get the master extended public key derived from the master extended private key
     */
     pub fn mpub_key(&self) -> Xpub {
-        let privk: PrivKey = PrivKey::from_slice(&self.mpriv_key.key::<32>());
+        let privk: PrivKey = PrivKey::from_slice(&self.mpriv_key.key::<32>()).unwrap();
         let chaincode: [u8; 32] = self.mpriv_key.chaincode();
         let pubk: PubKey = PubKey::from_priv_key(&privk);
 

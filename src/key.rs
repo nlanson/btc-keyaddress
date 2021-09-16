@@ -8,7 +8,14 @@ use crate::{
     util::encode_02x,
     util::try_into
 };
-use std::fmt;
+
+/**
+    Enum to handle errors in the key module.
+*/
+#[derive(Debug)]
+pub enum Error {
+    BadSlice(String)
+}
 
 /**
     Define methods shared by Public and Private keys.
@@ -17,7 +24,9 @@ pub trait Key {
     /**
         Create a new instance of Self from a u8 slice.
     */
-    fn from_slice(byte_array: &[u8]) -> Self;
+    fn from_slice(byte_array: &[u8]) -> Result<Self, Error>
+    where Self: Sized
+    ;
 
     /**
         Return self as a byte array.
@@ -25,9 +34,7 @@ pub trait Key {
     fn as_bytes<const N: usize>(&self) -> [u8; N];
 }
 
-enum Error {
-    KeyError(String)
-}
+
 
 /*
     Define the tuple structs PrivKey and PubKey.
@@ -63,14 +70,24 @@ impl PrivKey {
         bs58check::check_encode(bs58check::VersionPrefix::PrivateKeyWIF, &key)
     }
 
-    pub fn add_assign(&mut self, other: &[u8]) {
-        self.0.add_assign(other);
+    /**
+        Takes in self and another slice and returns the sum of the values modulo
+        by the order of the SECP256K1 curve.
+    */
+    pub fn add_assign(&mut self, other: &[u8]) -> Result<(), Error> {
+        self.0.add_assign(other).expect("add_assign failed");
+        Ok(())
     }
 }
 
 impl Key for PrivKey {
-    fn from_slice(byte_array: &[u8]) -> Self {
-        Self(SecretKey::from_slice(byte_array).expect("Invalid slice"))
+    fn from_slice(byte_array: &[u8]) -> Result<Self, Error> {
+        match SecretKey::from_slice(byte_array) {
+            Ok(x) => Ok(Self(x)),
+            _ => Err(Error::BadSlice(
+                format!("Expected slice of length 32 but got {}", byte_array.len())
+            ))
+        }
     }
 
 
@@ -107,8 +124,13 @@ impl PubKey {
 }
 
 impl Key for PubKey {
-    fn from_slice(byte_array: &[u8]) -> Self {
-        Self(PublicKey::from_slice(byte_array).expect("Invalid slice"))
+    fn from_slice(byte_array: &[u8]) -> Result<Self, Error> {
+        match PublicKey::from_slice(byte_array) {
+            Ok(x) => Ok(Self(x)),
+            _ => Err(Error::BadSlice(
+                format!("Expected slice of length 33 or 65 but got {}", byte_array.len())
+            ))
+        }
     }
 
     /**
@@ -116,18 +138,6 @@ impl Key for PubKey {
     */
     fn as_bytes<const N: usize>(&self) -> [u8; N] {
         try_into(self.0.serialize()[0..N].to_vec())
-    }
-}
-
-impl fmt::Display for PrivKey {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl fmt::Display for PubKey {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
     }
 }
 
@@ -144,13 +154,13 @@ mod tests {
 
     //Test priv key from hex string to PrivKey Struct
     fn test_priv_key() -> PrivKey {
-        PrivKey::from_slice(&decode_02x(TEST_PRIV_KEY_HEX))
+        PrivKey::from_slice(&decode_02x(TEST_PRIV_KEY_HEX)).unwrap()
     }
 
     #[test]
     fn private_key_tests() {
         let test_key: PrivKey = test_priv_key();
-        let expected_public_key = PubKey::from_slice(&decode_02x(TEST_PUB_KEY_HEX));
+        let expected_public_key = PubKey::from_slice(&decode_02x(TEST_PUB_KEY_HEX)).unwrap();
         let expected_compressed_wif = "Kz6Ei3hbi461rDN292f2funoueKegmYAn6UKppEktYAgBhUu65Q7".to_string();
         let expected_uncompressed_wif = "5JU1qir5EqH6BF8Uu7ihFhxh5gGZ6qcA1hfN2mgpZ4taoTTWjzu".to_string();
 
@@ -172,7 +182,7 @@ mod tests {
 
     #[test]
     fn public_key_tests() {
-        let test_key: PubKey = PubKey::from_slice(&decode_02x(TEST_PUB_KEY_HEX));
+        let test_key: PubKey = PubKey::from_slice(&decode_02x(TEST_PUB_KEY_HEX)).unwrap();
         let expected_compression_prefix = 0x02;
         let expected_uncompressed_prefix = 0x04;
 
