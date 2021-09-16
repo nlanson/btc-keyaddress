@@ -73,20 +73,21 @@ fn verify_bad_phrase() {
 
 fn hdwallet() {
     let phrase: String = "glow laugh acquire menu anchor evil occur put hover renew calm purpose".to_string();
-    //let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
-    let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
+    let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
+    //let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
     let hdw: HDWallet = HDWallet::new(mnemonic.clone());
 
     println!("
     mnemonic: {}\n
     mpriv: {}\n
     mpub:  {}\n
-    m/0:   {}\n
-    M/0:   {}\n
+    m/0'/0:   {}\n
+    M/0'/0:   {}\n
     ", mnemonic.phrase.join(" "),
        hdw.mpriv_key().serialize(),
        hdw.mpub_key().serialize(),
-       hdw.mpriv_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize(),
-       hdw.mpub_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize()
+       hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().get_xchild(ChildOptions::Normal(0)).unwrap().serialize(),
+       hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().get_xchild(ChildOptions::Normal(0)).unwrap().get_xpub().serialize()
+       //hdw.mpub_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize()
     );
 }

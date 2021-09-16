@@ -67,16 +67,18 @@ impl HDWallet {
         Get the master extended public key derived from the master extended private key
     */
     pub fn mpub_key(&self) -> Xpub {
-        let privk: PrivKey = PrivKey::from_slice(&self.mpriv_key.key::<32>()).unwrap();
-        let chaincode: [u8; 32] = self.mpriv_key.chaincode();
-        let pubk: PubKey = PubKey::from_priv_key(&privk);
+        // let privk: PrivKey = PrivKey::from_slice(&self.mpriv_key.key::<32>()).unwrap();
+        // let chaincode: [u8; 32] = self.mpriv_key.chaincode();
+        // let pubk: PubKey = PubKey::from_priv_key(&privk);
 
-        Xpub::construct(
-            pubk, chaincode,
-            0x00,
-            [0x00; 4],
-            [0x00; 4]
-        )
+        // Xpub::construct(
+        //     pubk, chaincode,
+        //     self.mpriv_key().depth,
+        //     self.mpriv_key().parent_fingerprint,
+        //     self.mpriv_key().index
+        // )
+
+        self.mpriv_key().get_xpub()
     }
 }
 

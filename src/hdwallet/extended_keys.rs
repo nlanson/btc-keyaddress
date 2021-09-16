@@ -32,7 +32,6 @@ use crate::{
 pub struct Xprv {
     key: PrivKey,
     chaincode: [u8; 32],
-    //parent: Option<&'static Xprv>,
     pub depth: u8,
     pub parent_fingerprint: [u8; 4],
     pub index: [u8; 4]
@@ -130,6 +129,22 @@ impl Xprv {
     */
     pub fn get_pub(&self) -> PubKey {
         PubKey::from_priv_key(&PrivKey::from_slice(&self.key::<32>()).unwrap())
+    }
+
+    /**
+        Find the corresponding xpub for a hardened xprv
+    */
+    pub fn get_xpub(&self) -> Xpub {
+        let privk: PrivKey = PrivKey::from_slice(&self.key::<32>()).unwrap();
+        let chaincode: [u8; 32] = self.chaincode();
+        let pubk: PubKey = PubKey::from_priv_key(&privk);
+
+        Xpub::construct(
+            pubk, chaincode,
+            self.depth,
+            self.parent_fingerprint,
+            self.index
+        )
     }
     
 }
