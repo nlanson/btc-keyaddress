@@ -15,13 +15,12 @@
             for providing clear reference code to work against, especially with bip32.
 
     Todo:
-     - Derive child public keys
-        Notes:
-            https://github.com/rust-bitcoin/rust-bitcoin/blob/master/src/util/bip32.rs
-   
-     - Make the following files cleaner and error handling easier: (Error enums etc...)
-            - extended_keys.rs
-            - hdwallet/mod.rs
+        - Write unit tests for child key deriveration
+
+        - Store entire parent finger print for extended keys and only pass in the first
+          four bytes for serialisation via a method. (To combat clashes)
+
+        - Derive child keys using deriveration paths
         
      
 */

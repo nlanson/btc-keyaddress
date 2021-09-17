@@ -13,7 +13,8 @@ use crate::{
         hash160
     },
     hdwallet::{
-        ExtendedKey, Xprv, Xpub
+        ExtendedKey, Xprv, Xpub,
+        HDWError
     },
     key::{
         Key,
@@ -33,28 +34,18 @@ pub enum ChildOptions {
 }
 
 /**
-    Enum for handling deriveration errors
-*/
-#[derive(Debug)]
-pub enum Error {
-    IndexTooLarge(String),
-    IndexReserved(String),
-    CantHarden()
-}
-
-/**
     Function to derive new child xprv keys from parent xprv keys.
     Use the hardened bool to generated hardened child xprv.
 
     Xprv -> Xprv
 */
-pub fn derive_xprv(parent: &Xprv, options: ChildOptions) -> Result<Xprv, Error> {
+pub fn derive_xprv(parent: &Xprv, options: ChildOptions) -> Result<Xprv, HDWError> {
     //Assign the index and data based on ChildOptions
     let (index, data): (u32, Vec<u8>) = match options {
         ChildOptions::Normal(x) => {
             let index: u32 = x;
             if index >= (2 as u32).pow(31) { //If index is larger than 2^31, then return an error as those indexes are reserved for hardened keys.
-                return Err(Error::IndexReserved(
+                return Err(HDWError::IndexReserved(
                     format!("Expected index to be less than 2^31. Found {} which is reserved for hardened keys", index)
                 )) 
             }
@@ -68,7 +59,7 @@ pub fn derive_xprv(parent: &Xprv, options: ChildOptions) -> Result<Xprv, Error> 
         },
         ChildOptions::Hardened(x) => {       
             if x >= (2 as u32).pow(31) { //If provided index is larger than 2^31, then return an error since 2^31 + 2^31 wont fit in a u32 int
-                return Err(Error::IndexTooLarge(
+                return Err(HDWError::IndexTooLarge(
                     format!("Expected provided index to be less than 2^31. Found {}", x)
                 )) 
             }
@@ -117,14 +108,14 @@ pub fn derive_xprv(parent: &Xprv, options: ChildOptions) -> Result<Xprv, Error> 
 
     Xpub -> Xpub
 */
-pub fn derive_xpub(parent: &Xpub, options: ChildOptions) -> Result<Xpub, Error> {
+pub fn derive_xpub(parent: &Xpub, options: ChildOptions) -> Result<Xpub, HDWError> {
     //Extract the index from the options.
     //if the options specify hardened, then return an error
     let index: u32 = match options {
-        ChildOptions::Hardened(x) => return Err(Error::CantHarden()),
+        ChildOptions::Hardened(x) => return Err(HDWError::CantHarden()),
         ChildOptions::Normal(x) => {
             if x >= (2 as u32).pow(31) {
-                return Err(Error::IndexTooLarge(
+                return Err(HDWError::IndexTooLarge(
                     format!("Expected provided index to be less than 2^31. Found {}", x)
                 ));
             }

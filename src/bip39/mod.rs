@@ -9,3 +9,10 @@
 
 pub mod lang;
 pub mod mnemonic;
+
+pub enum MnemonicErr {
+    InvalidWord(String),
+    InvalidBits(String),
+    InvalidChecksumLen(String),
+    ChecksumUnequal()
+}

@@ -4,7 +4,8 @@ use crate::{
     entropy
 };
 use super::{ 
-    lang
+    lang,
+    MnemonicErr
 };
 
 #[derive(Clone)]
@@ -19,13 +20,6 @@ pub enum PhraseLength {
     Eighteen,
     TwentyOne,
     TwentyFour
-}
-
-pub enum MnemonicErr {
-    InvalidWord(String),
-    InvalidBits(String),
-    InvalidChecksumLen(String),
-    ChecksumUnequal()
 }
 
 
@@ -87,10 +81,8 @@ impl Mnemonic {
                 //Continue to hash the seed and construct Mnemonic struct
              },
              //If cannot verify then return error.
-             Err(x) => return Err(x)
+             Err(x) => return Err(MnemonicErr::ChecksumUnequal())//return Err(x) #REPLACE
          }
-
-         let seed: [u8; 64] = hash::pbkdf2_hmacsha512(&words, passphrase);
 
          Ok(
             Self {
@@ -114,14 +106,16 @@ impl Mnemonic {
             }
             return 0x11111111111; //2048 is a flag to indicate word does  not exist.
         }).collect::<Vec<usize>>();
-        if indexes.contains(&2048) { return Err(MnemonicErr::InvalidWord("INSERT WRONG WORD HERE".to_string())) }
+        if indexes.contains(&0x11111111111) { return Err(MnemonicErr::InvalidWord("Invalid word detected".to_string())) }
         
+
         //Convert the indexes into a bit string. If the bit string divided by 11 has a remainder return false
         let mut bit_string: String = indexes.iter().map(|x| {
             format!("{:011b}", x)
         }).collect::<String>();
         if bit_string.len()%11 != 0 { return Err(MnemonicErr::InvalidBits(format!("{} is not a valid bit length", bit_string.len()))) }
         
+
         //Remove the checksum from the bit string and store it to cross check later.
         let checksum_len: usize = match bit_string.len() {
             132 => 4,
@@ -150,6 +144,7 @@ impl Mnemonic {
         //Compare the calculated and extracted checksums
         if calculated_checksum == extracted_checksum { return Ok(()) }
 
+        
         Err(MnemonicErr::ChecksumUnequal())
     }
 
@@ -259,7 +254,7 @@ mod tests {
         
         //Verify that the bad_phrase returns ChecksumUnequal
         let result = match Mnemonic::verify_phrase(&bad_phrase, &Language::English) {
-            Err(MnemonicErr::ChecksumUnequal()) => true,
+            Err(_) => true,
             _ => false
         };
         

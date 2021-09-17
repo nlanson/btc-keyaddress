@@ -7,9 +7,7 @@ use crate::{
     key,
     key::{Key},
     address,
-    hdwallet::{
-        ckd
-    },
+    hdwallet,
     bip39
 };
 use std::fmt;
@@ -29,6 +27,17 @@ impl fmt::Display for key::PubKey {
     }
 }
 
+impl fmt::Display for key::KeyError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let val: String = match self {
+            Self::BadSlice(x) => x.clone(),
+            Self::BadArithmatic(x) => x.clone()
+        };
+        
+        write!(f, "{}", val)
+    }
+}
+
 /*
     address module impls
 */
@@ -41,7 +50,7 @@ impl fmt::Display for address::Address {
 /*
     bip39 module impls
 */
-impl fmt::Display for bip39::mnemonic::MnemonicErr {
+impl fmt::Display for bip39::MnemonicErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let val: String = match self {
             Self::ChecksumUnequal() => "Bad checksum".to_string(),
@@ -54,10 +63,17 @@ impl fmt::Display for bip39::mnemonic::MnemonicErr {
     }
 }
 
-impl fmt::Debug for bip39::mnemonic::MnemonicErr {
+impl fmt::Debug for bip39::MnemonicErr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let val: String = match self {
+            Self::ChecksumUnequal() => "Bad checksum".to_string(),
+            Self::InvalidBits(x) => x.to_string(),
+            Self::InvalidWord(x) => x.to_string(),
+            Self::InvalidChecksumLen(x) => x.to_string()
+        };
+        
         f.debug_struct("MnemonicErr")
-         .field("Err:", &self)
+         .field("Err:", &val)
          .finish()
     }
 }
@@ -72,7 +88,7 @@ impl fmt::Display for bip39::mnemonic::Mnemonic {
 /*
     hdwallet module impls
 */
-impl fmt::Display for ckd::Error {
+impl fmt::Display for hdwallet::HDWError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let val = match self {
             Self::IndexTooLarge(x) => x,

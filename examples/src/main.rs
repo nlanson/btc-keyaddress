@@ -1,27 +1,27 @@
 use btc_keyaddress::{
-    key::{
-        PubKey,
-        PrivKey
-    },
     address::Address,
     bip39::{
+        MnemonicErr,
+        lang::Language,
         mnemonic::Mnemonic,
-        mnemonic::PhraseLength,
-        lang::Language
+        mnemonic::PhraseLength
     },
     hdwallet::{
         HDWallet,
         ckd::ChildOptions,
-        extended_keys::ExtendedKey
-    }
-};
+        extended_keys::ExtendedKey,
+        HDWError
+    }, key::{
+        PubKey,
+        PrivKey
+}};
 
 fn main() {
     //print_vals();
     //bip39();
     //verify_mnemonic_phrase();
-    //sverify_bad_phrase();
-    hdwallet();
+    //verify_bad_phrase();
+    hdwallet().unwrap();
 }
 
 fn print_vals() {
@@ -44,34 +44,28 @@ fn print_vals() {
     );
 }
 
-fn bip39() -> Mnemonic {
-    let mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
-    // println!("Phrase: {}", mnemonic.phrase.join(" "));
-    // println!("Seed:   {:?}", &mnemonic.seed);
-    mnemonic
+fn bip39() -> Result<Mnemonic, MnemonicErr> {
+    let mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "")?;
+    Ok(mnemonic)
 }
 
-fn verify_mnemonic_phrase() {
+fn verify_mnemonic_phrase() -> Result<(), MnemonicErr> {
     let correct_phrase: Vec<&str> = vec!["forget", "arrow", "shadow", "era", "gap", "pretty", "have", "fire", "street", "law", "valve", "sunset"];
     let phrase: Vec<String> = correct_phrase.iter().map(|x| x.to_string()).collect();
-    let t = Mnemonic::verify_phrase(&phrase, &Language::English);
-    match t {
-        Ok(()) => println!("Checksum successful. Your seed is valid"),
-        Err(x) => println!("{}", x)
-    }
+    Mnemonic::verify_phrase(&phrase, &Language::English)?;
+
+    Ok(())
 }
 
-fn verify_bad_phrase() {
-    let bad_phrase: Vec<&str> = vec!["arrow", "shadow", "era", "gap", "pretty", "have", "fire", "street", "law", "valve", "sunset", "forget"];
+fn verify_bad_phrase()-> Result<(), MnemonicErr> {
+    let bad_phrase: Vec<&str> = vec!["govern", "shadow", "era", "gap", "pretty", "have", "fire", "street", "law", "valve", "sunset", "forget"];
     let phrase: Vec<String> = bad_phrase.iter().map(|x| x.to_string()).collect();
-    let t = Mnemonic::verify_phrase(&phrase, &Language::English);
-    match t {
-        Ok(()) => println!("Checksum successful. Your seed is valid"),
-        Err(x) => println!("{}", x)
-    }
+    Mnemonic::verify_phrase(&phrase, &Language::English)?; //Will panic on unwrap
+
+    Ok(())
 }
 
-fn hdwallet() {
+fn hdwallet() -> Result<(), HDWError> {
     let phrase: String = "glow laugh acquire menu anchor evil occur put hover renew calm purpose".to_string();
     let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
     //let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
@@ -81,13 +75,18 @@ fn hdwallet() {
     mnemonic: {}\n
     mpriv: {}\n
     mpub:  {}\n
-    m/0'/0:   {}\n
-    M/0'/0:   {}\n
+    address (m/0/0):   {}
     ", mnemonic.phrase.join(" "),
        hdw.mpriv_key().serialize(),
        hdw.mpub_key().serialize(),
-       hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().get_xchild(ChildOptions::Normal(0)).unwrap().serialize(),
-       hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().get_xchild(ChildOptions::Normal(0)).unwrap().get_xpub().serialize()
-       //hdw.mpub_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize()
+       Address::from_pub_key(
+           &hdw.mpriv_key()
+           .get_xchild(ChildOptions::Normal(0))?
+           .get_xchild(ChildOptions::Normal(0))?
+           .get_pub(),
+           true
+        )
     );
+
+    Ok(())
 }

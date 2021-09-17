@@ -36,6 +36,13 @@ pub struct HDWallet {
     mpriv_key: Xprv
 }
 
+#[derive(Debug)]
+pub enum HDWError {
+    IndexTooLarge(String),
+    IndexReserved(String),
+    CantHarden()
+}
+
 impl HDWallet {
     /**
         Creates a new HD Wallet structure from mnemonic
@@ -67,17 +74,6 @@ impl HDWallet {
         Get the master extended public key derived from the master extended private key
     */
     pub fn mpub_key(&self) -> Xpub {
-        // let privk: PrivKey = PrivKey::from_slice(&self.mpriv_key.key::<32>()).unwrap();
-        // let chaincode: [u8; 32] = self.mpriv_key.chaincode();
-        // let pubk: PubKey = PubKey::from_priv_key(&privk);
-
-        // Xpub::construct(
-        //     pubk, chaincode,
-        //     self.mpriv_key().depth,
-        //     self.mpriv_key().parent_fingerprint,
-        //     self.mpriv_key().index
-        // )
-
         self.mpriv_key().get_xpub()
     }
 }

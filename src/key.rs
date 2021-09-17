@@ -13,8 +13,9 @@ use crate::{
     Enum to handle errors in the key module.
 */
 #[derive(Debug)]
-pub enum Error {
-    BadSlice(String)
+pub enum KeyError {
+    BadSlice(String),
+    BadArithmatic(String)
 }
 
 /**
@@ -24,7 +25,7 @@ pub trait Key {
     /**
         Create a new instance of Self from a u8 slice.
     */
-    fn from_slice(byte_array: &[u8]) -> Result<Self, Error>
+    fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError>
     where Self: Sized;
 
     /**
@@ -73,17 +74,19 @@ impl PrivKey {
         Takes in self and another slice and returns the sum of the values modulo
         by the order of the SECP256K1 curve.
     */
-    pub fn add_assign(&mut self, other: &[u8]) -> Result<(), Error> {
-        self.0.add_assign(other).expect("add_assign failed");
-        Ok(())
+    pub fn add_assign(&mut self, other: &[u8]) -> Result<(), KeyError> {
+        match self.0.add_assign(other) {
+            Ok(_) => Ok(()),
+            Err(x) => Err(KeyError::BadArithmatic(x.to_string()))
+        }
     }
 }
 
 impl Key for PrivKey {
-    fn from_slice(byte_array: &[u8]) -> Result<Self, Error> {
+    fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError> {
         match SecretKey::from_slice(byte_array) {
             Ok(x) => Ok(Self(x)),
-            _ => Err(Error::BadSlice(
+            _ => Err(KeyError::BadSlice(
                 format!("Expected slice of length 32 but got {}", byte_array.len())
             ))
         }
@@ -121,10 +124,11 @@ impl PubKey {
         self.0.serialize_uncompressed()
     }
 
-    pub fn add_assign(&mut self, other: &[u8]) -> Result<(), Error> {
-        //self.0.combine(&PubKey::from_slice(&other).unwrap().raw()).unwrap();
-        self.0.add_exp_assign(&Secp256k1::new(), other).unwrap();
-        Ok(())
+    pub fn add_assign(&mut self, other: &[u8]) -> Result<(), KeyError> {
+        match self.0.add_exp_assign(&Secp256k1::new(), other) {
+            Ok(_) => Ok(()),
+            Err(x) => Err(KeyError::BadArithmatic(x.to_string()))
+        }
     }
 
     fn raw(&self) -> PublicKey {
@@ -133,10 +137,10 @@ impl PubKey {
 }
 
 impl Key for PubKey {
-    fn from_slice(byte_array: &[u8]) -> Result<Self, Error> {
+    fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError> {
         match PublicKey::from_slice(byte_array) {
             Ok(x) => Ok(Self(x)),
-            _ => Err(Error::BadSlice(
+            _ => Err(KeyError::BadSlice(
                 format!("Expected slice of length 33 or 65 but got {}", byte_array.len())
             ))
         }
