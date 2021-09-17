@@ -15,12 +15,13 @@
             for providing clear reference code to work against, especially with bip32.
 
     Todo:
-        - Write unit tests for child key deriveration
+        - Derive child keys using string deriveration paths.
+            ( deriveration_path: String ) -> Xprv or Xpub
 
         - Store entire parent finger print for extended keys and only pass in the first
           four bytes for serialisation via a method. (To combat clashes)
 
-        - Derive child keys using deriveration paths
+        
         
      
 */

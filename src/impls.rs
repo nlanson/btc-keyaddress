@@ -78,7 +78,7 @@ impl fmt::Debug for bip39::MnemonicErr {
     }
 }
 
-impl fmt::Display for bip39::mnemonic::Mnemonic {
+impl fmt::Display for bip39::Mnemonic {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {        
         write!(f, "{}", self)
     }

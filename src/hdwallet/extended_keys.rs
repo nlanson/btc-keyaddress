@@ -24,7 +24,8 @@ use crate::{
             ChildOptions
         },
         HDWError
-    }
+    },
+    address::Address
 };
 
 #[derive(Clone)]
@@ -77,6 +78,13 @@ pub trait ExtendedKey {
         Return the non extended public key of self.
     */
     fn get_pub(&self) -> PubKey;
+
+    /**
+        Get the address of self.
+    */
+    fn get_address(&self) -> String {
+        Address::from_pub_key(&self.get_pub(), true)
+    }
 }
 
 impl ExtendedKey for Xprv {
@@ -210,10 +218,22 @@ impl ExtendedKey for Xpub {
 
 #[cfg(test)]
 mod tests {
+    /*
+        Tests for child key deriveration are implemented in ckd.rs
+    */
+    
     use super::*;
-    use crate::{bip39::{lang::Language, mnemonic::Mnemonic, mnemonic::PhraseLength}, hdwallet::HDWallet, util::{
+    use crate::{
+        bip39::{
+            Language,
+            Mnemonic,
+            PhraseLength
+        },
+        hdwallet::HDWallet,
+        util::{
             decode_02x
-        }};
+        }
+    };
 
     //Data generated on leanrmeabitcoin.com/technical/hd-wallets
     const TEST_MNEMONIC: &str = "glow laugh acquire menu anchor evil occur put hover renew calm purpose";
@@ -226,8 +246,8 @@ mod tests {
         let hdw: HDWallet = HDWallet::new(mnemonic);
 
         //Test if the calculated and expected key and chaincode are equal
-        assert_eq!(decode_02x(TEST_MPRIV), hdw.mpriv_key.key::<32>());
-        assert_eq!(decode_02x(TEST_MCC), hdw.mpriv_key.chaincode());
+        assert_eq!(decode_02x(TEST_MPRIV), hdw.mpriv_key().key::<32>());
+        assert_eq!(decode_02x(TEST_MCC), hdw.mpriv_key().chaincode());
     }
 
     #[test]
@@ -238,8 +258,8 @@ mod tests {
 
             //Check lengths of mpriv, mpub and cc as well as compression prefix
             // of mpub.key to check if it is 0x02 or 0x03
-            assert_eq!(hdw.mpriv_key.key::<32>().len(), 32);
-            assert_eq!(hdw.mpriv_key.chaincode().len(), 32);
+            assert_eq!(hdw.mpriv_key().key::<32>().len(), 32);
+            assert_eq!(hdw.mpriv_key().chaincode().len(), 32);
             assert_eq!(hdw.mpub_key().key::<33>().len(), 33);
             assert!(
                 match hdw.mpub_key().key::<33>()[0] {

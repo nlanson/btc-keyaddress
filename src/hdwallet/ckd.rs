@@ -112,7 +112,7 @@ pub fn derive_xpub(parent: &Xpub, options: ChildOptions) -> Result<Xpub, HDWErro
     //Extract the index from the options.
     //if the options specify hardened, then return an error
     let index: u32 = match options {
-        ChildOptions::Hardened(x) => return Err(HDWError::CantHarden()),
+        ChildOptions::Hardened(_) => return Err(HDWError::CantHarden()),
         ChildOptions::Normal(x) => {
             if x >= (2 as u32).pow(31) {
                 return Err(HDWError::IndexTooLarge(
@@ -157,7 +157,101 @@ pub fn derive_xpub(parent: &Xpub, options: ChildOptions) -> Result<Xpub, HDWErro
     )
 }
 
+#[allow(non_snake_case, non_upper_case_globals)]
 #[cfg(test)]
 mod tests {
+    use crate::{
+        hdwallet::{
+            HDWallet,
+            HDWError,
+        },
+        bip39::{
+            Mnemonic,
+            MnemonicErr,
+            Language
+        }
+    };
     use super::*;
+
+    const TEST_MNEMONIC: &str = "glow laugh acquire menu anchor evil occur put hover renew calm purpose";
+
+    const EXPECTED_m0: &str = "xprv9veD4fr6rg67aWannnQipC3ZkKj9CP2xaQf8yQkRGyp9N32PVzwvMs2nYoDzVyYdviChaXVzokWJnQLixWgZZNDaKRvRMMVJVJU85GZ5uTW";
+    const EXPECTED_M0: &str = "xpub69dZUBNzh3eQnzfFtowjBKzJJMZdbqkowdajmoA2qKM8EqMY3YGAufMGQ6MD3Mr3mrsCp8ihwGekfogUyRK3kHaj4Qk7WUPa8NUCGB8BK6D";
+    const EXPECTED_m0h: &str = "xprv9veD4frFCLd5k5JeTE37vHNabs5r4CrNy6wyW1WKj8ZsnkpLY9SwaAitRyrDZp9vZqiNEL5pbntcdnk7Zxea5WeKP3aQBdQNfern39bV93Q";
+    const EXPECTED_M0h: &str = "xpub69dZUBP92iBNxZP7ZFa8HRKK9tvLTfaELKsaJPuwHU6rfZ9V5gmC7y3NHF6M2ggSKAEZit9dEKo4fhEp2hsJW3Nk5Hd9JrrJRgeEkGryygR";
+
+    const EXPECTED_m0_0_address: &str = "1E8UW1NDvpG7xTBxRTa9FXwvrXNq95dQyp";
+    const EXPECTED_m0_1_address: &str = "1Pg7rysbg9D2D94rxfkPiK4XdPM6qzMv42";
+
+    fn create_hdw_from_test_mnemonic() -> HDWallet {
+        let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
+        HDWallet::new(mnemonic)
+    }
+
+    #[test]
+    fn ckd_normal() {
+        let hdw: HDWallet = create_hdw_from_test_mnemonic();
+
+        //Get the first child extended private and public key of the master key.
+        //Calculate the child extended public key twice  through the master xpub and child xprv
+        let derived_m0 = hdw.mpriv_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize();
+        let derived_M0_fromxprv = hdw.mpriv_key().get_xchild(ChildOptions::Normal(0)).unwrap().get_xpub().serialize();
+        let derived_M0_fromxpub = hdw.mpub_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize();
+
+        //Test is derived values are equal to expected values and if derived xpubs are both identical
+        assert_eq!(derived_m0, EXPECTED_m0.to_string());
+        assert_eq!(derived_M0_fromxprv, derived_M0_fromxpub);
+        assert_eq!(derived_M0_fromxprv, EXPECTED_M0.to_string());
+        assert_eq!(derived_M0_fromxpub, EXPECTED_M0.to_string());
+    }
+
+    #[test]
+    fn ckd_hardened() {
+        let hdw: HDWallet = create_hdw_from_test_mnemonic();
+
+        //Calculate the hardened children of the master keys.
+        //Deriving the corresponding xpub of a hardened xprv is not possible. So pattern match the error.
+        let derived_m0h = hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().serialize();
+        let derived_M0h_fromxpub = match hdw.mpub_key().get_xchild(ChildOptions::Hardened(0)) {
+            Ok(_) => true,
+            Err(_) => false
+        }; 
+        let derived_M0h_fromxprv = hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().get_xpub().serialize();
+
+        //Test is derived values are equal to expected values and if hardened xpub deriveration failed
+        assert_eq!(derived_m0h, EXPECTED_m0h);
+        assert_eq!(derived_M0h_fromxpub, false);
+        assert_eq!(derived_M0h_fromxprv, EXPECTED_M0h);
+    }
+    
+    #[test]
+    fn ckd_address_test() {
+        let hdw: HDWallet = create_hdw_from_test_mnemonic();
+
+        //Get the addresses at m/0/0 and m/0/1 using both the public and private keys
+        let m0_0_address_from_xprv: String = hdw.mpriv_key()
+                                                .get_xchild(ChildOptions::Normal(0)).unwrap()
+                                                .get_xchild(ChildOptions::Normal(0)).unwrap()
+                                                .get_address();
+        let m0_0_address_from_xpub: String = hdw.mpub_key()
+                                                .get_xchild(ChildOptions::Normal(0)).unwrap()
+                                                .get_xchild(ChildOptions::Normal(0)).unwrap()
+                                                .get_address();
+        let m0_1_address_from_xprv: String = hdw.mpriv_key()
+                                                .get_xchild(ChildOptions::Normal(0)).unwrap()
+                                                .get_xchild(ChildOptions::Normal(1)).unwrap()
+                                                .get_address();
+        let m0_1_address_from_xpub: String = hdw.mpub_key()
+                                                .get_xchild(ChildOptions::Normal(0)).unwrap()
+                                                .get_xchild(ChildOptions::Normal(1)).unwrap()
+                                                .get_address();
+
+        //Compare the derived addresses to the expected address as 
+        //well as checking addresses derived from private keys and 
+        //the same as addresses derived from public keys
+        assert_eq!(m0_0_address_from_xprv, m0_0_address_from_xpub);
+        assert_eq!(m0_0_address_from_xprv, EXPECTED_m0_0_address);
+        assert_eq!(m0_1_address_from_xprv, m0_1_address_from_xpub);
+        assert_eq!(m0_1_address_from_xprv, EXPECTED_m0_1_address);
+    }
 }

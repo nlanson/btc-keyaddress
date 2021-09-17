@@ -2,19 +2,21 @@ use btc_keyaddress::{
     address::Address,
     bip39::{
         MnemonicErr,
-        lang::Language,
-        mnemonic::Mnemonic,
-        mnemonic::PhraseLength
+        Language,
+        Mnemonic,
+        PhraseLength
     },
     hdwallet::{
         HDWallet,
-        ckd::ChildOptions,
-        extended_keys::ExtendedKey,
+        ChildOptions,
+        ExtendedKey,
         HDWError
-    }, key::{
+    }, 
+    key::{
         PubKey,
         PrivKey
-}};
+    }
+};
 
 fn main() {
     //print_vals();
