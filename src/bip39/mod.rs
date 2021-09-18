@@ -15,8 +15,8 @@ pub use mnemonic::PhraseLength as PhraseLength;
 pub use lang::Language as Language;
 
 pub enum MnemonicErr {
-    InvalidWord(String),
-    InvalidBits(String),
-    InvalidChecksumLen(String),
+    InvalidWord((String, u8)),
+    InvalidBits(),
+    InvalidChecksumLen(),
     ChecksumUnequal()
 }

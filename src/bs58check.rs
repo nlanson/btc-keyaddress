@@ -34,7 +34,7 @@ pub fn check_encode(prefix: VersionPrefix, data: &[u8]) -> String {
     data.splice(0..0, p);
 
     //Create the checksum of the data. Store only the first 4 bytes as a vector.
-    let checksum: Vec<u8> = hash::sha256(hash::sha256(&data))[0..4].to_vec();
+    let checksum: Vec<u8> = hash::double_sha256(&data)[0..4].to_vec();
 
     //Append the checksum
     data.splice(data.len()..data.len(), checksum);

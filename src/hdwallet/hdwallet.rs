@@ -25,20 +25,23 @@ impl HDWallet {
     /**
         Creates a new HD Wallet structure from mnemonic
     */
-    pub fn new(mnemonic: Mnemonic) -> Self {
+    pub fn new(mnemonic: Mnemonic) -> Result<Self, HDWError> {
         let mprivkey_bytes: [u8; 64] = hash::hmac_sha512(&mnemonic.seed(), b"Bitcoin seed");
         let mpriv_key: Xprv = Xprv::construct(
-        PrivKey::from_slice(&mprivkey_bytes[0..32]).unwrap(),
+        match PrivKey::from_slice(&mprivkey_bytes[0..32]) {
+                Ok(x) => x,
+                Err(_) => return Err(HDWError::BadKey())
+            },
         try_into(mprivkey_bytes[32..64].to_vec()),
         0x00,
         [0x00; 4],
         [0x00; 4]
         );
 
-        Self {
+        Ok(Self {
             mnemonic,
             mpriv_key
-        }
+        })
     }
 
     /**

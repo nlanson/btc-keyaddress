@@ -243,7 +243,7 @@ mod tests {
     #[test]
     fn extended_keys_test() {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet = HDWallet::new(mnemonic);
+        let hdw: HDWallet = HDWallet::new(mnemonic).unwrap();
 
         //Test if the calculated and expected key and chaincode are equal
         assert_eq!(decode_02x(TEST_MPRIV), hdw.mpriv_key().key::<32>());
@@ -254,7 +254,7 @@ mod tests {
     fn random_extended_keys_test() {
         for _i in 0..5 {
             let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::TwentyFour, Language::English, "").unwrap();
-            let hdw: HDWallet = HDWallet::new(mnemonic);
+            let hdw: HDWallet = HDWallet::new(mnemonic).unwrap();
 
             //Check lengths of mpriv, mpub and cc as well as compression prefix
             // of mpub.key to check if it is 0x02 or 0x03
@@ -274,7 +274,7 @@ mod tests {
     #[test]
     fn serialize_extended_keys() {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet = HDWallet::new(mnemonic);
+        let hdw: HDWallet = HDWallet::new(mnemonic).unwrap();
 
         //master xprv serialization test
         assert_eq!(hdw.mpriv_key().serialize(), 

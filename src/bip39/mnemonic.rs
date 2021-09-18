@@ -38,7 +38,7 @@ impl Mnemonic {
         };
 
         //Hash and extract required bits
-        let unmasked_checksum = hash::sha256(&bytes)[0];
+        let unmasked_checksum: u8 = hash::sha256(&bytes)[0];                        
         let checksum: u8 = match Self::mask_checksum(unmasked_checksum, checksum_len) {
             Ok(x) => x,
             Err(x) => return Err(x)
@@ -81,7 +81,7 @@ impl Mnemonic {
                 //Continue to hash the seed and construct Mnemonic struct
              },
              //If cannot verify then return error.
-             Err(x) => return Err(MnemonicErr::ChecksumUnequal())//return Err(x) #REPLACE
+             Err(x) => return Err(x) 
          }
 
          Ok(
@@ -101,19 +101,23 @@ impl Mnemonic {
         //Iterate over the split phrase, and find the index of the word in the word list.
         //If the word list does not contain a word, return false.
         let indexes: Vec<usize> = words.iter().map(|x| {
-            if word_list.contains(&&x[..]) {
-                return word_list.iter().position(|i| i == x).unwrap();
-            }
-            return 0x11111111111; //2048 is a flag to indicate word does  not exist.
+            return word_list.iter().position(|i| i == x).unwrap_or(2048);
+            //2048 is a flag to indicate word does  not exist.
         }).collect::<Vec<usize>>();
-        if indexes.contains(&0x11111111111) { return Err(MnemonicErr::InvalidWord("Invalid word detected".to_string())) }
+
+        //If there is an invalid word, return error.
+        for i in 0..indexes.len() {
+            if indexes[i] == 2048 {
+                return Err(MnemonicErr::InvalidWord((words[i].to_string(), i as u8)))
+            }
+        }
         
 
         //Convert the indexes into a bit string. If the bit string divided by 11 has a remainder return false
         let mut bit_string: String = indexes.iter().map(|x| {
             format!("{:011b}", x)
         }).collect::<String>();
-        if bit_string.len()%11 != 0 { return Err(MnemonicErr::InvalidBits(format!("{} is not a valid bit length", bit_string.len()))) }
+        if bit_string.len()%11 != 0 { return Err(MnemonicErr::InvalidBits()) }
         
 
         //Remove the checksum from the bit string and store it to cross check later.
@@ -123,7 +127,7 @@ impl Mnemonic {
             198 => 6,
             231 => 7,
             264 => 8,
-            _ => return Err(MnemonicErr::InvalidBits(format!("{} is not a valid bit length", bit_string.len())))
+            _ => return Err(MnemonicErr::InvalidBits())
         };
         let extracted_checksum: u8  = util::decode_binary_string(&bit_string[bit_string.len()-checksum_len..bit_string.len()].to_string()) as u8;
         bit_string.replace_range(bit_string.len()-checksum_len..bit_string.len(), "");
@@ -188,7 +192,7 @@ impl Mnemonic {
             8 => {
                 unmasked_checksum
             },
-            _ => return Err(MnemonicErr::InvalidChecksumLen(format!("Bad checksum length")))
+            _ => return Err(MnemonicErr::InvalidChecksumLen())
         };
 
         Ok(checksum)
@@ -204,7 +208,7 @@ impl Mnemonic {
             192 => format!("{}{:06b}", bit_string, checksum),
             224 => format!("{}{:07b}", bit_string, checksum),
             256 => format!("{}{:08b}", bit_string, checksum),
-            _ => return Err(MnemonicErr::InvalidBits("Invalid bit string length".to_string()))
+            _ => return Err(MnemonicErr::InvalidBits())
         };
 
         Ok(appended)
@@ -213,7 +217,7 @@ impl Mnemonic {
 
 #[cfg(test)]
 mod tests {
-    use crate::bip39::mnemonic::MnemonicErr;
+    use crate::bip39::MnemonicErr;
 
     use super::{
         Mnemonic,

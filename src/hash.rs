@@ -13,7 +13,7 @@ use crate::{
 /**
     Takes in a byte array and returns ripemd160(sha256(input)) 
 */
-pub fn hash160<T>(input: T) -> [u8; 20] 
+pub fn hash160<T>(input: T) -> [u8; 20]
 where T: AsRef<[u8]>
 {
     ripemd160(sha256(input))
@@ -39,6 +39,17 @@ where T: AsRef<[u8]>
     let mut r = Sha256::new();
     r.update(input);
     try_into(r.finalize().to_vec())
+                    
+}
+
+/**
+
+*/
+pub fn double_sha256<T>(input: T) -> [u8; 32]
+where T: AsRef<[u8]>
+{
+    let round1 = sha256(input);
+    sha256(round1)
 }
 
 /**
@@ -71,6 +82,7 @@ pub fn pbkdf2_hmacsha512(phrase: &Vec<String>, passphrase: &str) -> [u8; 64] {
 pub fn hmac_sha512(data: &[u8], key: &[u8]) -> [u8; 64] {
     let mut hmac = HmacSha512::new_from_slice(key).expect("Hmac error");
     hmac.update(data);
+
     try_into(hmac.finalize().into_bytes().to_vec())
 }
 

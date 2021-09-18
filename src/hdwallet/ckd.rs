@@ -45,9 +45,7 @@ pub fn derive_xprv(parent: &Xprv, options: ChildOptions) -> Result<Xprv, HDWErro
         ChildOptions::Normal(x) => {
             let index: u32 = x;
             if index >= (2 as u32).pow(31) { //If index is larger than 2^31, then return an error as those indexes are reserved for hardened keys.
-                return Err(HDWError::IndexReserved(
-                    format!("Expected index to be less than 2^31. Found {} which is reserved for hardened keys", index)
-                )) 
+                return Err(HDWError::IndexReserved(index)) 
             }
             
             //Normal private key child is [0x00 || parent pub bytes || index bytes]
@@ -59,9 +57,7 @@ pub fn derive_xprv(parent: &Xprv, options: ChildOptions) -> Result<Xprv, HDWErro
         },
         ChildOptions::Hardened(x) => {       
             if x >= (2 as u32).pow(31) { //If provided index is larger than 2^31, then return an error since 2^31 + 2^31 wont fit in a u32 int
-                return Err(HDWError::IndexTooLarge(
-                    format!("Expected provided index to be less than 2^31. Found {}", x)
-                )) 
+                return Err(HDWError::IndexTooLarge(x)) 
             }
             let index: u32 = x + (2 as u32).pow(31);
             
@@ -82,9 +78,16 @@ pub fn derive_xprv(parent: &Xprv, options: ChildOptions) -> Result<Xprv, HDWErro
     let left_bytes: [u8; 32] = try_into(hash[0..32].to_vec());
     let child_chaincode: [u8; 32] = try_into(hash[32..64].to_vec());
 
-    //Calculate the child private key from the left bytes and parent private key
-    let mut child_key: PrivKey = PrivKey::from_slice(&parent.key::<32>()).unwrap();
-    child_key.add_assign(&left_bytes).unwrap();
+    //Calculate the child private key from the left bytes and parent private key. 
+    //Return an error if this cannot be done
+    let mut child_key: PrivKey = match PrivKey::from_slice(&parent.key::<32>()) {
+        Ok(x) => x,
+        Err(_) => return Err(HDWError::BadKey())
+    };
+    match child_key.add_assign(&left_bytes) {
+        Ok(_) => { },
+        Err(_) => return Err(HDWError::BadArithmatic())
+    }
 
     //Set the remaining meta data
     let depth: u8 = parent.depth + 1;
@@ -115,9 +118,7 @@ pub fn derive_xpub(parent: &Xpub, options: ChildOptions) -> Result<Xpub, HDWErro
         ChildOptions::Hardened(_) => return Err(HDWError::CantHarden()),
         ChildOptions::Normal(x) => {
             if x >= (2 as u32).pow(31) {
-                return Err(HDWError::IndexTooLarge(
-                    format!("Expected provided index to be less than 2^31. Found {}", x)
-                ));
+                return Err(HDWError::IndexTooLarge(x));
             }
             x
         }
@@ -136,9 +137,16 @@ pub fn derive_xpub(parent: &Xpub, options: ChildOptions) -> Result<Xpub, HDWErro
     let child_chaincode: [u8; 32] = try_into(hash[32..64].to_vec());
 
     //Add the parent public key to the left bytes to get the final child key
-    let mut child_key: PubKey = PubKey::from_slice(&parent.key::<33>()).unwrap();
-    let sk: PrivKey = PrivKey::from_slice(&left_bytes).unwrap();
-    child_key.add_assign(&sk.as_bytes::<32>()[..]).unwrap();
+    //Return appropriate error if unable to do so
+    let mut child_key: PubKey =  PubKey::from_slice(&parent.key::<33>()).unwrap();
+    let sk: PrivKey = match PrivKey::from_slice(&left_bytes) {
+        Ok(x) => x,
+        Err(_) => return Err(HDWError::BadKey())
+    };
+    match child_key.add_assign(&sk.as_bytes::<32>()[..]) {
+        Ok(_) => { },
+        Err(_) => return Err(HDWError::BadArithmatic())
+    }
 
 
     //Set the remaining meta data
@@ -185,7 +193,7 @@ mod tests {
 
     fn create_hdw_from_test_mnemonic() -> HDWallet {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        HDWallet::new(mnemonic)
+        HDWallet::new(mnemonic).unwrap()
     }
 
     #[test]

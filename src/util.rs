@@ -31,5 +31,5 @@ pub fn decode_binary_string(b: &String) -> usize {
 */
 pub fn try_into<T, const N: usize>(v: Vec<T>) -> [T; N] {
     v.try_into()
-        .unwrap_or_else(|v: Vec<T>| panic!("Expected a Vec of length {} but it was {}", N, v.len()))
+        .unwrap_or_else(|v: Vec<T>| panic!("Expected {}, found {}", N, v.len()))
 }

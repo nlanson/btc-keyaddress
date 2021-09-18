@@ -21,8 +21,8 @@ use btc_keyaddress::{
 fn main() {
     //print_vals();
     //bip39();
-    //verify_mnemonic_phrase();
-    //verify_bad_phrase();
+    println!("{:?}", verify_mnemonic_phrase());
+    println!("{:?}", verify_bad_phrase());
     hdwallet().unwrap();
 }
 
@@ -71,7 +71,7 @@ fn hdwallet() -> Result<(), HDWError> {
     let phrase: String = "glow laugh acquire menu anchor evil occur put hover renew calm purpose".to_string();
     let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
     //let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
-    let hdw: HDWallet = HDWallet::new(mnemonic.clone());
+    let hdw: HDWallet = HDWallet::new(mnemonic.clone()).unwrap();
 
     println!("
     mnemonic: {}\n

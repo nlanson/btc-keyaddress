@@ -29,9 +29,9 @@ impl fmt::Display for key::PubKey {
 
 impl fmt::Display for key::KeyError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let val: String = match self {
-            Self::BadSlice(x) => x.clone(),
-            Self::BadArithmatic(x) => x.clone()
+        let val: &str = match self {
+            Self::BadSlice() => "Bad slice input",
+            Self::BadArithmatic() => "Bad arithmatic"
         };
         
         write!(f, "{}", val)
@@ -47,6 +47,7 @@ impl fmt::Display for address::Address {
     }
 }
 
+
 /*
     bip39 module impls
 */
@@ -54,9 +55,9 @@ impl fmt::Display for bip39::MnemonicErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let val: String = match self {
             Self::ChecksumUnequal() => "Bad checksum".to_string(),
-            Self::InvalidBits(x) => x.to_string(),
-            Self::InvalidWord(x) => x.to_string(),
-            Self::InvalidChecksumLen(x) => x.to_string()
+            Self::InvalidBits() => "Invalid bits detected".to_string(),
+            Self::InvalidWord(x) => format!("Word '{}' at position {} is not valid", x.0, x.1),
+            Self::InvalidChecksumLen() => "Invalid checksum".to_string()
         };
         
         write!(f, "{}", val)
@@ -67,9 +68,9 @@ impl fmt::Debug for bip39::MnemonicErr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let val: String = match self {
             Self::ChecksumUnequal() => "Bad checksum".to_string(),
-            Self::InvalidBits(x) => x.to_string(),
-            Self::InvalidWord(x) => x.to_string(),
-            Self::InvalidChecksumLen(x) => x.to_string()
+            Self::InvalidBits() => "Invalid bits detected".to_string(),
+            Self::InvalidWord(x) => format!("Word '{}' at position {} is not valid", x.0, x.1),
+            Self::InvalidChecksumLen() => "Invalid checksum".to_string()
         };
         
         f.debug_struct("MnemonicErr")
@@ -91,9 +92,11 @@ impl fmt::Display for bip39::Mnemonic {
 impl fmt::Display for hdwallet::HDWError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let val = match self {
-            Self::IndexTooLarge(x) => x,
-            Self::IndexReserved(x) => x,
-            Self::CantHarden() => "cannot produce hardened child public key"
+            Self::IndexTooLarge(x) => format!("The index {} is too large", x),
+            Self::IndexReserved(x) => format!("The index {} is reserved for hardened keys", x),
+            Self::CantHarden() => "cannot produce hardened child public key".to_string(),
+            Self::BadKey() => "Cannot use this key. Likely a bad slice.".to_string(),
+            Self::BadArithmatic() => "Bad arithmatic".to_string()
         };
         
         write!(f, "{}", val)

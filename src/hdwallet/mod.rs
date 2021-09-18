@@ -26,7 +26,9 @@ pub use extended_keys::Xpub;
 
 #[derive(Debug)]
 pub enum HDWError {
-    IndexTooLarge(String),
-    IndexReserved(String),
-    CantHarden()
+    IndexTooLarge(u32),
+    IndexReserved(u32),
+    CantHarden(),
+    BadKey(),
+    BadArithmatic()
 }

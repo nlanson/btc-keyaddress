@@ -14,8 +14,8 @@ use crate::{
 */
 #[derive(Debug)]
 pub enum KeyError {
-    BadSlice(String),
-    BadArithmatic(String)
+    BadSlice(),
+    BadArithmatic()
 }
 
 /**
@@ -77,7 +77,7 @@ impl PrivKey {
     pub fn add_assign(&mut self, other: &[u8]) -> Result<(), KeyError> {
         match self.0.add_assign(other) {
             Ok(_) => Ok(()),
-            Err(x) => Err(KeyError::BadArithmatic(x.to_string()))
+            Err(x) => Err(KeyError::BadArithmatic())
         }
     }
 }
@@ -86,9 +86,7 @@ impl Key for PrivKey {
     fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError> {
         match SecretKey::from_slice(byte_array) {
             Ok(x) => Ok(Self(x)),
-            _ => Err(KeyError::BadSlice(
-                format!("Expected slice of length 32 but got {}", byte_array.len())
-            ))
+            _ => Err(KeyError::BadSlice())
         }
     }
 
@@ -127,22 +125,20 @@ impl PubKey {
     pub fn add_assign(&mut self, other: &[u8]) -> Result<(), KeyError> {
         match self.0.add_exp_assign(&Secp256k1::new(), other) {
             Ok(_) => Ok(()),
-            Err(x) => Err(KeyError::BadArithmatic(x.to_string()))
+            Err(x) => Err(KeyError::BadArithmatic())
         }
     }
 
-    fn raw(&self) -> PublicKey {
-        self.0
-    }
+    // fn raw(&self) -> PublicKey {
+    //     self.0
+    // }
 }
 
 impl Key for PubKey {
     fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError> {
         match PublicKey::from_slice(byte_array) {
             Ok(x) => Ok(Self(x)),
-            _ => Err(KeyError::BadSlice(
-                format!("Expected slice of length 33 or 65 but got {}", byte_array.len())
-            ))
+            _ => Err(KeyError::BadSlice())
         }
     }
 
