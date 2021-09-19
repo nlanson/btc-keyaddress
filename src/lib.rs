@@ -17,13 +17,13 @@
     Todo:
         - Derive child keys using string deriveration paths.
             ( deriveration_path: String ) -> Xprv or Xpub
-
-        - Store entire parent finger print for extended keys and only pass in the first
-          four bytes for serialisation via a method. (To combat clashes)
         
         - Create extended keys from base58 encoded strings.
-           decode, extract bytes, construct
-           for verifying the keys, secp256k1 will verify through from_slice() method
+           Need to give more verbose errors in the from_str() method.
+        
+        - Create HDWallet from a Xprv string (use the provided key as master)
+
+        - Create method in bs58check module to validate payload to prevent unnecessary duplicate functioning code
 */
 
 //Outward facing modules

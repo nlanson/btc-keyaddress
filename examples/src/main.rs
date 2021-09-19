@@ -21,9 +21,9 @@ use btc_keyaddress::{
 fn main() {
     //print_vals();
     //bip39();
-    println!("{:?}", verify_mnemonic_phrase());
-    println!("{:?}", verify_bad_phrase());
-    hdwallet().unwrap();
+    //println!("{:?}", verify_mnemonic_phrase());
+    //println!("{:?}", verify_bad_phrase());
+    hdwallet().unwrap()
 }
 
 fn print_vals() {

@@ -11,6 +11,12 @@ pub enum VersionPrefix {
     None
 }
 
+pub enum Bs58Error {
+    InvalidChar((char, usize)),
+    NonAsciiChar(usize),
+    Unknown(String)
+}
+
 /**
     Returns the Base58Check encoded value of the input data.
     * Prefix is based on use case as degined in the VersionPrefix enum
@@ -53,7 +59,16 @@ pub fn encode(data: &[u8]) -> String {
 /**
     Decodes a given Base58 string into a Byte vector
 */
-pub fn decode(encoded: String) -> Result<Vec<u8>, bs58::decode::Error> {
-    bs58::decode(encoded).into_vec()
+pub fn decode(encoded: String) -> Result<Vec<u8>, Bs58Error> {
+    match bs58::decode(encoded).into_vec() {
+        Ok(x) => Ok(x),
+        Err(x) => {
+            match x {
+                bs58::decode::Error::InvalidCharacter { character: c, index: i } => return Err(Bs58Error::InvalidChar((c, i))),
+                bs58::decode::Error::NonAsciiCharacter { index: i } => return Err(Bs58Error::NonAsciiChar(i)),
+                x => return Err(Bs58Error::Unknown(x.to_string()))
+            }
+        }
+    }
 
 }

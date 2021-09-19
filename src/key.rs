@@ -77,7 +77,7 @@ impl PrivKey {
     pub fn add_assign(&mut self, other: &[u8]) -> Result<(), KeyError> {
         match self.0.add_assign(other) {
             Ok(_) => Ok(()),
-            Err(x) => Err(KeyError::BadArithmatic())
+            Err(_) => Err(KeyError::BadArithmatic())
         }
     }
 }
@@ -125,7 +125,7 @@ impl PubKey {
     pub fn add_assign(&mut self, other: &[u8]) -> Result<(), KeyError> {
         match self.0.add_exp_assign(&Secp256k1::new(), other) {
             Ok(_) => Ok(()),
-            Err(x) => Err(KeyError::BadArithmatic())
+            Err(_) => Err(KeyError::BadArithmatic())
         }
     }
 

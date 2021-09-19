@@ -6,7 +6,6 @@
     are the keys and the last 32 bytes is the chaincode.
 */
 
-use std::any::TypeId;
 use crate::{
     key::{
         PrivKey,
@@ -15,6 +14,7 @@ use crate::{
     },
     bs58check::{
         check_encode,
+        decode,
         VersionPrefix
     },
     hdwallet::{
@@ -25,7 +25,9 @@ use crate::{
         },
         HDWError
     },
-    address::Address
+    address::Address,
+    hash,
+    util::try_into
 };
 
 #[derive(Clone)]
@@ -46,12 +48,19 @@ pub struct Xpub {
     pub index: [u8; 4]
 }
 
-pub trait ExtendedKey {
+pub trait ExtendedKey<T> {
     /**
         Constructs the Extended Key.
     */
-    fn construct<T: 'static>(key: T, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self
+    fn construct(key: T, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self
     where T: Key;
+
+    /**
+        Import a extended key from a string.
+        "xprv[...]" or "xpub[...]""
+    */
+    fn from_str(key: &str) -> Result<Self, HDWError>
+    where Self: Sized;
 
     /**
         Returns the key part (left 32 bytes) of the extended key
@@ -87,20 +96,54 @@ pub trait ExtendedKey {
     }
 }
 
-impl ExtendedKey for Xprv {
-    fn construct<T: 'static>(key: T, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self 
-    where T: Key
-    {
-        if TypeId::of::<T>() == TypeId::of::<PrivKey>() {
-            return Self {
-                key: PrivKey::from_slice(&key.as_bytes::<32>()).unwrap(),
-                chaincode: chaincode,
-                //Serialisation info
-                depth: depth,
-                parent_fingerprint: pf,
-                index: index
-            }
-        } else { panic!("Tried to create extended private key without using PrivKey") }
+impl ExtendedKey<PrivKey> for Xprv {
+    fn construct(key: PrivKey, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self {
+        Self {
+            key: PrivKey::from_slice(&key.as_bytes::<32>()).unwrap(),
+            chaincode: chaincode,
+            //Serialisation info
+            depth: depth,
+            parent_fingerprint: pf,
+            index: index
+        }
+    }
+
+    fn from_str(key: &str) -> Result<Self, HDWError> {
+        let bytes = match decode(key.to_string()) {
+            Ok(x) => x,
+            Err(_) => return Err(HDWError::BadKey())
+        };
+        //Check if the decoded key is 84 bytes large
+        if bytes.len() != 82 { return Err(HDWError::BadKey()) }
+        
+        //Check if the checkum of the decoded bytes is equal to the calculated checksum
+        let data = bytes[..bytes.len()-4].to_vec();
+        let extracted_checksum = bytes[78..].to_vec();
+        let derived_checksum = hash::double_sha256(data)[0..4].to_vec();
+        if derived_checksum != extracted_checksum  { return Err(HDWError::BadKey()) }
+        
+        //Check if the verion of the key is for "xprv" keys
+        let version = bytes[0..4].to_vec();
+        if version != vec![0x04, 0x88, 0xAD, 0xE4] { return Err(HDWError::BadKey()) }
+
+        //Extract the remaining data from the payload
+        let depth: u8 = bytes[4];
+        let fingerprint: [u8; 4] = try_into(bytes[5..9].to_vec());
+        let index: [u8; 4] = try_into(bytes[9..13].to_vec());
+        let chaincode: [u8; 32] = try_into(bytes[13..45].to_vec());
+        let key: PrivKey = match PrivKey::from_slice(&bytes[46..78]) {
+            Ok(x) => x,
+            Err(_) => return Err(HDWError::BadKey())
+        };
+
+        //Construct self
+        Ok(Self::construct(
+            key,
+            chaincode,
+            depth,
+            fingerprint,
+            index
+        ))
     }
 
     /**
@@ -166,11 +209,8 @@ impl Xprv {
     
 }
 
-impl ExtendedKey for Xpub {
-    fn construct<T: 'static>(key: T, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self 
-    where T: Key
-    {
-        if TypeId::of::<T>() == TypeId::of::<PubKey>() {
+impl ExtendedKey<PubKey> for Xpub {
+    fn construct(key: PubKey, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self {
             return Self {
                 key: PubKey::from_slice(&key.as_bytes::<33>()).unwrap(),
                 chaincode: chaincode,
@@ -179,7 +219,44 @@ impl ExtendedKey for Xpub {
                 parent_fingerprint: pf,
                 index: index
             }
-        } else { panic!("Tried to create extended public key without using PubKey") }
+    }
+
+    fn from_str(key: &str) -> Result<Self, HDWError> {
+        let bytes = match decode(key.to_string()) {
+            Ok(x) => x,
+            Err(x) => panic!("cannot decode due to {}", x)
+        };
+        //Check if the decoded key is 84 bytes large
+        if bytes.len() != 82 { return Err(HDWError::BadKey()) }
+
+        //Check if the checkum of the decoded bytes is equal to the calculated checksum
+        let data = bytes[..bytes.len()-4].to_vec();
+        let extracted_checksum = bytes[78..].to_vec();
+        let derived_checksum = hash::double_sha256(data)[0..4].to_vec();
+        if derived_checksum != extracted_checksum  { return Err(HDWError::BadKey()) }
+        
+        //Check if the verion of the key is for "xpub" keys
+        let version = bytes[0..4].to_vec();
+        if version != vec![0x04, 0x88, 0xB2, 0x1E] { return Err(HDWError::BadKey()) }
+        
+        //Extract the remaining data from the payload
+        let depth: u8 = bytes[4];
+        let fingerprint: [u8; 4] = try_into(bytes[5..9].to_vec());
+        let index: [u8; 4] = try_into(bytes[9..13].to_vec());
+        let chaincode: [u8; 32] = try_into(bytes[13..45].to_vec());
+        let key: PubKey = match PubKey::from_slice(&bytes[45..78]) {
+            Ok(x) => x,
+            Err(_) => return Err(HDWError::BadKey())
+        };
+
+        //Construct self
+        Ok(Self::construct(
+            key,
+            chaincode,
+            depth,
+            fingerprint,
+            index
+        ))
     }
 
     /**
@@ -285,5 +362,24 @@ mod tests {
         assert_eq!(hdw.mpub_key().serialize(),
         "xpub661MyMwAqRbcEqTnPR3hW9tAWNA97FvEEenYXP8eWi7i2nYDypfdG5d8iWfK8YgesKi2EE5mk9THcTqnveDWwZVMuctjmxeEaUKgtg7CEEc".to_string()
         );
+    }
+
+    #[test]
+    fn create_xkeys_from_str() {
+        let test_data: Vec<&str> = vec![
+            "xprv9s21ZrQH143K2MPKHPWh91wRxLKehoCNsRrwizj2xNaj9zD5SHMNiHJesDEYgJAavgNE1fDWLgYNneHeSA8oVeVXVYomhP1wxdzZtKsLJbc",
+            "this is definately not a extended private key",
+            "xpub661MyMwAqRbcEqTnPR3hW9tAWNA97FvEEenYXP8eWi7i2nYDypfdG5d8iWfK8YgesKi2EE5mk9THcTqnveDWwZVMuctjmxeEaUKgtg7CEEc"
+        ];
+
+        let expected_results: Vec<bool> = vec![
+            true,
+            false,
+            false
+        ];
+
+        for i in 0..test_data.len() {
+            assert_eq!(Xprv::from_str(test_data[i]).is_ok(), expected_results[i]);
+        }
     }
 }
