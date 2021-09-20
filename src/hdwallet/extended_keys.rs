@@ -15,7 +15,9 @@ use crate::{
     bs58check::{
         check_encode,
         decode,
-        VersionPrefix
+        validate_checksum,
+        VersionPrefix,
+        Bs58Error
     },
     hdwallet::{
         ckd::{
@@ -26,7 +28,6 @@ use crate::{
         HDWError
     },
     address::Address,
-    hash,
     util::try_into
 };
 
@@ -94,6 +95,50 @@ pub trait ExtendedKey<T> {
     fn get_address(&self) -> String {
         Address::from_pub_key(&self.get_pub(), true)
     }
+
+    /**
+        Derive the key at the given path.
+    */
+    fn derive_from_path(&self, path: &str) -> Result<Self, HDWError>
+    where Self: Sized + Clone
+    {
+        let mut children: Vec<&str> = path.split('/').map(|x| x).collect();
+        
+        if children[0] == "m" {
+            children.remove(0);
+        } else {
+            return Err(HDWError::BadPath(path.to_string()))
+        }
+
+        let mut current_key: Self = self.clone();
+        let mut childkey: Self = self.clone();
+        for i in 0..children.len() {
+            //Set the options for the child
+            let options: ChildOptions = match children[i].parse() {
+                //If the provided index can be parsed without errors, it will be a normal child
+                Ok(x) => ChildOptions::Normal(x),
+
+                //If the provided index cant be parsed, check if it can be parsed with the last char removed.
+                //If this works, then it will be a hardened child. Else return an error.
+                Err(_) => {
+                    let hardened_index = &children[i][0..children[i].len()-1];
+                    match hardened_index.parse() {
+                        Ok(x) => ChildOptions::Hardened(x),
+                        Err(_) => return Err(HDWError::BadPath(path.to_string()))
+                    }
+                }
+            };
+            
+            childkey = match current_key.get_xchild(options) {
+                Ok(x) => x,
+                Err(x) => return Err(x)
+            };
+            current_key = childkey.clone();
+        }
+
+
+        Ok(childkey)  
+    }
 }
 
 impl ExtendedKey<PrivKey> for Xprv {
@@ -109,22 +154,27 @@ impl ExtendedKey<PrivKey> for Xprv {
     }
 
     fn from_str(key: &str) -> Result<Self, HDWError> {
-        let bytes = match decode(key.to_string()) {
+        let bytes = match decode(&key.to_string()) {
             Ok(x) => x,
-            Err(_) => return Err(HDWError::BadKey())
+            //If decode error, return the index of the bad character or a generic error
+            Err(x) => match x {
+                Bs58Error::InvalidChar(x) => return Err(HDWError::BadChar(x.1)),
+                Bs58Error::NonAsciiChar(x) => return Err(HDWError::BadChar(x)),
+                _ => return Err(HDWError::BadKey())
+            }
         };
         //Check if the decoded key is 84 bytes large
         if bytes.len() != 82 { return Err(HDWError::BadKey()) }
         
-        //Check if the checkum of the decoded bytes is equal to the calculated checksum
-        let data = bytes[..bytes.len()-4].to_vec();
-        let extracted_checksum = bytes[78..].to_vec();
-        let derived_checksum = hash::double_sha256(data)[0..4].to_vec();
-        if derived_checksum != extracted_checksum  { return Err(HDWError::BadKey()) }
+        //Check if the checkum of the decoded bytes is equal to the calculated checksum.
+        //validate_checksum() method will likely not return an Error as the key has already been decoded once.
+        if let Ok(x) = validate_checksum(key) {
+            if !x { return Err(HDWError::BadChecksum()) } 
+        }
         
         //Check if the verion of the key is for "xprv" keys
         let version = bytes[0..4].to_vec();
-        if version != vec![0x04, 0x88, 0xAD, 0xE4] { return Err(HDWError::BadKey()) }
+        if version != vec![0x04, 0x88, 0xAD, 0xE4] { return Err(HDWError::BadPrefix(version)) }
 
         //Extract the remaining data from the payload
         let depth: u8 = bytes[4];
@@ -222,22 +272,26 @@ impl ExtendedKey<PubKey> for Xpub {
     }
 
     fn from_str(key: &str) -> Result<Self, HDWError> {
-        let bytes = match decode(key.to_string()) {
+        let bytes = match decode(&key.to_string()) {
             Ok(x) => x,
-            Err(x) => panic!("cannot decode due to {}", x)
+            //If decode error, return the index of the bad character or a generic error
+            Err(x) => match x {
+                Bs58Error::InvalidChar(x) => return Err(HDWError::BadChar(x.1)),
+                Bs58Error::NonAsciiChar(x) => return Err(HDWError::BadChar(x)),
+                _ => return Err(HDWError::BadKey())
+            }
         };
         //Check if the decoded key is 84 bytes large
         if bytes.len() != 82 { return Err(HDWError::BadKey()) }
 
         //Check if the checkum of the decoded bytes is equal to the calculated checksum
-        let data = bytes[..bytes.len()-4].to_vec();
-        let extracted_checksum = bytes[78..].to_vec();
-        let derived_checksum = hash::double_sha256(data)[0..4].to_vec();
-        if derived_checksum != extracted_checksum  { return Err(HDWError::BadKey()) }
+        if let Ok(x) = validate_checksum(key) {
+            if !x { return Err(HDWError::BadChecksum()) } 
+        }
         
         //Check if the verion of the key is for "xpub" keys
         let version = bytes[0..4].to_vec();
-        if version != vec![0x04, 0x88, 0xB2, 0x1E] { return Err(HDWError::BadKey()) }
+        if version != vec![0x04, 0x88, 0xB2, 0x1E] { return Err(HDWError::BadPrefix(version)) }
         
         //Extract the remaining data from the payload
         let depth: u8 = bytes[4];
@@ -366,20 +420,34 @@ mod tests {
 
     #[test]
     fn create_xkeys_from_str() {
+        //XPRV
         let test_data: Vec<&str> = vec![
             "xprv9s21ZrQH143K2MPKHPWh91wRxLKehoCNsRrwizj2xNaj9zD5SHMNiHJesDEYgJAavgNE1fDWLgYNneHeSA8oVeVXVYomhP1wxdzZtKsLJbc",
             "this is definately not a extended private key",
             "xpub661MyMwAqRbcEqTnPR3hW9tAWNA97FvEEenYXP8eWi7i2nYDypfdG5d8iWfK8YgesKi2EE5mk9THcTqnveDWwZVMuctjmxeEaUKgtg7CEEc"
         ];
-
         let expected_results: Vec<bool> = vec![
             true,
             false,
-            false
+            false,
         ];
-
         for i in 0..test_data.len() {
             assert_eq!(Xprv::from_str(test_data[i]).is_ok(), expected_results[i]);
+        }
+
+        //XPUB
+        let test_data: Vec<&str> = vec![
+            "xpub661MyMwAqRbcEqTnPR3hW9tAWNA97FvEEenYXP8eWi7i2nYDypfdG5d8iWfK8YgesKi2EE5mk9THcTqnveDWwZVMuctjmxeEaUKgtg7CEEc",
+            "this is definately not a extended private key",
+            "xprv661MyMwAqRbcEqTnPR3hW9tAWNA97FvEEenYXP8eWi7i2nYDypfdG5d8iWfK8YgesKi2EE5mk9THcTqnveDWwZVMuctjmxeEaUKgtg7CEEc"
+        ];
+        let expected_results: Vec<bool> = vec![
+            true,
+            false,
+            false,
+        ];
+        for i in 0..test_data.len() {
+            assert_eq!(Xpub::from_str(test_data[i]).is_ok(), expected_results[i]);
         }
     }
 }

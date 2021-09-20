@@ -30,5 +30,9 @@ pub enum HDWError {
     IndexReserved(u32),
     CantHarden(),
     BadKey(),
-    BadArithmatic()
+    BadArithmatic(),
+    BadChar(usize),
+    BadChecksum(),
+    BadPrefix(Vec<u8>),
+    BadPath(String)
 }
