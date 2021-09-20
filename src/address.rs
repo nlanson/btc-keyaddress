@@ -25,25 +25,30 @@ impl Address {
         Verifies that an address is valid by checking the payload and checksum
     */
     pub fn is_valid(address: String) -> bool {
-        let decoded: Vec<u8> = match bs58check::decode(address) {
+        let decoded: Vec<u8> = match bs58check::decode(&address) {
             Ok(x) => x,
             Err(_) => return false //Could return Err() here instead to provide more insight on why the address is not valid
         };
         if decoded.len() != 25 { return false }
 
-        let checksum: [u8; 4] = try_into( //Extract the checksum from the decoded address
-            decoded[decoded.len()-4..decoded.len()].to_vec()
-        ); 
-        let payload_hash: [u8; 4] = try_into( //Hash the payload of the address
-            hash::sha256(hash::sha256(
-            decoded[0..decoded.len()-4].to_vec()
-            ))[0..4].to_vec()
-        );
+        
+        if let Ok(_) = bs58check::validate_checksum(&address) {
+            return true;
+        };
+        
+        // let checksum: [u8; 4] = try_into( //Extract the checksum from the decoded address
+        //     decoded[decoded.len()-4..decoded.len()].to_vec()
+        // ); 
+        // let payload_hash: [u8; 4] = try_into( //Hash the payload of the address
+        //     hash::sha256(hash::sha256(
+        //     decoded[0..decoded.len()-4].to_vec()
+        //     ))[0..4].to_vec()
+        // );
 
-        //Compare the attached checksum to the hashed payload
-        if checksum == payload_hash {
-            return true
-        }
+        // //Compare the attached checksum to the hashed payload
+        // if checksum == payload_hash {
+        //     return true
+        // }
 
         false
     }
@@ -77,6 +82,8 @@ mod tests {
         //Test if the expeted and derived keys are equal
         assert_eq!(expected_compressed_address, derived_compressed_address);
         assert_eq!(expected_uncompressed_address, derived_uncompressed_address);
+        assert_eq!(Address::is_valid(derived_compressed_address.to_string()), true);
+        assert_eq!(Address::is_valid(derived_uncompressed_address.to_string()), true);
     }
 
     #[test]

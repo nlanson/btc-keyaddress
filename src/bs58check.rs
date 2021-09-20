@@ -1,4 +1,8 @@
-use crate::{bs58, hash};
+use crate::{
+    bs58, 
+    hash,
+    util::try_into
+};
 
 pub enum VersionPrefix {
     BTCAddress,
@@ -59,7 +63,7 @@ pub fn encode(data: &[u8]) -> String {
 /**
     Decodes a given Base58 string into a Byte vector
 */
-pub fn decode(encoded: String) -> Result<Vec<u8>, Bs58Error> {
+pub fn decode(encoded: &String) -> Result<Vec<u8>, Bs58Error> {
     match bs58::decode(encoded).into_vec() {
         Ok(x) => Ok(x),
         Err(x) => {
@@ -71,4 +75,16 @@ pub fn decode(encoded: String) -> Result<Vec<u8>, Bs58Error> {
         }
     }
 
+}
+
+/**
+    Validate the checksum on a Base58Check encoded string
+*/
+pub fn validate_checksum(encoded: &str) -> Result<bool, Bs58Error> {
+    let bytes = decode(&encoded.to_string())?;
+    let payload = &bytes[..bytes.len()-4];
+    let extracted_checksum: [u8; 4] = try_into(bytes[bytes.len()-4..].to_vec());
+    let derived_checksum: [u8; 4] = try_into(hash::double_sha256(payload)[0..4].to_vec());
+
+    Ok(extracted_checksum == derived_checksum)
 }

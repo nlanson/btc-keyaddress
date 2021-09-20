@@ -16,14 +16,9 @@
 
     Todo:
         - Derive child keys using string deriveration paths.
-            ( deriveration_path: String ) -> Xprv or Xpub
-        
-        - Create extended keys from base58 encoded strings.
-           Need to give more verbose errors in the from_str() method.
+            Write units tests for deriveration path method
         
         - Create HDWallet from a Xprv string (use the provided key as master)
-
-        - Create method in bs58check module to validate payload to prevent unnecessary duplicate functioning code
 */
 
 //Outward facing modules
