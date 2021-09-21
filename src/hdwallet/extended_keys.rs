@@ -450,4 +450,20 @@ mod tests {
             assert_eq!(Xpub::from_str(test_data[i]).is_ok(), expected_results[i]);
         }
     }
+
+    #[test]
+    fn derive_from_path_tests() {
+        let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
+        let hdw: HDWallet = HDWallet::new(mnemonic).unwrap();
+        
+        let (xprv_at_path, xpub_at_path) = match hdw.mpriv_key().derive_from_path("m/44'/0'/0'/0") {
+            Ok(x) => {
+                (x.serialize(), x.get_xpub().serialize())
+            },
+            Err(x) => panic!("{}", x)
+        };
+
+        assert_eq!(xprv_at_path, "xprvA2RVpXN1QL4okLkV3NT6ADt7UcqauZdi6Tyv2wBscQ3kq9zvvfsxBBgQTcoj7GZCa7wkmmeLvQHdqVJEQ1D4PGoDgYV8CZj9w9jqGNbGCaT");
+        assert_eq!(xpub_at_path, "xpub6FQrE2tuEhd6xppx9Pz6XMpr2eg5K2MZTguWqKbVAjajhxL5UDCCiyztJtCFDrAqPoQfmbVeVX5BKXQ7vxgR42DtsVa3g2YMLZQjbEnxbqi");
+    }
 }

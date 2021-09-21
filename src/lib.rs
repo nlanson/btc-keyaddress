@@ -15,10 +15,8 @@
             for providing clear reference code to work against, especially with bip32.
 
     Todo:
-        - Derive child keys using string deriveration paths.
-            Write units tests for deriveration path method
-        
         - Create HDWallet from a Xprv string (use the provided key as master)
+        - Generate array of addresses given a deriveration path and count
 */
 
 //Outward facing modules
