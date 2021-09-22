@@ -8,7 +8,7 @@ This library implements keys and addresses for use with Bitcoin.
 
 ## Installation
 
-Add a dependency to your ```cargo.toml```:
+Add this as a dependency to your ```cargo.toml```:
 ``` 
 btc_keyaddress = { git = "https://github.com/nlanson/btc-keyaddress" }
 ```
