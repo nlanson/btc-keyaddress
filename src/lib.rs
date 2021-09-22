@@ -20,6 +20,7 @@
 */
 
 //Outward facing modules
+pub mod prelude;
 pub mod key;
 pub mod address;
 pub mod bip39;
@@ -28,7 +29,7 @@ pub mod hdwallet;
 //Modules for internal use
 mod hash;
 mod bs58check;
-pub mod util;
+mod util;
 mod entropy;
 mod impls;
 

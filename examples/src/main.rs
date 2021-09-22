@@ -1,22 +1,4 @@
-use btc_keyaddress::{
-    address::Address,
-    bip39::{
-        MnemonicErr,
-        Language,
-        Mnemonic,
-        PhraseLength
-    },
-    hdwallet::{
-        HDWallet,
-        ChildOptions,
-        ExtendedKey,
-        HDWError
-    }, 
-    key::{
-        PubKey,
-        PrivKey
-    }
-};
+use btc_keyaddress::prelude::*;
 
 fn main() {
     //print_vals();
