@@ -15,6 +15,8 @@ btc_keyaddress = { git = "https://github.com/nlanson/btc-keyaddress" }
     
 ## Basic Usage Examples
 ```rust
+use btc_keyaddress::prelude::*;
+
 //Create a new randomm mnemonic
 let mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
 
