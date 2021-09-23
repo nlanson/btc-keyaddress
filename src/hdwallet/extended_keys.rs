@@ -97,6 +97,12 @@ pub trait ExtendedKey<T> {
     }
 
     /**
+        Creates a list of addresses from the extended keys
+    */
+    fn create_address_list(&self, count: usize) -> Vec<String>
+    where Self: Sized;
+
+    /**
         Derive the key at the given path.
     */
     fn derive_from_path(&self, path: &str) -> Result<Self, HDWError>
@@ -230,6 +236,12 @@ impl ExtendedKey<PrivKey> for Xprv {
     fn get_pub(&self) -> PubKey {
         PubKey::from_priv_key(&PrivKey::from_slice(&self.key::<32>()).unwrap())
     }
+
+    fn create_address_list(&self, count: usize) -> Vec<String>
+    where Self: Sized 
+    {
+        todo!();
+    }
     
 }
 
@@ -344,6 +356,12 @@ impl ExtendedKey<PubKey> for Xpub {
 
     fn get_pub(&self) -> PubKey {
         PubKey::from_slice(&self.key::<33>()).unwrap()
+    }
+
+    fn create_address_list(&self, count: usize) -> Vec<String>
+    where Self: Sized 
+    {
+        todo!();
     }
 }
 
