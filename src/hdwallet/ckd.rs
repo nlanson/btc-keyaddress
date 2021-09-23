@@ -27,7 +27,7 @@ use crate::{
 /**
     Enum to pattern match child key deriveration options.
 */
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ChildOptions {
     Normal(u32),
     Hardened(u32)

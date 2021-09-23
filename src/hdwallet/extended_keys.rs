@@ -25,7 +25,8 @@ use crate::{
             derive_xpub,
             ChildOptions
         },
-        HDWError
+        HDWError,
+        Path
     },
     address::Address,
     util::try_into
@@ -97,53 +98,24 @@ pub trait ExtendedKey<T> {
     }
 
     /**
-        Creates a list of addresses from the extended keys
-    */
-    fn create_address_list(&self, count: usize) -> Vec<String>
-    where Self: Sized;
-
-    /**
         Derive the key at the given path.
+        Takes in a vec of strings representing the path.
+        eg. [44', 0', 0', 0] would represent the path m/44'/0'/0'/0
     */
-    fn derive_from_path(&self, path: &str) -> Result<Self, HDWError>
+    fn derive_from_path(&self, path: &Path) -> Result<Self, HDWError>
     where Self: Sized + Clone
     {
-        let mut children: Vec<&str> = path.split('/').map(|x| x).collect();
-        
-        if children[0] == "m" {
-            children.remove(0);
-        } else {
-            return Err(HDWError::BadPath(path.to_string()))
-        }
 
         let mut current_key: Self = self.clone();
         let mut childkey: Self = self.clone();
-        for i in 0..children.len() {
-            //Set the options for the child
-            let options: ChildOptions = match children[i].parse() {
-                //If the provided index can be parsed without errors, it will be a normal child
-                Ok(x) => ChildOptions::Normal(x),
-
-                //If the provided index cant be parsed, check if it can be parsed with the last char removed.
-                //If this works, then it will be a hardened child. Else return an error.
-                Err(_) => {
-                    let hardened_index = &children[i][0..children[i].len()-1];
-                    match hardened_index.parse() {
-                        Ok(x) => ChildOptions::Hardened(x),
-                        Err(_) => return Err(HDWError::BadPath(path.to_string()))
-                    }
-                }
-            };
-            
-            childkey = match current_key.get_xchild(options) {
+        for i in 0..path.children.len() {
+            childkey = match current_key.get_xchild(path.children[i].clone()) {
                 Ok(x) => x,
                 Err(x) => return Err(x)
             };
             current_key = childkey.clone();
         }
-
-
-        Ok(childkey)  
+        Ok(childkey) 
     }
 }
 
@@ -235,12 +207,6 @@ impl ExtendedKey<PrivKey> for Xprv {
 
     fn get_pub(&self) -> PubKey {
         PubKey::from_priv_key(&PrivKey::from_slice(&self.key::<32>()).unwrap())
-    }
-
-    fn create_address_list(&self, count: usize) -> Vec<String>
-    where Self: Sized 
-    {
-        todo!();
     }
     
 }
@@ -358,11 +324,6 @@ impl ExtendedKey<PubKey> for Xpub {
         PubKey::from_slice(&self.key::<33>()).unwrap()
     }
 
-    fn create_address_list(&self, count: usize) -> Vec<String>
-    where Self: Sized 
-    {
-        todo!();
-    }
 }
 
 #[cfg(test)]
@@ -473,8 +434,9 @@ mod tests {
     fn derive_from_path_tests() {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
         let hdw: HDWallet = HDWallet::new(mnemonic).unwrap();
-        
-        let (xprv_at_path, xpub_at_path) = match hdw.mpriv_key().derive_from_path("m/44'/0'/0'/0") {
+        let path: Path = Path::from_str("m/44'/0'/0'/0").unwrap();
+
+        let (xprv_at_path, xpub_at_path) = match hdw.mpriv_key().derive_from_path(&path) {
             Ok(x) => {
                 (x.serialize(), x.get_xpub().serialize())
             },

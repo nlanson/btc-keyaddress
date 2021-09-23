@@ -27,21 +27,15 @@ let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").un
 //Create a hierarchical deterministic wallet from the mnemonic
 let hdwallet = HDWallet::new(mnemonic.clone()).unwrap();
 
-//Get the extended key pair at deriveration path m/44'/0'/0'/0  (BIP-44)
-let (xprv, xpub) = match hdw.mpriv_key().derive_from_path("m/44'/0'/0'/0") {
-    Ok(x) => { 
-        (x, x.get_xpub())
-    },
-    Err(x) => panic!("Could not derive key pair")
-};
+//Get the extended key pair at deriveration path m/44'/0'/0'/0/0  (BIP-44)
+let xprv = hdw.get_xprv_key_at("m/44'/0'/0'/0/0").unwrap();
+println!("Key pair at 'm/44'/0'/0'/0':");
+println!("{}", xprv.serialize());
+println!("{}", xprv.get_xpub().serialize());
 
-//Serialise an extended key
-let serialized = xprv.serialize();
-println!("{}", serialized);
-
-//Print the address of an extended key
-let address = xpub.get_address();
-println!("{}", address);
+//Get a list of addresses at a given deriveration path
+let addresses = hdw.get_addresses("m/44'/0'/0'/0/0", 10).unwrap();
+println!("{}", addresses)'
 ```
 
   

@@ -14,6 +14,7 @@
 mod hdwallet;
 mod extended_keys;
 mod ckd;
+mod path;
 
 pub use hdwallet::HDWallet;
 pub use ckd::derive_xprv;
@@ -22,6 +23,7 @@ pub use ckd::ChildOptions;
 pub use extended_keys::ExtendedKey;
 pub use extended_keys::Xprv;
 pub use extended_keys::Xpub;
+pub use path::Path;
 
 
 #[derive(Debug)]

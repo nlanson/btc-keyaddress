@@ -17,6 +17,7 @@
     Todo:
         - Create HDWallet from a Xprv string (use the provided key as master)
         - Generate array of addresses given a deriveration path and count
+            Implement tests and function to create xprv and xpub by count
 */
 
 //Outward facing modules

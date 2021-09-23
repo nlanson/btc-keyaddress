@@ -72,15 +72,12 @@ fn hdwallet() -> Result<(), HDWError> {
         )
     );
 
-    match hdw.mpriv_key().derive_from_path("m/44'/0'/0'/0") {
-        Ok(x) => { 
-            println!("Key pair at m/44'/0'/0'/0:");
-            println!("{}", x.serialize());
-            println!("{}", x.get_xpub().serialize()) 
-        
-        },
-        Err(x) => println!("{}", x)
-    };
+    let xprv = hdw.get_xprv_key_at("m/44'/0'/0'/0").unwrap();
+    println!("Key pair at 'm/44'/0'/0'/0':");
+    println!("{}", xprv.serialize());
+    println!("{}", xprv.get_xpub().serialize());
+    hdw.get_addresses("m/44'/0'/0'/0/0", 10).unwrap();
+    
 
     Ok(())
 }
