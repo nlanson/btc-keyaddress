@@ -1,19 +1,19 @@
 use btc_keyaddress::prelude::*;
 
 fn main() {
-    //print_vals();
+    print_vals();
     //bip39();
     //println!("{:?}", verify_mnemonic_phrase());
     //println!("{:?}", verify_bad_phrase());
-    hdwallet().unwrap()
+    //hdwallet().unwrap()
 }
 
 fn print_vals() {
     let private_key: PrivKey = PrivKey::new_rand();
-    let compressed_wif: String = private_key.export_as_wif(true);
-    let uncompressed_wif: String = private_key.export_as_wif(false);
+    let compressed_wif: String = private_key.export_as_wif(true, true);
+    let uncompressed_wif: String = private_key.export_as_wif(false, true);
     let public_key: PubKey = PubKey::from_priv_key(&private_key);
-    let compressed_address: String = Address::from_pub_key(&public_key, true);
+    let compressed_address: String = Address::testnet_address_from_pub_key(&public_key, true);
     let uncompressed_address: String = Address::from_pub_key(&public_key, false);
 
     println!(
@@ -72,11 +72,11 @@ fn hdwallet() -> Result<(), HDWError> {
         )
     );
 
-    let xprv = hdw.get_xprv_key_at("m/44'/0'/0'/0").unwrap();
+    let xprv = hdw.get_xprv_key_at("m/44'/0'/0'/0/0").unwrap();
     println!("Key pair at 'm/44'/0'/0'/0':");
-    println!("{}", xprv.serialize());
+    println!("{}", xprv.get_prv().export_as_wif(true, false));
     println!("{}", xprv.get_xpub().serialize());
-    hdw.get_addresses("m/44'/0'/0'/0/0", 10).unwrap();
+    println!("{:?}", hdw.get_addresses("m/44'/0'/0'/0/0", 10).unwrap());
     
 
     Ok(())

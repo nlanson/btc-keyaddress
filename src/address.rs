@@ -22,6 +22,20 @@ impl Address {
     }
 
     /**
+        Does the same thing as the from_pub_key() method but uses the test net prefix
+        instead of the regular prefix when encoding to base 58.
+    */
+    pub fn testnet_address_from_pub_key(pk: &PubKey, compressed: bool) -> String {
+        let mut pubkey_bytes: Vec<u8> = pk.as_bytes::<33>().to_vec();
+        if !compressed { pubkey_bytes = pk.decompressed_bytes().to_vec(); }
+        
+        let mut hash: Vec<u8> = hash::sha256(&pubkey_bytes).to_vec();
+        hash = hash::ripemd160(hash).to_vec();
+        bs58check::check_encode(bs58check::VersionPrefix::BTCTestNetAddress, &hash)
+
+    }
+
+    /**
         Verifies that an address is valid by checking the payload and checksum
     */
     pub fn is_valid(address: String) -> bool {
@@ -35,20 +49,6 @@ impl Address {
         if let Ok(_) = bs58check::validate_checksum(&address) {
             return true;
         };
-        
-        // let checksum: [u8; 4] = try_into( //Extract the checksum from the decoded address
-        //     decoded[decoded.len()-4..decoded.len()].to_vec()
-        // ); 
-        // let payload_hash: [u8; 4] = try_into( //Hash the payload of the address
-        //     hash::sha256(hash::sha256(
-        //     decoded[0..decoded.len()-4].to_vec()
-        //     ))[0..4].to_vec()
-        // );
-
-        // //Compare the attached checksum to the hashed payload
-        // if checksum == payload_hash {
-        //     return true
-        // }
 
         false
     }

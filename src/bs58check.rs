@@ -9,6 +9,7 @@ pub enum VersionPrefix {
     P2ScriptAddress,
     BTCTestNetAddress,
     PrivateKeyWIF,
+    TestNetPrivateKeyWIF,
     //BIP32
     Xprv,
     Xpub,
@@ -32,9 +33,10 @@ pub fn check_encode(prefix: VersionPrefix, data: &[u8]) -> String {
     //Set the prefix based on use
     let p: Vec<u8> = match prefix {
         VersionPrefix::BTCAddress => vec![0x00],
-        VersionPrefix::BTCTestNetAddress => vec![0x05],
-        VersionPrefix::P2ScriptAddress => vec![0x6F],
+        VersionPrefix::BTCTestNetAddress => vec![0x6F],
+        VersionPrefix::P2ScriptAddress => vec![0x05],
         VersionPrefix::PrivateKeyWIF => vec![0x80],
+        VersionPrefix::TestNetPrivateKeyWIF => vec![0xef],
         VersionPrefix::Xprv => vec![0x04, 0x88, 0xAD, 0xE4],
         VersionPrefix::Xpub => vec![0x04, 0x88, 0xB2, 0x1E],
         VersionPrefix::None => vec![]

@@ -61,13 +61,18 @@ impl PrivKey {
         Export the private key a wallet-import-format (Base58Check Encoded with prefix)
         * Use the parameter to indicate if WIF should include the compression byte.
     */
-    pub fn export_as_wif(&self, compressed: bool) -> String {
+    pub fn export_as_wif(&self, compressed: bool, testnet: bool) -> String {
         let mut key: Vec<u8> = self.as_bytes::<32>().to_vec();
         if compressed {
             key.append(&mut vec![0x01]);
         }
         
-        bs58check::check_encode(bs58check::VersionPrefix::PrivateKeyWIF, &key)
+        if testnet {
+            bs58check::check_encode(bs58check::VersionPrefix::TestNetPrivateKeyWIF, &key)
+        } else {
+            bs58check::check_encode(bs58check::VersionPrefix::PrivateKeyWIF, &key)
+        }
+        
     }
 
     /**
@@ -174,8 +179,8 @@ mod tests {
         let expected_uncompressed_wif = "5JU1qir5EqH6BF8Uu7ihFhxh5gGZ6qcA1hfN2mgpZ4taoTTWjzu".to_string();
 
         let derived_public_key = PubKey::from_priv_key(&test_key);
-        let derived_compressed_wif = test_key.export_as_wif(true);
-        let derived_uncompressed_wif = test_key.export_as_wif(false);
+        let derived_compressed_wif = test_key.export_as_wif(true, false);
+        let derived_uncompressed_wif = test_key.export_as_wif(false, false);
         
 
         //Is the derived public key the same as the expected public key?
