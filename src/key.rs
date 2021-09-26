@@ -85,6 +85,10 @@ impl PrivKey {
             Err(_) => Err(KeyError::BadArithmatic())
         }
     }
+
+    pub fn raw(&self) -> SecretKey {
+        self.0
+    }
 }
 
 impl Key for PrivKey {
@@ -134,9 +138,9 @@ impl PubKey {
         }
     }
 
-    // fn raw(&self) -> PublicKey {
-    //     self.0
-    // }
+    pub fn raw(&self) -> PublicKey {
+        self.0
+    }
 }
 
 impl Key for PubKey {
