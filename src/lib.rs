@@ -34,7 +34,7 @@ pub mod script;
 
 //Modules for internal use
 mod hash;
-mod bs58check;
+mod encoding;
 mod util;
 mod entropy;
 mod impls;

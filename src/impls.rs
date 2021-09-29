@@ -7,7 +7,7 @@ use crate::{
     key,
     key::{Key},
     address,
-    bs58check,
+    encoding,
     hdwallet,
     bip39
 };
@@ -51,7 +51,7 @@ impl fmt::Display for address::Address {
 /**
     bs58check module impls
 */
-impl fmt::Display for bs58check::Bs58Error {
+impl fmt::Display for encoding::bs58check::Bs58Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let val: String = match self {
             Self::InvalidChar(x) => format!("Invalid char '{}' at index {}", x.0, x.1),

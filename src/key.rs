@@ -3,7 +3,9 @@ use crate::{
     PublicKey,
     SecretKey,
     SecpOsRng,
-    bs58check,
+    encoding::{
+        bs58check as bs58check
+    },
     util::decode_02x,
     util::encode_02x,
     util::try_into

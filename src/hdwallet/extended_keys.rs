@@ -12,7 +12,7 @@ use crate::{
         PubKey,
         Key
     },
-    bs58check::{
+    encoding::bs58check::{
         check_encode,
         decode,
         validate_checksum,

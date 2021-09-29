@@ -1,7 +1,10 @@
 use crate:: {
     key::PubKey, key::Key,
     hash,
-    bs58check,
+    encoding::{
+        bs58check as bs58check,
+        bech32 as bech32
+    },
     script::RedeemScript
 };
 
@@ -47,6 +50,38 @@ impl Address {
     */
     pub fn testnet_script_address(script: &RedeemScript) -> String {
         bs58check::check_encode(bs58check::VersionPrefix::TestnetP2SHAddress, &script.hash())
+    }
+
+    /**
+        Create a mainnet P2WPKH address from a public key
+    */
+    pub fn p2wpkh(pk: &PubKey) -> Result<String, bech32::Bech32Err>  {
+        let hash = hash::hash160(&pk.as_bytes::<33>());
+        Ok(bech32::encode_to_address(&hash, "mainnet")?)
+    }
+
+    /**
+        Create a testnet P2WPKH address from a public key
+    */
+    pub fn testnet_p2wpkh(pk: &PubKey) -> Result<String, bech32::Bech32Err>  {
+        let hash = hash::hash160(&pk.as_bytes::<33>());
+        Ok(bech32::encode_to_address(&hash, "testnet")?)
+    }
+
+    /**
+        Create mainnet P2WSH addresses from a redeem script
+    */
+    pub fn p2wsh(script: RedeemScript) -> Result<String, bech32::Bech32Err> {
+        let hash = hash::sha256(script.script);
+        Ok(bech32::encode_to_address(&hash, "mainnet")?)
+    }
+
+    /**
+        Create mainnet P2WSH addresses from a redeem script
+    */
+    pub fn testnet_p2wsh(script: RedeemScript) -> Result<String, bech32::Bech32Err> {
+        let hash = hash::sha256(script.script);
+        Ok(bech32::encode_to_address(&hash, "testnet")?)
     }
 
     /**

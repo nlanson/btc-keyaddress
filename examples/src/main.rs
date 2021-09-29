@@ -1,11 +1,12 @@
-use btc_keyaddress::prelude::*;
+use btc_keyaddress::{key::Key, prelude::*};
 
 fn main() {
-    print_vals();
+    //print_vals();
     //bip39();
     //println!("{:?}", verify_mnemonic_phrase());
     //println!("{:?}", verify_bad_phrase());
     //hdwallet().unwrap()
+    p2wpkh();
 }
 
 fn print_vals() {
@@ -80,4 +81,12 @@ fn hdwallet() -> Result<(), HDWError> {
     
 
     Ok(())
+}
+
+fn p2wpkh() {
+    let private_key: PrivKey = PrivKey::new_rand();
+    let p2wpkh_address = Address::p2wpkh(&PubKey::from_priv_key(&private_key)).unwrap();
+
+    println!("{}", encode_02x(&PubKey::from_priv_key(&private_key).as_bytes::<33>()));
+    println!("{}", p2wpkh_address);
 }
