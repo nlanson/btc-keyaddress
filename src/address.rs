@@ -2,7 +2,7 @@ use crate:: {
     key::PubKey, key::Key,
     hash,
     bs58check,
-    util::try_into
+    script::RedeemScript
 };
 
 pub struct Address;
@@ -22,6 +22,13 @@ impl Address {
     }
 
     /**
+        Creates a P2SH address from a redeem script
+    */
+    pub fn from_script(script: &RedeemScript) -> String {
+        bs58check::check_encode(bs58check::VersionPrefix::P2ScriptAddress, &script.hash())
+    }
+
+    /**
         Does the same thing as the from_pub_key() method but uses the test net prefix
         instead of the regular prefix when encoding to base 58.
     */
@@ -33,6 +40,13 @@ impl Address {
         hash = hash::ripemd160(hash).to_vec();
         bs58check::check_encode(bs58check::VersionPrefix::BTCTestNetAddress, &hash)
 
+    }
+
+    /**
+        Creates a P2SH address for the test net
+    */
+    pub fn testnet_script_address(script: &RedeemScript) -> String {
+        bs58check::check_encode(bs58check::VersionPrefix::TestnetP2SHAddress, &script.hash())
     }
 
     /**

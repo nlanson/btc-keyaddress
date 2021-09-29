@@ -33,6 +33,8 @@ pub use crate::{
         encode_02x,
         decode_02x,
         try_into
-    }
+    },
+
+    script::RedeemScript
 
 };

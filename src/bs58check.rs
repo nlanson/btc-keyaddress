@@ -7,6 +7,7 @@ use crate::{
 pub enum VersionPrefix {
     BTCAddress,
     P2ScriptAddress,
+    TestnetP2SHAddress,
     BTCTestNetAddress,
     PrivateKeyWIF,
     TestNetPrivateKeyWIF,
@@ -35,6 +36,7 @@ pub fn check_encode(prefix: VersionPrefix, data: &[u8]) -> String {
         VersionPrefix::BTCAddress => vec![0x00],
         VersionPrefix::BTCTestNetAddress => vec![0x6F],
         VersionPrefix::P2ScriptAddress => vec![0x05],
+        VersionPrefix::TestnetP2SHAddress => vec![0xC4],
         VersionPrefix::PrivateKeyWIF => vec![0x80],
         VersionPrefix::TestNetPrivateKeyWIF => vec![0xef],
         VersionPrefix::Xprv => vec![0x04, 0x88, 0xAD, 0xE4],

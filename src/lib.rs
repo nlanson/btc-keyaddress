@@ -18,6 +18,10 @@
         - Create HDWallet from a Xprv string (use the provided key as master)
         - Generate array of addresses given a deriveration path and count
             Implement tests and function to create xprv and xpub by count
+        - Create P2SH addresses using multisig.
+           - Method to take in m of n option and the required keys -> MultiSig redeem Script
+           - Hash the script to make the address
+        - Create Bech32 addresses
 */
 
 //Outward facing modules
@@ -26,6 +30,7 @@ pub mod key;
 pub mod address;
 pub mod bip39;
 pub mod hdwallet;
+pub mod script;
 
 //Modules for internal use
 mod hash;
