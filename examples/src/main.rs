@@ -7,6 +7,7 @@ fn main() {
     //println!("{:?}", verify_bad_phrase());
     //hdwallet().unwrap()
     p2wpkh();
+    p2wsh();
 }
 
 fn print_vals() {
@@ -89,4 +90,15 @@ fn p2wpkh() {
 
     println!("{}", encode_02x(&PubKey::from_priv_key(&private_key).as_bytes::<33>()));
     println!("{}", p2wpkh_address);
+    println!("{}", p2wpkh_address.len());
+}
+
+fn p2wsh() {
+    let script: RedeemScript = RedeemScript::new(vec![
+        0x6a, 0x29, 0x05, 0x20, 0x03
+    ]);
+
+    let p2wsh_address = Address::p2wsh(&script).unwrap();
+    println!("{}", p2wsh_address);
+    println!("{}", p2wsh_address.len());
 }

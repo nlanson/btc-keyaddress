@@ -71,16 +71,16 @@ impl Address {
     /**
         Create mainnet P2WSH addresses from a redeem script
     */
-    pub fn p2wsh(script: RedeemScript) -> Result<String, bech32::Bech32Err> {
-        let hash = hash::sha256(script.script);
+    pub fn p2wsh(script: &RedeemScript) -> Result<String, bech32::Bech32Err> {
+        let hash = hash::sha256(script.script.clone());
         Ok(bech32::encode_to_address(&hash, "mainnet")?)
     }
 
     /**
         Create mainnet P2WSH addresses from a redeem script
     */
-    pub fn testnet_p2wsh(script: RedeemScript) -> Result<String, bech32::Bech32Err> {
-        let hash = hash::sha256(script.script);
+    pub fn testnet_p2wsh(script: &RedeemScript) -> Result<String, bech32::Bech32Err> {
+        let hash = hash::sha256(script.script.clone());
         Ok(bech32::encode_to_address(&hash, "testnet")?)
     }
 
