@@ -75,9 +75,16 @@ pub trait ExtendedKey<T> {
     fn chaincode(&self) -> [u8; 32];
 
     /**
-        Base58 check encode the extended key with serialisation info.
+        Base58 check encode the extended key with serialisation prefix for legacy
+        p2pkh.
     */
-    fn serialize(&self) -> String;
+    fn serialize_legacy(&self) -> String;
+
+    /**
+        Base58 check encode the extended key with serialisation prefix for newer
+        p2wpkh. (Segwit)
+    */
+    fn serialize_segwit(&self) -> String;
 
     /**
         Derives the child key of self
@@ -185,7 +192,7 @@ impl ExtendedKey<PrivKey> for Xprv {
         self.chaincode
     }
 
-    fn serialize(&self) -> String {
+    fn serialize_legacy(&self) -> String {
         let mut payload: Vec<u8> = vec![];
         payload.push(self.depth); //depth
         self.parent_fingerprint.iter().for_each(|x| payload.push(*x)); //fingerprint
@@ -195,6 +202,18 @@ impl ExtendedKey<PrivKey> for Xprv {
         self.key::<32>().iter().for_each(|x| payload.push(*x)); //private key
         
         check_encode(VersionPrefix::Xprv,&payload)
+    }
+
+    fn serialize_segwit(&self) -> String {
+        let mut payload: Vec<u8> = vec![];
+        payload.push(self.depth); //depth
+        self.parent_fingerprint.iter().for_each(|x| payload.push(*x)); //fingerprint
+        self.index.iter().for_each(|x| payload.push(*x)); //index
+        self.chaincode().iter().for_each(|x| payload.push(*x)); //chaincode
+        payload.push(0x00); //private key append 0x00
+        self.key::<32>().iter().for_each(|x| payload.push(*x)); //private key
+        
+        check_encode(VersionPrefix::Zprv,&payload)
     }
 
     fn get_xchild(&self, options: ChildOptions) -> Result<Xprv, HDWError> {
@@ -302,7 +321,7 @@ impl ExtendedKey<PubKey> for Xpub {
         self.chaincode
     }
 
-    fn serialize(&self) -> String {
+    fn serialize_legacy(&self) -> String {
         let mut payload: Vec<u8> = vec![];
         payload.push(self.depth); //depth
         self.parent_fingerprint.iter().for_each(|x| payload.push(*x)); //parent fingerprint
@@ -311,6 +330,17 @@ impl ExtendedKey<PubKey> for Xpub {
         self.key::<33>().iter().for_each(|x| payload.push(*x)); //public key
         
         check_encode(VersionPrefix::Xpub,&payload)
+    }
+
+    fn serialize_segwit(&self) -> String {
+        let mut payload: Vec<u8> = vec![];
+        payload.push(self.depth); //depth
+        self.parent_fingerprint.iter().for_each(|x| payload.push(*x)); //parent fingerprint
+        self.index.iter().for_each(|x| payload.push(*x)); //index
+        self.chaincode().iter().for_each(|x| payload.push(*x)); //chaincode
+        self.key::<33>().iter().for_each(|x| payload.push(*x)); //public key
+        
+        check_encode(VersionPrefix::Zpub,&payload)
     }
 
     fn get_xchild(&self, options: ChildOptions) -> Result<Xpub, HDWError> {
@@ -387,12 +417,12 @@ mod tests {
         let hdw: HDWallet = HDWallet::new(mnemonic).unwrap();
 
         //master xprv serialization test
-        assert_eq!(hdw.mpriv_key().serialize(), 
+        assert_eq!(hdw.mpriv_key().serialize_legacy(), 
         "xprv9s21ZrQH143K2MPKHPWh91wRxLKehoCNsRrwizj2xNaj9zD5SHMNiHJesDEYgJAavgNE1fDWLgYNneHeSA8oVeVXVYomhP1wxdzZtKsLJbc".to_string()
         );
 
         //master xpub serialization test
-        assert_eq!(hdw.mpub_key().serialize(),
+        assert_eq!(hdw.mpub_key().serialize_legacy(),
         "xpub661MyMwAqRbcEqTnPR3hW9tAWNA97FvEEenYXP8eWi7i2nYDypfdG5d8iWfK8YgesKi2EE5mk9THcTqnveDWwZVMuctjmxeEaUKgtg7CEEc".to_string()
         );
     }
@@ -438,12 +468,38 @@ mod tests {
 
         let (xprv_at_path, xpub_at_path) = match hdw.mpriv_key().derive_from_path(&path) {
             Ok(x) => {
-                (x.serialize(), x.get_xpub().serialize())
+                (x.serialize_legacy(), x.get_xpub().serialize_legacy())
             },
             Err(x) => panic!("{}", x)
         };
 
         assert_eq!(xprv_at_path, "xprvA2RVpXN1QL4okLkV3NT6ADt7UcqauZdi6Tyv2wBscQ3kq9zvvfsxBBgQTcoj7GZCa7wkmmeLvQHdqVJEQ1D4PGoDgYV8CZj9w9jqGNbGCaT");
         assert_eq!(xpub_at_path, "xpub6FQrE2tuEhd6xppx9Pz6XMpr2eg5K2MZTguWqKbVAjajhxL5UDCCiyztJtCFDrAqPoQfmbVeVX5BKXQ7vxgR42DtsVa3g2YMLZQjbEnxbqi");
+    }
+
+    #[test]
+    fn bip84_test_vectors() {
+        let mnemonic: Mnemonic = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(), Language::English, "").unwrap();
+        let hdw = HDWallet::new(mnemonic).unwrap();
+        
+        // Account 0, root = m/84'/0'/0'
+        let account = hdw.get_xprv_key_at("m/84'/0'/0'").unwrap();
+        assert_eq!(account.serialize_segwit(), "zprvAdG4iTXWBoARxkkzNpNh8r6Qag3irQB8PzEMkAFeTRXxHpbF9z4QgEvBRmfvqWvGp42t42nvgGpNgYSJA9iefm1yYNZKEm7z6qUWCroSQnE");
+        assert_eq!(account.get_xpub().serialize_segwit(), "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs");
+
+        // Account 0, first receiving address = m/84'/0'/0'/0/0
+        let account = hdw.get_xprv_key_at("m/84'/0'/0'/0/0").unwrap();
+        assert_eq!(account.get_prv().export_as_wif(true, false), "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d");
+        assert_eq!(Address::p2wpkh(&account.get_pub()).unwrap(), "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu");
+
+        // Account 0, second receiving address = m/84'/0'/0'/0/1
+        let account = hdw.get_xprv_key_at("m/84'/0'/0'/0/1").unwrap();
+        assert_eq!(account.get_prv().export_as_wif(true, false), "Kxpf5b8p3qX56DKEe5NqWbNUP9MnqoRFzZwHRtsFqhzuvUJsYZCy");
+        assert_eq!(Address::p2wpkh(&account.get_pub()).unwrap(), "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g");
+
+        // Account 0, first change address = m/84'/0'/0'/1/0
+        let account = hdw.get_xprv_key_at("m/84'/0'/0'/1/0").unwrap();
+        assert_eq!(account.get_prv().export_as_wif(true, false), "KxuoxufJL5csa1Wieb2kp29VNdn92Us8CoaUG3aGtPtcF3AzeXvF");
+        assert_eq!(Address::p2wpkh(&account.get_pub()).unwrap(), "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el");
     }
 }
