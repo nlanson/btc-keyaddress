@@ -17,7 +17,8 @@ use crate::{
 #[derive(Debug)]
 pub enum KeyError {
     BadSlice(),
-    BadArithmatic()
+    BadArithmatic(),
+    BadWif()
 }
 
 /**
@@ -90,6 +91,28 @@ impl PrivKey {
 
     pub fn raw(&self) -> SecretKey {
         self.0
+    }
+
+    /**
+      Create a private key from wif
+    */
+    pub fn from_wif(wif: &str) -> Result<Self, KeyError> {
+        let mut bytes = match bs58check::decode(&wif.to_string()) {
+            Ok(x) => x,
+            Err(_) => return Err(KeyError::BadWif())
+        };
+
+        bytes.remove(0); //remove the version prefix
+        bytes.splice(bytes.len()-4..bytes.len(), vec![]); //remove the checksum
+        if bytes.len() == 33 {
+            bytes.remove(bytes.len()-1); //remove the compression byte
+            return Ok(Self::from_slice(&bytes)?);
+        } else if bytes.len() == 32 {
+            return Ok(Self::from_slice(&bytes)?)
+        }
+        
+        return Err(KeyError::BadWif())
+        
     }
 }
 
@@ -235,5 +258,30 @@ mod tests {
                 _ => false
             }
         );
+    }
+
+    #[test]
+    fn privkey_from_wif() {
+        let testnet_wifs: Vec<&str> = vec![
+            "cRQbJ2t9mfrAXE9THANTGnj42ysgKtxMaTv9rw9eRMrZBfNAsPv9",
+            "92TBwcKPNuJUz9R7rt4W4aUCZczhdTGiNBBELUDqMUP6w7V3tPN"
+        ];
+
+        let expected_pk: PrivKey = PrivKey::from_slice(&[114, 38, 26, 249, 94, 159, 251, 207, 115, 108, 169, 140, 97, 249, 149, 161, 110, 42, 120, 163, 193, 164, 192, 248, 91, 30, 123, 98, 59, 24, 220, 54]).unwrap();
+        
+        for i in 0..testnet_wifs.len() {
+            assert!(PrivKey::from_wif(testnet_wifs[i]).unwrap().as_bytes() == expected_pk.as_bytes::<32>());
+        }
+
+        let mainnet_wifs: Vec<&str> = vec![
+            "cTgPUEMicCdp7afFt7436LwduW8o3oiYVQyJMoiVscGDaLDQZGYr",
+            "92y3prhVTZ6AmYBw83jNmiDqEi3DhWchDL2Rn3RosSD4JbZ3jZu"
+        ];
+
+        let expected_pk: PrivKey = PrivKey::from_slice(&[181, 243, 36, 71, 85, 202, 145, 148, 138, 199, 106, 36, 223, 13, 86, 51, 15, 97, 88, 163, 177, 89, 167, 155, 157, 230, 44, 107, 160, 171, 46, 60]).unwrap();
+        
+        for i in 0..mainnet_wifs.len() {
+            assert!(PrivKey::from_wif(mainnet_wifs[i]).unwrap().as_bytes() == expected_pk.as_bytes::<32>());
+        }
     }
 }

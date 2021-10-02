@@ -1,13 +1,13 @@
 use btc_keyaddress::{key::Key, prelude::*};
 
 fn main() {
-    //print_vals();
+    print_vals();
     //bip39();
     //println!("{:?}", verify_mnemonic_phrase());
     //println!("{:?}", verify_bad_phrase());
     //hdwallet().unwrap()
-    p2wpkh();
-    p2wsh();
+    //p2wpkh();
+    //p2wsh();
 }
 
 fn print_vals() {
@@ -86,11 +86,11 @@ fn hdwallet() -> Result<(), HDWError> {
 
 fn p2wpkh() {
     let private_key: PrivKey = PrivKey::new_rand();
-    let p2wpkh_address = Address::p2wpkh(&PubKey::from_priv_key(&private_key)).unwrap();
+    let p2wpkh_address = Address::testnet_p2wpkh(&PubKey::from_priv_key(&private_key)).unwrap();
 
-    println!("{}", encode_02x(&PubKey::from_priv_key(&private_key).as_bytes::<33>()));
+    println!("{}", &private_key.export_as_wif(true, true));
+    println!("{:?}", &private_key.as_bytes::<32>());
     println!("{}", p2wpkh_address);
-    println!("{}", p2wpkh_address.len());
 }
 
 fn p2wsh() {
@@ -100,5 +100,4 @@ fn p2wsh() {
 
     let p2wsh_address = Address::p2wsh(&script).unwrap();
     println!("{}", p2wsh_address);
-    println!("{}", p2wsh_address.len());
 }
