@@ -110,7 +110,8 @@ mod tests {
     };
     use crate::{
         key::PrivKey,
-        util::decode_02x
+        util::decode_02x,
+        script::RedeemScript
     };
 
     const TEST_PUB_KEY_HEX: &str = "0204664c60ceabd82967055ccbd0f56a1585dfbd42032656efa501c463b16fbdfe";
@@ -155,5 +156,83 @@ mod tests {
                 _ => false
             }
         );
+    }
+
+    #[test]
+    fn testnet_legacy_address_tests() {
+        //Test data test
+        let private_key: PrivKey = PrivKey::from_wif("cNShtSaCAzPPSFgm5LiGUhkuyBhJyV4jQqYXP3asyXK9k8uhiZdx").unwrap();
+        let public_key: PubKey = PubKey::from_priv_key(&private_key);
+        let derived_address: String = Address::testnet_address_from_pub_key(&public_key, true);
+        let expected_address: String = "msSJzRfQb2T3hvws3vRhqtK2Ao39cabEa2".to_string();
+
+        assert!(derived_address == expected_address);
+
+        //Random tests
+        for _i in 0..5 {
+            let k = PrivKey::new_rand();
+            let pk = PubKey::from_priv_key(&k);
+            let address = Address::testnet_address_from_pub_key(&pk, true);
+            match address.chars().nth(0) {
+                Some('m') | Some('n') => assert!(true),
+                _ => assert!(false)
+            }
+        }
+    }
+
+    #[test]
+    fn p2sh_address_tests() {
+        //Test data test
+        let script: RedeemScript = RedeemScript::new(vec![0x6a, 0x29, 0x05, 0x20, 0x03]);
+        let derived_address = Address::from_script(&script);
+        let expected_address = "33SjjXog5Tqm3kCYNGCQBH46gc48a4SUXn".to_string();
+        assert!(derived_address == expected_address);
+
+        //Random mainnet tests
+        for i in 0..5 {
+            let script: RedeemScript = RedeemScript::new(vec![i; 5]);
+            let address = Address::from_script(&script);
+            match address.chars().nth(0) {
+                Some('3') => assert!(true),
+                _ => assert!(false)
+            }
+        }
+
+        //Random testnet tests
+        for i in 0..5 {
+            let script: RedeemScript = RedeemScript::new(vec![i; 5]);
+            let address = Address::testnet_script_address(&script);
+            match address.chars().nth(0) {
+                Some('2') => assert!(true),
+                _ => assert!(false)
+            }
+        }
+    }
+
+    #[test]
+    fn p2wpkh_address_tests() {
+        let key_1: PrivKey = PrivKey::from_wif("cPYWWA7yv4ivb2ueWJP6SKr6rSJiT6JfGkdVrgvhrWR7soE8RxBG").unwrap();
+        let pk1 = PubKey::from_priv_key(&key_1);
+        let derived_address_1 = Address::testnet_p2wpkh(&pk1).unwrap();
+        let expected_address_1 = "tb1qxauw2dslmtgdyzw73gtv9mzv5erp3xf7mt83vq".to_string();
+        assert!(derived_address_1 == expected_address_1);
+        
+        let key_2: PrivKey = PrivKey::from_wif("cRzmfLNVsbHp5MYJhY8xz6DaYJBUgSKQL8jwU2xL3su6GScPgxsb").unwrap();
+        let pk2 = PubKey::from_priv_key(&key_2);
+        let derived_address_2 = Address::testnet_p2wpkh(&pk2).unwrap();
+        let expected_address_2 = "tb1qj8rvxxnzkdapv3rueazzyn434duv5q5ep3ze5e".to_string();
+        assert!(derived_address_2 == expected_address_2);
+    }
+
+    #[test]
+    fn p2wsh_address_tests() {
+        let redeem_script: RedeemScript = RedeemScript::new(vec![0x6a, 0x29, 0x05, 0x20, 0x03]);
+        let derived_mainnet_address = Address::p2wsh(&redeem_script).unwrap();
+        let expected_mainnet_address = "bc1q4sr2gyed4ww8zm0t9ktn47qxlu2nhl5ejkf6fjzfttnsjvxdkqjqe7yhq9".to_string();
+        let derived_testnet_address = Address::testnet_p2wsh(&redeem_script).unwrap();
+        let expected_testnet_address = "tb1q4sr2gyed4ww8zm0t9ktn47qxlu2nhl5ejkf6fjzfttnsjvxdkqjqwkjc62".to_string();
+
+        assert!(derived_mainnet_address == expected_mainnet_address);
+        assert!(derived_testnet_address == expected_testnet_address);
     }
 }
