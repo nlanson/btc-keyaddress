@@ -202,9 +202,9 @@ mod tests {
 
         //Get the first child extended private and public key of the master key.
         //Calculate the child extended public key twice  through the master xpub and child xprv
-        let derived_m0 = hdw.mpriv_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize();
-        let derived_M0_fromxprv = hdw.mpriv_key().get_xchild(ChildOptions::Normal(0)).unwrap().get_xpub().serialize();
-        let derived_M0_fromxpub = hdw.mpub_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize();
+        let derived_m0 = hdw.mpriv_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize_legacy();
+        let derived_M0_fromxprv = hdw.mpriv_key().get_xchild(ChildOptions::Normal(0)).unwrap().get_xpub().serialize_legacy();
+        let derived_M0_fromxpub = hdw.mpub_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize_legacy();
 
         //Test is derived values are equal to expected values and if derived xpubs are both identical
         assert_eq!(derived_m0, EXPECTED_m0.to_string());
@@ -219,12 +219,12 @@ mod tests {
 
         //Calculate the hardened children of the master keys.
         //Deriving the corresponding xpub of a hardened xprv is not possible. So pattern match the error.
-        let derived_m0h = hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().serialize();
+        let derived_m0h = hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().serialize_legacy();
         let derived_M0h_fromxpub = match hdw.mpub_key().get_xchild(ChildOptions::Hardened(0)) {
             Ok(_) => true,
             Err(_) => false
         }; 
-        let derived_M0h_fromxprv = hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().get_xpub().serialize();
+        let derived_M0h_fromxprv = hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().get_xpub().serialize_legacy();
 
         //Test is derived values are equal to expected values and if hardened xpub deriveration failed
         assert_eq!(derived_m0h, EXPECTED_m0h);

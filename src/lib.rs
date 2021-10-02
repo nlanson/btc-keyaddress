@@ -15,13 +15,11 @@
             for providing clear reference code to work against, especially with bip32.
 
     Todo:
-        - Create HDWallet from a Xprv string (use the provided key as master)
-        - Generate array of addresses given a deriveration path and count
-            Implement tests and function to create xprv and xpub by count
         - Create P2SH addresses using multisig.
            - Method to take in m of n option and the required keys -> MultiSig redeem Script
            - Hash the script to make the address
-        - Create Bech32 addresses
+        
+        - Serialization of BIP-49 (P2SH nested P2WPKH keys using ypriv/ypub prefix)
 */
 
 //Outward facing modules

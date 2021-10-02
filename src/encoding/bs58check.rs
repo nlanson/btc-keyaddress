@@ -14,6 +14,9 @@ pub enum VersionPrefix {
     //BIP32
     Xprv,
     Xpub,
+    //BIP84
+    Zprv,
+    Zpub,
     None
 }
 
@@ -41,6 +44,8 @@ pub fn check_encode(prefix: VersionPrefix, data: &[u8]) -> String {
         VersionPrefix::TestNetPrivateKeyWIF => vec![0xef],
         VersionPrefix::Xprv => vec![0x04, 0x88, 0xAD, 0xE4],
         VersionPrefix::Xpub => vec![0x04, 0x88, 0xB2, 0x1E],
+        VersionPrefix::Zprv => vec![0x04, 0xb2, 0x43, 0x0c],
+        VersionPrefix::Zpub => vec![0x04, 0xb2, 0x47, 0x46],
         VersionPrefix::None => vec![]
     };
 

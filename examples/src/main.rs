@@ -61,8 +61,8 @@ fn hdwallet() -> Result<(), HDWError> {
     mpub:  {}\n
     address (m/0/0):   {}
     ", mnemonic.phrase.join(" "),
-       hdw.mpriv_key().serialize(),
-       hdw.mpub_key().serialize(),
+       hdw.mpriv_key().serialize_legacy(),
+       hdw.mpub_key().serialize_legacy(),
        Address::from_pub_key(
            &hdw.mpriv_key()
            .get_xchild(ChildOptions::Normal(0))?
@@ -75,7 +75,7 @@ fn hdwallet() -> Result<(), HDWError> {
     let xprv = hdw.get_xprv_key_at("m/44'/0'/0'/0/0").unwrap();
     println!("Key pair at 'm/44'/0'/0'/0':");
     println!("{}", xprv.get_prv().export_as_wif(true, false));
-    println!("{}", xprv.get_xpub().serialize());
+    println!("{}", xprv.get_xpub().serialize_legacy());
     println!("{:?}", hdw.get_addresses("m/44'/0'/0'/0/0", 10).unwrap());
     
 
