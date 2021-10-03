@@ -85,9 +85,9 @@ fn hdwallet() -> Result<(), HDWError> {
 
 fn multisig_address() {
     let keys: Vec<PrivKey> = vec![
-        PrivKey::new_rand(),
-        PrivKey::new_rand(),
-        PrivKey::new_rand()
+        PrivKey::from_wif("cU1mPkyNgJ8ceLG5v2zN1VkZcvDCE7VK8KrnHwW82PZb6RCq7zRq").unwrap(),
+        PrivKey::from_wif("cPTFNJD7hgbZTqNJgW89HABGtRzYo5aLpCQKvmNdtRNGWo49NAky").unwrap(),
+        PrivKey::from_wif("cNUe2L9CNJZoedMU8YNrzRuxFc56dvMjFxzK4mTsSGhXwbidAyog").unwrap()
     ];
 
     let m = 2;
