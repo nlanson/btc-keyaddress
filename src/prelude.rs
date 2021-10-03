@@ -35,6 +35,6 @@ pub use crate::{
         try_into
     },
 
-    script::RedeemScript
+    script::Script
 
 };

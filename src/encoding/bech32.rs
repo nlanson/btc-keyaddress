@@ -3,14 +3,6 @@
 */
 use bitcoin_bech32::{WitnessProgram, u5};
 use bitcoin_bech32::constants::Network;
-use crate::{
-    key::{
-        PubKey
-    },
-    script::{
-        RedeemScript
-    }
-};
 
 #[derive(Debug)]
 pub enum Bech32Err {
