@@ -6,6 +6,7 @@ fn main() {
     //println!("{:?}", verify_mnemonic_phrase());
     //println!("{:?}", verify_bad_phrase());
     //hdwallet().unwrap()
+    multisig_address();
 }
 
 fn print_vals() {
@@ -80,4 +81,20 @@ fn hdwallet() -> Result<(), HDWError> {
     
 
     Ok(())
+}
+
+fn multisig_address() {
+    let keys: Vec<PrivKey> = vec![
+        PrivKey::new_rand(),
+        PrivKey::new_rand(),
+        PrivKey::new_rand()
+    ];
+
+    let m = 2;
+    let n = 3;
+
+    let script = Script::multisig(m, n, &keys).unwrap();
+    let address = Address::p2wsh(&script).unwrap();
+
+    println!("{}", address);
 }

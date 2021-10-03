@@ -5,7 +5,7 @@ use crate:: {
         bs58check as bs58check,
         bech32 as bech32
     },
-    script::RedeemScript
+    script::Script
 };
 
 pub struct Address;
@@ -27,7 +27,7 @@ impl Address {
     /**
         Creates a P2SH address from a redeem script
     */
-    pub fn from_script(script: &RedeemScript) -> String {
+    pub fn from_script(script: &Script) -> String {
         bs58check::check_encode(bs58check::VersionPrefix::P2ScriptAddress, &script.hash())
     }
 
@@ -48,7 +48,7 @@ impl Address {
     /**
         Creates a P2SH address for the test net
     */
-    pub fn testnet_script_address(script: &RedeemScript) -> String {
+    pub fn testnet_script_address(script: &Script) -> String {
         bs58check::check_encode(bs58check::VersionPrefix::TestnetP2SHAddress, &script.hash())
     }
 
@@ -71,7 +71,7 @@ impl Address {
     /**
         Create mainnet P2WSH addresses from a redeem script
     */
-    pub fn p2wsh(script: &RedeemScript) -> Result<String, bech32::Bech32Err> {
+    pub fn p2wsh(script: &Script) -> Result<String, bech32::Bech32Err> {
         let hash = hash::sha256(script.script.clone());
         Ok(bech32::encode_to_address(&hash, "mainnet")?)
     }
@@ -79,7 +79,7 @@ impl Address {
     /**
         Create mainnet P2WSH addresses from a redeem script
     */
-    pub fn testnet_p2wsh(script: &RedeemScript) -> Result<String, bech32::Bech32Err> {
+    pub fn testnet_p2wsh(script: &Script) -> Result<String, bech32::Bech32Err> {
         let hash = hash::sha256(script.script.clone());
         Ok(bech32::encode_to_address(&hash, "testnet")?)
     }
@@ -111,7 +111,7 @@ mod tests {
     use crate::{
         key::PrivKey,
         util::decode_02x,
-        script::RedeemScript
+        script::Script
     };
 
     const TEST_PUB_KEY_HEX: &str = "0204664c60ceabd82967055ccbd0f56a1585dfbd42032656efa501c463b16fbdfe";
@@ -183,14 +183,14 @@ mod tests {
     #[test]
     fn p2sh_address_tests() {
         //Test data test
-        let script: RedeemScript = RedeemScript::new(vec![0x6a, 0x29, 0x05, 0x20, 0x03]);
+        let script: Script = Script::new(vec![0x6a, 0x29, 0x05, 0x20, 0x03]);
         let derived_address = Address::from_script(&script);
         let expected_address = "33SjjXog5Tqm3kCYNGCQBH46gc48a4SUXn".to_string();
         assert!(derived_address == expected_address);
 
         //Random mainnet tests
         for i in 0..5 {
-            let script: RedeemScript = RedeemScript::new(vec![i; 5]);
+            let script: Script = Script::new(vec![i; 5]);
             let address = Address::from_script(&script);
             match address.chars().nth(0) {
                 Some('3') => assert!(true),
@@ -200,7 +200,7 @@ mod tests {
 
         //Random testnet tests
         for i in 0..5 {
-            let script: RedeemScript = RedeemScript::new(vec![i; 5]);
+            let script: Script = Script::new(vec![i; 5]);
             let address = Address::testnet_script_address(&script);
             match address.chars().nth(0) {
                 Some('2') => assert!(true),
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn p2wsh_address_tests() {
-        let redeem_script: RedeemScript = RedeemScript::new(vec![0x6a, 0x29, 0x05, 0x20, 0x03]);
+        let redeem_script: Script = Script::new(vec![0x6a, 0x29, 0x05, 0x20, 0x03]);
         let derived_mainnet_address = Address::p2wsh(&redeem_script).unwrap();
         let expected_mainnet_address = "bc1q4sr2gyed4ww8zm0t9ktn47qxlu2nhl5ejkf6fjzfttnsjvxdkqjqe7yhq9".to_string();
         let derived_testnet_address = Address::testnet_p2wsh(&redeem_script).unwrap();
