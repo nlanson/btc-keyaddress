@@ -62,7 +62,8 @@ impl Script {
         let mut script: Vec<u8> = vec![m + 80]; //m value as opcode
 
         for i in 0..keys.len() {
-            script.push(0x20);
+            script.push(0x21 /*PubKey::from_priv_key(&keys[i]).as_bytes::<33>().len() as u8*/);
+            println!("{}", script[script.len()-1]);
             script.append(&mut PubKey::from_priv_key(&keys[i]).as_bytes::<33>().to_vec())
         }
 

@@ -94,7 +94,16 @@ fn multisig_address() {
     let n = 3;
 
     let script = Script::multisig(m, n, &keys).unwrap();
-    let address = Address::p2wsh(&script).unwrap();
+    let address = Address::testnet_script_address(&script);
 
-    println!("{}", address);
+    println!("
+        Address: {}\n
+        Key 1: {}\n
+        Key 2: {}\n
+        Key 3: {}
+    ", address,
+       keys[0].export_as_wif(true, true),
+       keys[1].export_as_wif(true, true),
+       keys[2].export_as_wif(true, true)
+    );
 }
