@@ -7,7 +7,8 @@ use crate::{
     address::Address,
     key::{
         PrivKey,
-        Key
+        Key,
+        PubKey
     }
 };
 
@@ -63,6 +64,7 @@ impl Script {
         for i in 0..keys.len() {
             script.push(0x20);
             script.append(&mut keys[i].as_bytes::<32>().to_vec());
+            script.append(&mut PubKey::from_priv_key(&keys[i]).as_bytes::<33>().to_vec())
         }
 
         script.push(n + 80); //n value as opcode
