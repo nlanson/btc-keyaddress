@@ -8,7 +8,8 @@ use crate::{
     },
     util::decode_02x,
     util::encode_02x,
-    util::try_into
+    util::try_into,
+    util::Network
 };
 
 /**
@@ -64,16 +65,15 @@ impl PrivKey {
         Export the private key a wallet-import-format (Base58Check Encoded with prefix)
         * Use the parameter to indicate if WIF should include the compression byte.
     */
-    pub fn export_as_wif(&self, compressed: bool, testnet: bool) -> String {
+    pub fn export_as_wif(&self, compressed: bool, network: Network) -> String {
         let mut key: Vec<u8> = self.as_bytes::<32>().to_vec();
         if compressed {
             key.append(&mut vec![0x01]);
         }
         
-        if testnet {
-            bs58check::check_encode(bs58check::VersionPrefix::TestNetPrivateKeyWIF, &key)
-        } else {
-            bs58check::check_encode(bs58check::VersionPrefix::PrivateKeyWIF, &key)
+        match network {
+            Network::Bitcoin => bs58check::check_encode(bs58check::VersionPrefix::PrivateKeyWIF, &key),
+            Network::Testnet => bs58check::check_encode(bs58check::VersionPrefix::TestNetPrivateKeyWIF, &key)
         }
         
     }
@@ -188,7 +188,8 @@ impl Key for PubKey {
 mod tests {
     use super::{
         PrivKey, PubKey, Key,
-        encode_02x, decode_02x
+        encode_02x, decode_02x,
+        Network
     };
 
     //The private key to use in tests
@@ -208,8 +209,8 @@ mod tests {
         let expected_uncompressed_wif = "5JU1qir5EqH6BF8Uu7ihFhxh5gGZ6qcA1hfN2mgpZ4taoTTWjzu".to_string();
 
         let derived_public_key = PubKey::from_priv_key(&test_key);
-        let derived_compressed_wif = test_key.export_as_wif(true, false);
-        let derived_uncompressed_wif = test_key.export_as_wif(false, false);
+        let derived_compressed_wif = test_key.export_as_wif(true, Network::Bitcoin);
+        let derived_uncompressed_wif = test_key.export_as_wif(false, Network::Bitcoin);
         
 
         //Is the derived public key the same as the expected public key?

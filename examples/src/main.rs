@@ -11,10 +11,10 @@ fn main() {
 
 fn print_vals() {
     let private_key: PrivKey = PrivKey::new_rand();
-    let compressed_wif: String = private_key.export_as_wif(true, true);
-    let uncompressed_wif: String = private_key.export_as_wif(false, true);
+    let compressed_wif: String = private_key.export_as_wif(true, Network::Testnet);
+    let uncompressed_wif: String = private_key.export_as_wif(false, Network::Testnet);
     let public_key: PubKey = PubKey::from_priv_key(&private_key);
-    let compressed_address: String = Address::P2PKH(public_key.clone(), Network::Bitcoin).to_string().unwrap();
+    let compressed_address: String = Address::P2PKH(public_key.clone(), Network::Testnet).to_string().unwrap();
 
     println!(
         "
@@ -73,7 +73,7 @@ fn hdwallet() -> Result<(), HDWError> {
 
     let xprv = hdw.get_xprv_key_at("m/44'/0'/0'/0/0").unwrap();
     println!("Key pair at 'm/44'/0'/0'/0':");
-    println!("{}", xprv.get_prv().export_as_wif(true, false));
+    println!("{}", xprv.get_prv().export_as_wif(true, Network::Bitcoin));
     println!("{}", xprv.get_xpub().serialize_legacy());
     println!("{:?}", hdw.get_legacy_addresses("m/44'/0'/0'/0/0", 10, Network::Bitcoin).unwrap());
     
@@ -97,6 +97,6 @@ fn multisig_address() {
         Address: {}\n
         Key 1: {}
     ", address,
-       keys[0].export_as_wif(true, true)
+       keys[0].export_as_wif(true, Network::Testnet)
     );
 }

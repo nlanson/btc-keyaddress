@@ -497,17 +497,17 @@ mod tests {
 
         // Account 0, first receiving address = m/84'/0'/0'/0/0
         let account = hdw.get_xprv_key_at("m/84'/0'/0'/0/0").unwrap();
-        assert_eq!(account.get_prv().export_as_wif(true, false), "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d");
+        assert_eq!(account.get_prv().export_as_wif(true, Network::Bitcoin), "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d");
         assert_eq!(Address::P2WPKH(account.get_pub(), Network::Bitcoin).to_string().unwrap(), "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu");
 
         // Account 0, second receiving address = m/84'/0'/0'/0/1
         let account = hdw.get_xprv_key_at("m/84'/0'/0'/0/1").unwrap();
-        assert_eq!(account.get_prv().export_as_wif(true, false), "Kxpf5b8p3qX56DKEe5NqWbNUP9MnqoRFzZwHRtsFqhzuvUJsYZCy");
+        assert_eq!(account.get_prv().export_as_wif(true, Network::Bitcoin), "Kxpf5b8p3qX56DKEe5NqWbNUP9MnqoRFzZwHRtsFqhzuvUJsYZCy");
         assert_eq!(Address::P2WPKH(account.get_pub(), Network::Bitcoin).to_string().unwrap(), "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g");
 
         // Account 0, first change address = m/84'/0'/0'/1/0
         let account = hdw.get_xprv_key_at("m/84'/0'/0'/1/0").unwrap();
-        assert_eq!(account.get_prv().export_as_wif(true, false), "KxuoxufJL5csa1Wieb2kp29VNdn92Us8CoaUG3aGtPtcF3AzeXvF");
+        assert_eq!(account.get_prv().export_as_wif(true, Network::Bitcoin), "KxuoxufJL5csa1Wieb2kp29VNdn92Us8CoaUG3aGtPtcF3AzeXvF");
         assert_eq!(Address::P2WPKH(account.get_pub(), Network::Bitcoin).to_string().unwrap(), "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el");
     }
 }
