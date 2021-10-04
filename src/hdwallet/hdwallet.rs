@@ -10,7 +10,8 @@ use crate::{
         HDWError, ChildOptions, Path
     },
     hash,
-    util::try_into
+    util::try_into,
+    util::Network
 };
 
 
@@ -79,16 +80,16 @@ impl HDWallet {
     /**
         Creates a lists of addresses at a given path
     */
-    fn get_addresses(&self, path: &str, count: usize, segwit: bool) -> Result<Vec<String>, HDWError> {
+    fn get_addresses(&self, path: &str, count: usize, segwit: bool, network: Network) -> Result<Vec<String>, HDWError> {
         let mut addresses: Vec<String> = vec![];
         let mut p: Path = Path::from_str(path)?;
         let last_index = p.children.len()-1;
         for _i in 0..count {
             //Push the address at the current path into the return vec
             if segwit {
-                addresses.push(self.mpriv_key().derive_from_path(&p)?.get_bech32_address());
+                addresses.push(self.mpriv_key().derive_from_path(&p)?.get_bech32_address(network.clone()));
             } else {
-                addresses.push(self.mpriv_key().derive_from_path(&p)?.get_legacy_address());
+                addresses.push(self.mpriv_key().derive_from_path(&p)?.get_legacy_address(network.clone()));
             }
             
             //Then increment the deepest index by one
@@ -112,15 +113,15 @@ impl HDWallet {
     /**
         Return legacy addresses at a given deriveration path
     */
-    pub fn get_legacy_addresses(&self, path: &str, count: usize)  -> Result<Vec<String>, HDWError> {
-        Self::get_addresses(self, path, count, false)
+    pub fn get_legacy_addresses(&self, path: &str, count: usize, network: Network)  -> Result<Vec<String>, HDWError> {
+        Self::get_addresses(self, path, count, false, network)
     }
 
     /**
         Return segwit addresses at a given deriveration path
     */
-    pub fn get_bech32_addresses(&self, path: &str, count: usize) -> Result<Vec<String>, HDWError> {
-        Self::get_addresses(self, path, count, true)
+    pub fn get_bech32_addresses(&self, path: &str, count: usize, network: Network) -> Result<Vec<String>, HDWError> {
+        Self::get_addresses(self, path, count, true, network)
     }
 
 }

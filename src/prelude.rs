@@ -34,7 +34,8 @@ pub use crate::{
     util::{
         encode_02x,
         decode_02x,
-        try_into
+        try_into,
+        Network
     },
 
     script::Script

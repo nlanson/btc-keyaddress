@@ -4,7 +4,6 @@
 
 use crate::{
     hash,
-    address::Address,
     key::{
         PrivKey,
         Key,
@@ -12,6 +11,7 @@ use crate::{
     }
 };
 
+#[derive(Debug, Clone)]
 pub struct Script {
     pub script: Vec<u8>
 }
@@ -38,17 +38,6 @@ impl Script {
     */
     pub fn hash(&self) -> [u8; 20] {
         hash::hash160(&self.script)
-    }
-
-    /**
-        Get the address of the script
-    */
-    pub fn address(&self, network: &str) -> Result<String, ScriptErr> {
-        match network {
-            "testnet" => Ok(Address::testnet_script_address(self)),
-            "mainnet" => Ok(Address::from_script(self)),
-            _ => Err(ScriptErr::BadNetwork())
-        }
     }
 
     /**

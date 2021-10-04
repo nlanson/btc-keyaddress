@@ -177,7 +177,8 @@ mod tests {
             Mnemonic,
             MnemonicErr,
             Language
-        }
+        },
+        util::Network
     };
     use super::*;
 
@@ -240,19 +241,19 @@ mod tests {
         let m0_0_address_from_xprv: String = hdw.mpriv_key()
                                                 .get_xchild(ChildOptions::Normal(0)).unwrap()
                                                 .get_xchild(ChildOptions::Normal(0)).unwrap()
-                                                .get_legacy_address();
+                                                .get_legacy_address(Network::Bitcoin);
         let m0_0_address_from_xpub: String = hdw.mpub_key()
                                                 .get_xchild(ChildOptions::Normal(0)).unwrap()
                                                 .get_xchild(ChildOptions::Normal(0)).unwrap()
-                                                .get_legacy_address();
+                                                .get_legacy_address(Network::Bitcoin);
         let m0_1_address_from_xprv: String = hdw.mpriv_key()
                                                 .get_xchild(ChildOptions::Normal(0)).unwrap()
                                                 .get_xchild(ChildOptions::Normal(1)).unwrap()
-                                                .get_legacy_address();
+                                                .get_legacy_address(Network::Bitcoin);
         let m0_1_address_from_xpub: String = hdw.mpub_key()
                                                 .get_xchild(ChildOptions::Normal(0)).unwrap()
                                                 .get_xchild(ChildOptions::Normal(1)).unwrap()
-                                                .get_legacy_address();
+                                                .get_legacy_address(Network::Bitcoin);
 
         //Compare the derived addresses to the expected address as 
         //well as checking addresses derived from private keys and 
