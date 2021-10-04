@@ -98,10 +98,17 @@ pub trait ExtendedKey<T> {
     fn get_pub(&self) -> PubKey;
 
     /**
-        Get the address of self.
+        Get the legacy address of self.
     */
-    fn get_address(&self) -> String {
+    fn get_legacy_address(&self) -> String {
         Address::from_pub_key(&self.get_pub(), true)
+    }
+
+    /**
+        Get the Bech32 address of self
+    */
+    fn get_bech32_address(&self) -> String {
+        Address::p2wpkh(&self.get_pub()).unwrap()
     }
 
     /**

@@ -77,7 +77,7 @@ fn hdwallet() -> Result<(), HDWError> {
     println!("Key pair at 'm/44'/0'/0'/0':");
     println!("{}", xprv.get_prv().export_as_wif(true, false));
     println!("{}", xprv.get_xpub().serialize_legacy());
-    println!("{:?}", hdw.get_addresses("m/44'/0'/0'/0/0", 10).unwrap());
+    println!("{:?}", hdw.get_legacy_addresses("m/44'/0'/0'/0/0", 10).unwrap());
     
 
     Ok(())

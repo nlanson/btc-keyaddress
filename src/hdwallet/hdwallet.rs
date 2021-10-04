@@ -79,13 +79,17 @@ impl HDWallet {
     /**
         Creates a lists of addresses at a given path
     */
-    pub fn get_addresses(&self, path: &str, count: usize) -> Result<Vec<String>, HDWError> {
+    fn get_addresses(&self, path: &str, count: usize, segwit: bool) -> Result<Vec<String>, HDWError> {
         let mut addresses: Vec<String> = vec![];
         let mut p: Path = Path::from_str(path)?;
         let last_index = p.children.len()-1;
         for _i in 0..count {
             //Push the address at the current path into the return vec
-            addresses.push(self.mpriv_key().derive_from_path(&p)?.get_address());
+            if segwit {
+                addresses.push(self.mpriv_key().derive_from_path(&p)?.get_bech32_address());
+            } else {
+                addresses.push(self.mpriv_key().derive_from_path(&p)?.get_legacy_address());
+            }
             
             //Then increment the deepest index by one
             match p.children[last_index] {
@@ -104,4 +108,19 @@ impl HDWallet {
 
         Ok(addresses)
     }
+
+    /**
+        Return legacy addresses at a given deriveration path
+    */
+    pub fn get_legacy_addresses(&self, path: &str, count: usize)  -> Result<Vec<String>, HDWError> {
+        Self::get_addresses(self, path, count, false)
+    }
+
+    /**
+        Return segwit addresses at a given deriveration path
+    */
+    pub fn get_bech32_addresses(&self, path: &str, count: usize) -> Result<Vec<String>, HDWError> {
+        Self::get_addresses(self, path, count, true)
+    }
+
 }
