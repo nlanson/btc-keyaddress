@@ -86,24 +86,19 @@ fn hdwallet() -> Result<(), HDWError> {
 fn multisig_address() {
     let keys: Vec<PrivKey> = vec![
         PrivKey::from_wif("cU1mPkyNgJ8ceLG5v2zN1VkZcvDCE7VK8KrnHwW82PZb6RCq7zRq").unwrap(),
-        PrivKey::from_wif("cPTFNJD7hgbZTqNJgW89HABGtRzYo5aLpCQKvmNdtRNGWo49NAky").unwrap(),
-        PrivKey::from_wif("cNUe2L9CNJZoedMU8YNrzRuxFc56dvMjFxzK4mTsSGhXwbidAyog").unwrap()
     ];
 
-    let m = 2;
-    let n = 3;
+    let m = 1;
+    let n = 1;
 
     let script = Script::multisig(m, n, &keys).unwrap();
+    println!("{:02x?}", script.script);
     let address = Address::testnet_script_address(&script);
 
     println!("
         Address: {}\n
-        Key 1: {}\n
-        Key 2: {}\n
-        Key 3: {}
+        Key 1: {}
     ", address,
-       keys[0].export_as_wif(true, true),
-       keys[1].export_as_wif(true, true),
-       keys[2].export_as_wif(true, true)
+       keys[0].export_as_wif(true, true)
     );
 }

@@ -15,9 +15,7 @@
             for providing clear reference code to work against, especially with bip32.
 
     Todo:
-        - Create P2SH addresses using multisig.
-           - Method to take in m of n option and the required keys -> MultiSig redeem Script
-           - Hash the script to make the address
+        - Unit tests for path deriveration
         
         - Serialization of BIP-49 (P2SH nested P2WPKH keys using ypriv/ypub prefix)
 */

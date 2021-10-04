@@ -10,7 +10,8 @@ pub use crate::{
 
     key::{
         PubKey,
-        PrivKey
+        PrivKey,
+        Key
     },
     
     address::Address,
@@ -26,7 +27,8 @@ pub use crate::{
         HDWallet,
         ChildOptions,
         ExtendedKey,
-        HDWError
+        HDWError,
+        Path
     }, 
 
     util::{

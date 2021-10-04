@@ -50,4 +50,41 @@ impl Path {
             children: p
         })
     }
+
+    pub fn to_string(&self) -> String {
+        let mut path: Vec<String> = vec!["m".to_string()];
+        for i in 0..self.children.len() {
+            path.push (match self.children[i] {
+                ChildOptions::Normal(x) => format!("{}", x),
+                ChildOptions::Hardened(x) => format!("{}'", x)
+            });
+
+        }
+
+        path.join("/")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        ChildOptions,
+        Path
+    };
+
+    #[test]
+    fn path_test() {
+        let path_str = "m/84'/0'/0'/0/0";
+        let path_struct = Path {
+            children: vec![
+                ChildOptions::Hardened(84),
+                ChildOptions::Hardened(0),
+                ChildOptions::Hardened(0),
+                ChildOptions::Normal(0),
+                ChildOptions::Normal(0)
+            ]
+        };
+    
+        assert_eq!(path_str, path_struct.to_string());
+    }   
 }
