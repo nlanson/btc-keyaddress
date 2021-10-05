@@ -6,7 +6,8 @@ fn main() {
     //println!("{:?}", verify_mnemonic_phrase());
     //println!("{:?}", verify_bad_phrase());
     //hdwallet().unwrap()
-    multisig_address();
+    //multisig_address();
+    segwit_hdwallet();
 }
 
 fn print_vals() {
@@ -99,4 +100,13 @@ fn multisig_address() {
     ", address,
        keys[0].export_as_wif(true, Network::Testnet)
     );
+}
+
+fn segwit_hdwallet() {
+    let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
+    let hdw = HDWallet::new(mnemonic.clone(), WalletType::P2PKH).unwrap();
+    let addresses = hdw.get_addresses("m/44'/0'/0'/0/0", 10, Network::Bitcoin).unwrap();
+
+    println!("Phrase: {}", mnemonic.phrase.join(" "));
+    println!("Addresses: {:?}", addresses);
 }
