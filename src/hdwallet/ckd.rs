@@ -172,6 +172,7 @@ mod tests {
         hdwallet::{
             HDWallet,
             HDWError,
+            WalletType
         },
         bip39::{
             Mnemonic,
@@ -194,7 +195,7 @@ mod tests {
 
     fn create_hdw_from_test_mnemonic() -> HDWallet {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        HDWallet::new(mnemonic).unwrap()
+        HDWallet::new(mnemonic, WalletType::P2PKH).unwrap()
     }
 
     #[test]
@@ -203,9 +204,9 @@ mod tests {
 
         //Get the first child extended private and public key of the master key.
         //Calculate the child extended public key twice  through the master xpub and child xprv
-        let derived_m0 = hdw.mpriv_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize_legacy();
-        let derived_M0_fromxprv = hdw.mpriv_key().get_xchild(ChildOptions::Normal(0)).unwrap().get_xpub().serialize_legacy();
-        let derived_M0_fromxpub = hdw.mpub_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize_legacy();
+        let derived_m0 = hdw.mpriv_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize(&WalletType::P2PKH, Network::Bitcoin);
+        let derived_M0_fromxprv = hdw.mpriv_key().get_xchild(ChildOptions::Normal(0)).unwrap().get_xpub().serialize(&WalletType::P2PKH, Network::Bitcoin);
+        let derived_M0_fromxpub = hdw.mpub_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize(&WalletType::P2PKH, Network::Bitcoin);
 
         //Test is derived values are equal to expected values and if derived xpubs are both identical
         assert_eq!(derived_m0, EXPECTED_m0.to_string());
@@ -220,12 +221,12 @@ mod tests {
 
         //Calculate the hardened children of the master keys.
         //Deriving the corresponding xpub of a hardened xprv is not possible. So pattern match the error.
-        let derived_m0h = hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().serialize_legacy();
+        let derived_m0h = hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().serialize(&WalletType::P2PKH, Network::Bitcoin);
         let derived_M0h_fromxpub = match hdw.mpub_key().get_xchild(ChildOptions::Hardened(0)) {
             Ok(_) => true,
             Err(_) => false
         }; 
-        let derived_M0h_fromxprv = hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().get_xpub().serialize_legacy();
+        let derived_M0h_fromxprv = hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().get_xpub().serialize(&WalletType::P2PKH, Network::Bitcoin);
 
         //Test is derived values are equal to expected values and if hardened xpub deriveration failed
         assert_eq!(derived_m0h, EXPECTED_m0h);
@@ -241,19 +242,19 @@ mod tests {
         let m0_0_address_from_xprv: String = hdw.mpriv_key()
                                                 .get_xchild(ChildOptions::Normal(0)).unwrap()
                                                 .get_xchild(ChildOptions::Normal(0)).unwrap()
-                                                .get_legacy_address(Network::Bitcoin);
+                                                .get_address(&WalletType::P2PKH, Network::Bitcoin);
         let m0_0_address_from_xpub: String = hdw.mpub_key()
                                                 .get_xchild(ChildOptions::Normal(0)).unwrap()
                                                 .get_xchild(ChildOptions::Normal(0)).unwrap()
-                                                .get_legacy_address(Network::Bitcoin);
+                                                .get_address(&WalletType::P2PKH, Network::Bitcoin);
         let m0_1_address_from_xprv: String = hdw.mpriv_key()
                                                 .get_xchild(ChildOptions::Normal(0)).unwrap()
                                                 .get_xchild(ChildOptions::Normal(1)).unwrap()
-                                                .get_legacy_address(Network::Bitcoin);
+                                                .get_address(&WalletType::P2PKH, Network::Bitcoin);
         let m0_1_address_from_xpub: String = hdw.mpub_key()
                                                 .get_xchild(ChildOptions::Normal(0)).unwrap()
                                                 .get_xchild(ChildOptions::Normal(1)).unwrap()
-                                                .get_legacy_address(Network::Bitcoin);
+                                                .get_address(&WalletType::P2PKH, Network::Bitcoin);
 
         //Compare the derived addresses to the expected address as 
         //well as checking addresses derived from private keys and 

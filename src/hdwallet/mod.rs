@@ -24,6 +24,7 @@ pub use extended_keys::ExtendedKey;
 pub use extended_keys::Xprv;
 pub use extended_keys::Xpub;
 pub use path::Path;
+pub use hdwallet::WalletType;
 
 
 #[derive(Debug)]

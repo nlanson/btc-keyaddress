@@ -9,6 +9,7 @@ use crate::{
         ExtendedKey, Xprv, Xpub, 
         HDWError, ChildOptions, Path
     },
+    encoding::bs58check::decode,
     hash,
     util::try_into,
     util::Network
@@ -17,16 +18,49 @@ use crate::{
 
 pub struct HDWallet {
     pub mnemonic: Mnemonic,
-    mpriv_key: Xprv
+    mpriv_key: Xprv,
+    r#type: WalletType
 }
 
+pub enum WalletType {
+    P2PKH,
+    P2WPKH,
+    P2SH_P2WPKH
+}
+
+impl WalletType {
+    pub fn from_xkey(key: &str) -> Result<Self, ()> {
+        let bytes = match decode(&key.to_string()) {
+            Ok(x) => x,
+            Err(_) => return Err(())
+        };
+
+        let prefix = &bytes[0..4];
+
+        match prefix {
+            &[0x04, 0x88, 0xAD, 0xE4] |
+            &[0x04, 0x88, 0xB2, 0x1E] |
+            &[0x04, 0x35, 0x83, 0x94] |
+            &[0x04, 0x35, 0x87, 0xCF] => Ok(WalletType::P2PKH),
+            &[0x04, 0xb2, 0x43, 0x0c] |
+            &[0x04, 0xb2, 0x47, 0x46] |
+            &[0x04, 0x5f, 0x18, 0xbc] |
+            &[0x04, 0x5f, 0x1c, 0xf6] => Ok(WalletType::P2WPKH),
+            &[0x04, 0x9d, 0x78, 0x78] |
+            &[0x04, 0x9d, 0x7c, 0xb2] |
+            &[0x04, 0x4a, 0x4e, 0x28] |
+            &[0x04, 0x4a, 0x52, 0x62] => Ok(WalletType::P2SH_P2WPKH),
+            _ => return Err(())
+        }
+    }
+}
 
 
 impl HDWallet {
     /**
         Creates a new HD Wallet structure from mnemonic
     */
-    pub fn new(mnemonic: Mnemonic) -> Result<Self, HDWError> {
+    pub fn new(mnemonic: Mnemonic, r#type: WalletType) -> Result<Self, HDWError> {
         let mprivkey_bytes: [u8; 64] = hash::hmac_sha512(&mnemonic.seed(), b"Bitcoin seed");
         let mpriv_key: Xprv = Xprv::construct(
         match PrivKey::from_slice(&mprivkey_bytes[0..32]) {
@@ -41,7 +75,8 @@ impl HDWallet {
 
         Ok(Self {
             mnemonic,
-            mpriv_key
+            mpriv_key,
+            r#type
         })
     }
 
@@ -80,17 +115,12 @@ impl HDWallet {
     /**
         Creates a lists of addresses at a given path
     */
-    fn get_addresses(&self, path: &str, count: usize, segwit: bool, network: Network) -> Result<Vec<String>, HDWError> {
+    pub fn get_addresses(&self, path: &str, count: usize, network: Network) -> Result<Vec<String>, HDWError> {
         let mut addresses: Vec<String> = vec![];
         let mut p: Path = Path::from_str(path)?;
         let last_index = p.children.len()-1;
         for _i in 0..count {
-            //Push the address at the current path into the return vec
-            if segwit {
-                addresses.push(self.mpriv_key().derive_from_path(&p)?.get_bech32_address(network.clone()));
-            } else {
-                addresses.push(self.mpriv_key().derive_from_path(&p)?.get_legacy_address(network.clone()));
-            }
+            addresses.push(self.mpriv_key().derive_from_path(&p)?.get_address(&self.r#type, network.clone()));
             
             //Then increment the deepest index by one
             match p.children[last_index] {
@@ -108,20 +138,6 @@ impl HDWallet {
         }
 
         Ok(addresses)
-    }
-
-    /**
-        Return legacy addresses at a given deriveration path
-    */
-    pub fn get_legacy_addresses(&self, path: &str, count: usize, network: Network)  -> Result<Vec<String>, HDWError> {
-        Self::get_addresses(self, path, count, false, network)
-    }
-
-    /**
-        Return segwit addresses at a given deriveration path
-    */
-    pub fn get_bech32_addresses(&self, path: &str, count: usize, network: Network) -> Result<Vec<String>, HDWError> {
-        Self::get_addresses(self, path, count, true, network)
     }
 
 }

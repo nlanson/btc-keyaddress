@@ -52,7 +52,7 @@ fn hdwallet() -> Result<(), HDWError> {
     let phrase: String = "glow laugh acquire menu anchor evil occur put hover renew calm purpose".to_string();
     let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
     //let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
-    let hdw: HDWallet = HDWallet::new(mnemonic.clone()).unwrap();
+    let hdw: HDWallet = HDWallet::new(mnemonic.clone(), WalletType::P2PKH).unwrap();
 
     println!("
     mnemonic: {}\n
@@ -60,8 +60,8 @@ fn hdwallet() -> Result<(), HDWError> {
     mpub:  {}\n
     address (m/0/0):   {}
     ", mnemonic.phrase.join(" "),
-       hdw.mpriv_key().serialize_legacy(),
-       hdw.mpub_key().serialize_legacy(),
+       hdw.mpriv_key().serialize(&WalletType::P2PKH, Network::Bitcoin),
+       hdw.mpub_key().serialize(&WalletType::P2PKH, Network::Bitcoin),
        Address::P2PKH(
            hdw.mpriv_key()
            .get_xchild(ChildOptions::Normal(0))?
@@ -74,8 +74,8 @@ fn hdwallet() -> Result<(), HDWError> {
     let xprv = hdw.get_xprv_key_at("m/44'/0'/0'/0/0").unwrap();
     println!("Key pair at 'm/44'/0'/0'/0':");
     println!("{}", xprv.get_prv().export_as_wif(true, Network::Bitcoin));
-    println!("{}", xprv.get_xpub().serialize_legacy());
-    println!("{:?}", hdw.get_legacy_addresses("m/44'/0'/0'/0/0", 10, Network::Bitcoin).unwrap());
+    println!("{}", xprv.get_xpub().serialize(&WalletType::P2PKH, Network::Bitcoin));
+    println!("{:?}", hdw.get_addresses("m/44'/0'/0'/0/0", 10, Network::Bitcoin).unwrap());
     
 
     Ok(())

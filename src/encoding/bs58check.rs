@@ -14,9 +14,18 @@ pub enum VersionPrefix {
     //BIP32
     Xprv,
     Xpub,
+    Tprv,
+    Tpub,
+    //BIP49
+    Yprv,
+    Ypub,
+    Uprv,
+    Upub,
     //BIP84
     Zprv,
     Zpub,
+    Vprv,
+    Vpub,
     None
 }
 
@@ -42,10 +51,18 @@ pub fn check_encode(prefix: VersionPrefix, data: &[u8]) -> String {
         VersionPrefix::TestnetP2SHAddress => vec![0xC4],
         VersionPrefix::PrivateKeyWIF => vec![0x80],
         VersionPrefix::TestNetPrivateKeyWIF => vec![0xef],
-        VersionPrefix::Xprv => vec![0x04, 0x88, 0xAD, 0xE4],
+        VersionPrefix::Xprv => vec![0x04, 0x88, 0xAD, 0xE4], //Legacy P2PKH
         VersionPrefix::Xpub => vec![0x04, 0x88, 0xB2, 0x1E],
-        VersionPrefix::Zprv => vec![0x04, 0xb2, 0x43, 0x0c],
+        VersionPrefix::Tprv => vec![0x04, 0x35, 0x83, 0x94],
+        VersionPrefix::Tpub => vec![0x04, 0x35, 0x87, 0xCF],
+        VersionPrefix::Yprv => vec![0x04, 0x9d, 0x78, 0x78], //P2SH nested P2WPKH
+        VersionPrefix::Ypub => vec![0x04, 0x9d, 0x7c, 0xb2],
+        VersionPrefix::Uprv => vec![0x04, 0x4a, 0x4e, 0x28],
+        VersionPrefix::Upub => vec![0x04, 0x4a, 0x52, 0x62],
+        VersionPrefix::Zprv => vec![0x04, 0xb2, 0x43, 0x0c], //P2WPKH
         VersionPrefix::Zpub => vec![0x04, 0xb2, 0x47, 0x46],
+        VersionPrefix::Vprv => vec![0x04, 0x5f, 0x18, 0xbc],
+        VersionPrefix::Vpub => vec![0x04, 0x5f, 0x1c, 0xf6],
         VersionPrefix::None => vec![]
     };
 

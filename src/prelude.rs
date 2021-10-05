@@ -28,7 +28,8 @@ pub use crate::{
         ChildOptions,
         ExtendedKey,
         HDWError,
-        Path
+        Path,
+        WalletType
     }, 
 
     util::{

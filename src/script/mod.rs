@@ -20,7 +20,8 @@ pub struct Script {
 pub enum ScriptErr {
     BadNetwork(),
     KeyCountDoesNotMatch(),
-    MaxKeyCountExceeded()
+    MaxKeyCountExceeded(),
+    HashLenIncorrect(usize)
 }
 
 impl Script {
@@ -58,6 +59,19 @@ impl Script {
         script.push(n + 80); //n value as opcode
         script.push(0xAE);   //op_checkmultisig
 
+        Ok(Script::new(script))
+    }
+
+    /**
+        Creates the redeem script for a P2SH nested P2WPKH address
+    */
+    pub fn p2sh_p2wpkh(hash: &[u8]) -> Result<Self, ScriptErr> {
+        if hash.len() != 20 { return Err(ScriptErr::HashLenIncorrect(hash.len())) }
+
+        //<0 20 <pub key hash>>
+        let mut script = vec![0x00, 0x14]; //Witness Version, Pubkey Hash len
+        script.append(&mut hash.to_vec());
+        
         Ok(Script::new(script))
     }
 }
