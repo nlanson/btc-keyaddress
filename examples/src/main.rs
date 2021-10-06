@@ -7,7 +7,8 @@ fn main() {
     //println!("{:?}", verify_bad_phrase());
     //hdwallet().unwrap()
     //multisig_address();
-    segwit_hdwallet();
+    //segwit_hdwallet();
+    p2sh_nested_p2wpkh_address()
 }
 
 fn print_vals() {
@@ -105,8 +106,16 @@ fn multisig_address() {
 fn segwit_hdwallet() {
     let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
     let hdw = HDWallet::new(mnemonic.clone(), WalletType::P2PKH).unwrap();
-    let addresses = hdw.get_addresses("m/44'/0'/0'/0/0", 10, Network::Bitcoin).unwrap();
+    let addresses = hdw.get_addresses("m/84'/0'/0'/0/0", 10, Network::Bitcoin).unwrap();
 
     println!("Phrase: {}", mnemonic.phrase.join(" "));
     println!("Addresses: {:?}", addresses);
+}
+
+fn p2sh_nested_p2wpkh_address() {
+    let key = PrivKey::new_rand();;
+    let pubkey = PubKey::from_priv_key(&key);
+    let address = Address::P2SH(Script::p2sh_p2wpkh(&pubkey).unwrap(), Network::Testnet).to_string().unwrap();
+
+    println!("Key: {}\nAddress:{}", key.export_as_wif(true, Network::Testnet), address);
 }

@@ -65,7 +65,9 @@ impl Script {
     /**
         Creates the redeem script for a P2SH nested P2WPKH address
     */
-    pub fn p2sh_p2wpkh(hash: &[u8]) -> Result<Self, ScriptErr> {
+    pub fn p2sh_p2wpkh(pubkey: &PubKey) -> Result<Self, ScriptErr> {
+        let hash = hash::hash160(pubkey.as_bytes::<33>());
+        
         if hash.len() != 20 { return Err(ScriptErr::HashLenIncorrect(hash.len())) }
 
         //<0 20 <pub key hash>>
