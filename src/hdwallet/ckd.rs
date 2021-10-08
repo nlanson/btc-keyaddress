@@ -91,7 +91,7 @@ pub fn derive_xprv(parent: &Xprv, options: ChildOptions) -> Result<Xprv, HDWErro
 
     //Set the remaining meta data
     let depth: u8 = parent.depth + 1;
-    let fingerprint: [u8; 4] = try_into(hash160(&parent.get_pub().as_bytes::<33>())[0..4].to_vec());
+    let fingerprint: [u8; 4] = try_into(parent.get_pub().hash160()[0..4].to_vec());
     let index = index.to_be_bytes();
 
     //Return the new Xpriv
@@ -151,7 +151,7 @@ pub fn derive_xpub(parent: &Xpub, options: ChildOptions) -> Result<Xpub, HDWErro
 
     //Set the remaining meta data
     let depth = parent.depth + 1;
-    let fingerprint: [u8; 4] = try_into(hash160(&parent.key::<33>())[0..4].to_vec());
+    let fingerprint: [u8; 4] = try_into(parent.get_pub().hash160()[0..4].to_vec());
     let index = index.to_be_bytes();
 
     Ok(

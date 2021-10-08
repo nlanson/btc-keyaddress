@@ -1,5 +1,6 @@
 /*
-    Minimal implementation of P2SH addresses
+    Script module that implements necessary scripts for creating addresses and
+    redeem scripts.
 */
 
 use crate::{

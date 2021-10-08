@@ -7,9 +7,9 @@ use crate::{
         bs58check as bs58check
     },
     util::decode_02x,
-    util::encode_02x,
     util::try_into,
-    util::Network
+    util::Network,
+    hash
 };
 
 /**
@@ -166,6 +166,13 @@ impl PubKey {
     pub fn raw(&self) -> PublicKey {
         self.0
     }
+
+    /**
+        Returns the Hash160 of the compressed public key
+    */
+    pub fn hash160(&self) -> Vec<u8> {
+        hash::hash160(self.as_bytes::<33>()).to_vec()
+    }
 }
 
 impl Key for PubKey {
@@ -188,8 +195,11 @@ impl Key for PubKey {
 mod tests {
     use super::{
         PrivKey, PubKey, Key,
-        encode_02x, decode_02x,
+        decode_02x,
         Network
+    };
+    use crate::{
+        util::encode_02x
     };
 
     //The private key to use in tests

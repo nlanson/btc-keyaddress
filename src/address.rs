@@ -46,12 +46,9 @@ impl Address {
     }
 
     fn p2pkh(pk: &PubKey, network: &Network) -> String {
-        let pubkey_bytes: Vec<u8> = pk.as_bytes::<33>().to_vec();
-        let hash = hash::hash160(&pubkey_bytes).to_vec();
-
         match network {
-            Network::Bitcoin => bs58check::check_encode(bs58check::VersionPrefix::BTCAddress, &hash),
-            Network::Testnet => bs58check::check_encode(bs58check::VersionPrefix::BTCTestNetAddress, &hash)
+            Network::Bitcoin => bs58check::check_encode(bs58check::VersionPrefix::BTCAddress, &pk.hash160()),
+            Network::Testnet => bs58check::check_encode(bs58check::VersionPrefix::BTCTestNetAddress, &pk.hash160())
         }
     }
 
@@ -63,8 +60,7 @@ impl Address {
     }
 
     fn p2wpkh(pk: &PubKey, network: &Network) -> Result<String, Bech32Err> {
-        let hash = hash::hash160(&pk.as_bytes::<33>());
-        Ok(encode(0, &hash, network)?)
+        Ok(encode(0, &pk.hash160(), network)?)
     }
 
     fn p2wsh(script: &Script, network: &Network) -> Result<String, Bech32Err> {
