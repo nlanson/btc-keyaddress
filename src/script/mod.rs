@@ -13,7 +13,7 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct Script {
-    pub script: Vec<u8>
+    pub code: Vec<u8>
 }
 
 #[derive(Debug)]
@@ -28,9 +28,9 @@ impl Script {
     /**
         Create a new instance of self
     */
-    pub fn new(script: Vec<u8>) -> Self {
+    pub fn new(code: Vec<u8>) -> Self {
         Self {
-            script
+            code
         }
     }
 
@@ -38,7 +38,7 @@ impl Script {
         Hash the script with Hash160
     */
     pub fn hash(&self) -> [u8; 20] {
-        hash::hash160(&self.script)
+        hash::hash160(&self.code)
     }
 
     /**
@@ -65,15 +65,27 @@ impl Script {
     /**
         Creates the redeem script for a P2SH nested P2WPKH address
     */
-    pub fn p2sh_p2wpkh(pubkey: &PubKey) -> Result<Self, ScriptErr> {
+    pub fn p2sh_p2wpkh(pubkey: &PubKey) -> Self {
         let hash = hash::hash160(pubkey.as_bytes::<33>());
         
-        if hash.len() != 20 { return Err(ScriptErr::HashLenIncorrect(hash.len())) }
 
         //<0 20 <pub key hash>>
         let mut script = vec![0x00, 0x14]; //Witness Version, Pubkey Hash len
         script.append(&mut hash.to_vec());
         
-        Ok(Script::new(script))
+        Script::new(script)
+    }
+
+    /**
+        Creates the redeem script for a P2SH nested P2WSH address
+    */
+    pub fn p2sh_p2wsh(script: &Self) -> Self {
+        let mut hash = hash::sha256(script.code.clone()).to_vec();
+
+        //<0 32 <script hash>>
+        let mut script = vec![0x00, 0x20];
+        script.append(&mut hash);
+
+        Script::new(script)
     }
 }

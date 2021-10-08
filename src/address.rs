@@ -68,7 +68,7 @@ impl Address {
     }
 
     fn p2wsh(script: &Script, network: &Network) -> Result<String, Bech32Err> {
-        let hash = hash::sha256(script.script.clone());
+        let hash = hash::sha256(script.code.clone());
         Ok(encode(0, &hash, network)?)
     }
 

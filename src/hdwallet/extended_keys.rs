@@ -99,7 +99,7 @@ pub trait ExtendedKey<T> {
             WalletType::P2PKH => Address::P2PKH(self.get_pub(), network).to_string().unwrap(),
             WalletType::P2WPKH => Address::P2WPKH(self.get_pub(), network).to_string().unwrap(),
             WalletType::P2SH_P2WPKH => {
-                let script: Script = Script::p2sh_p2wpkh(&self.get_pub()).unwrap();
+                let script: Script = Script::p2sh_p2wpkh(&self.get_pub());
                 Address::P2SH(script, network).to_string().unwrap()
             }
         }

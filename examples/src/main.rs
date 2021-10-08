@@ -8,7 +8,7 @@ fn main() {
     //hdwallet().unwrap()
     //multisig_address();
     //segwit_hdwallet();
-    p2sh_nested_p2wpkh_address()
+    p2wsh_address()
 }
 
 fn print_vals() {
@@ -92,7 +92,7 @@ fn multisig_address() {
     let n = 1;
 
     let script = Script::multisig(m, n, &keys).unwrap();
-    println!("{:02x?}", script.script);
+    println!("{:02x?}", script.code);
     let address = Address::P2SH(script, Network::Testnet);
 
     println!("
@@ -112,10 +112,29 @@ fn segwit_hdwallet() {
     println!("Addresses: {:?}", addresses);
 }
 
-fn p2sh_nested_p2wpkh_address() {
-    let key = PrivKey::new_rand();;
-    let pubkey = PubKey::from_priv_key(&key);
-    let address = Address::P2SH(Script::p2sh_p2wpkh(&pubkey).unwrap(), Network::Testnet).to_string().unwrap();
+fn p2wsh_address() {
+    let keys = vec![
+        PrivKey::from_wif("cPUFTUmN7R1vqyGetUfEv8Az5vTNAipHyCLZq8kpJS355NmB44BJ").unwrap(),
+        PrivKey::from_wif("cNReSU1dagjXPo4ky99PaXbW4NobKWoppb5AVaCpjjQsJ2uRgoDe").unwrap(),
+        PrivKey::from_wif("cSTgRcaiVDpG4yrsECW59wfUwYjTYsHh4UCcUhz2WatYWd18KDso").unwrap()
+    ];
 
-    println!("Key: {}\nAddress:{}", key.export_as_wif(true, Network::Testnet), address);
+    let m = 2;
+    let n = 3;
+
+    let script = Script::multisig(m, n, &keys).unwrap();
+    let address = Address::P2WSH(script.clone(), Network::Testnet).to_string().unwrap();
+
+    println!("
+        Address: {}\n
+        Script: {}\n
+        Key 1: {}\n
+        Key 2: {}\n
+        Key 3: {}\n
+    ", address,
+       encode_02x(&script.code),
+       encode_02x(&PubKey::from_priv_key(&keys[0]).as_bytes::<33>()),
+       encode_02x(&PubKey::from_priv_key(&keys[1]).as_bytes::<33>()),
+       encode_02x(&PubKey::from_priv_key(&keys[2]).as_bytes::<33>())
+    );
 }
