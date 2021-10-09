@@ -2,14 +2,7 @@
     Module implementing Multisig HD Wallet data structures
 */
 
-use crate::{
-    bip39::Mnemonic,
-    key::PubKey,
-    prelude::ExtendedKey,
-    script::Script,
-    util::Network,
-    address::Address
-};
+use crate::{address::Address, bip39::Mnemonic, key::PrivKey, key::PubKey, prelude::{ExtendedKey, Key}, script::Script, util::Network};
 use super::{
     HDWallet,
     WalletType,
@@ -46,6 +39,9 @@ impl HDMultisig {
         }
     }
 
+    /**
+       Returns the redeem script at a certain deriveration path 
+    */
     pub fn redeem_script_at(&self, path: &str, network: Network) -> Result<Script, HDWError> {
         let mut p: Path = Path::from_str(path)?;
         let mut keys: Vec<PubKey> = vec![];
@@ -57,6 +53,20 @@ impl HDMultisig {
         Ok(Script::multisig(self.m, self.n, &keys).unwrap())
     }
 
+    /**
+       Returns the private key for the given cosigner index at a certain deriveration path
+    */
+    pub fn key_at(&self, signer_index: usize, path: &str) -> Result<PrivKey, HDWError> {
+        let key = HDWallet::new(self.mnemonics[signer_index].clone(), WalletType::P2PKH)?
+                    .get_xprv_key_at(path)?
+                    .key::<32>();
+        
+        Ok(PrivKey::from_slice(&key).unwrap())
+    }
+
+    /**
+       Returns the address at a certain deriveration path 
+    */
     pub fn address_at(&self, path: &str, network: Network) -> Result<String, HDWError> {
         let redeem_script = self.redeem_script_at(path, network.clone()).unwrap();
 
@@ -72,6 +82,9 @@ impl HDMultisig {
         Ok(address.to_string().unwrap())
     }
 
+    /**
+       Returns a vector of addresses from a certain deriveration path
+    */
     pub fn get_addresses(&self, path: &str, count: usize, network: Network) -> Result<Vec<String>, HDWError> {
         let mut addresses: Vec<String> = vec![];
         let mut p: Path = Path::from_str(path)?;
