@@ -12,6 +12,7 @@
 */
 
 mod hdwallet;
+mod hdmultisig;
 mod extended_keys;
 mod ckd;
 mod path;

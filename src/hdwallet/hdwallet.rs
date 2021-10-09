@@ -22,6 +22,8 @@ pub struct HDWallet {
     r#type: WalletType
 }
 
+
+#[derive(Clone)]
 pub enum WalletType {
     P2PKH,
     P2WPKH,

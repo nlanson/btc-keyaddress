@@ -52,11 +52,12 @@ let  keys: Vec<PrivKey> = vec![
 	PrivKey::new_rand(),
 	PrivKey::new_rand()
 ];
+let pkeys: Vec<PubKey> = keys.iter().map(|x| PubKey::from_priv_key(x)).collect();
 
 //Create a 2-of-3 multisig script
 let  m = 2;
 let  n = 3;
-let  script = Script::multisig(m, n, &keys).unwrap();
+let  script = Script::multisig(m, n, &pkeys).unwrap();
  
 //Encode the script as an address
 let  address = Address::P2SH(&script, Network::Bitcoin).to_string().unwrap(); //Use p2wsh(&script) method to get Segwit P2WSH address

@@ -17,7 +17,14 @@
     Todo:
         - Unit tests for path deriveration
         
-        - Serialization of BIP-49 (P2SH nested P2WPKH keys using ypriv/ypub prefix)
+        - Implement HD Multisig Wallets compliant with BIP-48 and BIP-67
+                - BIP-48 describes the deriveration scheme for multisig wallets.
+                - BIP-67 describes the standard creation of multisig scripts from a given set of keys 
+                  by sorting public keys in lexiographical order.
+                - Implementing this would mean creating a new MultiSig HD Wallet Struct and modifying
+                  the script module's multisig script creation method to comply with BIP-67.
+
+
 */
 
 //Outward facing modules

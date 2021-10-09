@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::{
     Secp256k1,
     PublicKey,
@@ -19,7 +21,8 @@ use crate::{
 pub enum KeyError {
     BadSlice(),
     BadArithmatic(),
-    BadWif()
+    BadWif(),
+    BadString()
 }
 
 /**
@@ -114,6 +117,10 @@ impl PrivKey {
         return Err(KeyError::BadWif())
         
     }
+
+    pub fn get_pub(&self) -> PubKey {
+        PubKey::from_priv_key(self)
+    }
 }
 
 impl Key for PrivKey {
@@ -172,6 +179,19 @@ impl PubKey {
     */
     pub fn hash160(&self) -> Vec<u8> {
         hash::hash160(self.as_bytes::<33>()).to_vec()
+    }
+
+    pub fn hex(&self) -> String {
+        self.0.to_string()
+    }
+
+    pub fn from_str(hex: &str) -> Result<Self, KeyError> {
+        let pk = match PublicKey::from_str(hex) {
+            Ok(x) => x,
+            Err(_) => return Err(KeyError::BadString())
+        };
+
+        Ok( Self( pk ) )
     }
 }
 

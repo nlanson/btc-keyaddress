@@ -33,7 +33,8 @@ impl fmt::Display for key::KeyError {
         let val: &str = match self {
             Self::BadSlice() => "Bad slice input",
             Self::BadArithmatic() => "Bad arithmatic",
-            Self::BadWif() => "Bad WIF"
+            Self::BadWif() => "Bad WIF",
+            Self::BadString() => "Bad string"
         };
         
         write!(f, "{}", val)
