@@ -29,6 +29,7 @@ use crate::{
         Path,
         WalletType
     },
+    bip39::Mnemonic,
     hash,
     address::Address,
     util::try_into,
@@ -66,6 +67,9 @@ pub trait ExtendedKey<T> {
         "xprv[...]" or "xpub[...]""
     */
     fn from_str(key: &str) -> Result<Self, HDWError>
+    where Self: Sized;
+
+    fn from_mnemonic(mnemonic: &Mnemonic) -> Result<Self, HDWError>
     where Self: Sized;
 
     /**
@@ -180,6 +184,25 @@ impl ExtendedKey<PrivKey> for Xprv {
             fingerprint,
             index
         ))
+    }
+
+    /**
+        Convert a mnemonic to mater private key.
+    */
+    fn from_mnemonic(mnemonic: &Mnemonic) -> Result<Xprv, HDWError> {
+        let mprivkey_bytes: [u8; 64] = hash::hmac_sha512(&mnemonic.seed(), b"Bitcoin seed");
+        let master_private_key: Xprv = Xprv::construct(
+            match PrivKey::from_slice(&mprivkey_bytes[0..32]) {
+                Ok(x) => x,
+                Err(_) => return Err(HDWError::BadKey())
+            },
+            try_into(mprivkey_bytes[32..64].to_vec()),
+            0x00,
+            [0x00; 4],
+            [0x00; 4]
+        );
+
+        Ok( master_private_key )
     }
 
     /**
@@ -318,6 +341,25 @@ impl ExtendedKey<PubKey> for Xpub {
             fingerprint,
             index
         ))
+    }
+
+    /**
+        Convert a mnemonic to mater private key.
+    */
+    fn from_mnemonic(mnemonic: &Mnemonic) -> Result<Xpub, HDWError> {
+        let mprivkey_bytes: [u8; 64] = hash::hmac_sha512(&mnemonic.seed(), b"Bitcoin seed");
+        let master_private_key: Xprv = Xprv::construct(
+            match PrivKey::from_slice(&mprivkey_bytes[0..32]) {
+                Ok(x) => x,
+                Err(_) => return Err(HDWError::BadKey())
+            },
+            try_into(mprivkey_bytes[32..64].to_vec()),
+            0x00,
+            [0x00; 4],
+            [0x00; 4]
+        );
+
+        Ok( master_private_key.get_xpub() )
     }
 
     /**

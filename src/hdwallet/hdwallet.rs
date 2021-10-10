@@ -143,3 +143,154 @@ impl HDWallet {
     }
 
 }
+
+
+//New and revised HD Wallet struct from below
+
+
+
+pub struct HDWallet2 {
+    master_public_key: Xpub,
+    pub wallet_type: WalletType
+}
+
+pub trait WatchOnly {
+    /**
+        Return a list of addresses at the given deriveration path.
+    */
+    fn addresses_at(&self, path: &str, count: usize, network: Network) -> Result<Vec<String>, HDWError>
+    where Self: Sized;
+}
+
+pub struct Unlocker {
+    pub master_private_key: Xprv
+}
+
+impl Unlocker {
+    pub fn from_mnemonic(mnemonic: &Mnemonic) -> Result<Self, HDWError> {
+        Ok(Self {
+            master_private_key: Xprv::from_mnemonic(mnemonic)?
+        })
+    }
+
+    pub fn from_master_private(key: &str) -> Result<Self, HDWError> {
+        Ok(Self {
+            master_private_key: Xprv::from_str(key)?
+        })
+    }
+}
+
+impl HDWallet2 {
+    /**
+        Create a watch only wallet from mnemonic phrase
+    */
+    pub fn from_mnemonic(mnemonic: &Mnemonic, wallet_type: WalletType) -> Result<Self, HDWError> {
+        Ok(Self {
+            master_public_key: Xpub::from_mnemonic(mnemonic)?,
+            wallet_type
+        })
+    }
+
+    /**
+        Create a watch only wallet from a master private key
+    */
+    pub fn from_master_private(key: &str) -> Result<Self, HDWError> {
+        let wallet_type = match WalletType::from_xkey(key) {
+            Ok(x) => x,
+            Err(_) => return Err(HDWError::BadKey())
+        };
+
+        let master_public_key = Xprv::from_str(key)?.get_xpub();
+
+        Ok(Self {
+            master_public_key,
+            wallet_type
+        })
+    }
+
+    /**
+        Create a watch only wallet from a master public key
+    */
+    pub fn from_master_public(key: &str) -> Result<Self, HDWError> {
+        let wallet_type = match WalletType::from_xkey(key) {
+            Ok(x) => x,
+            Err(_) => return Err(HDWError::BadKey())
+        };
+
+        let master_public_key = Xpub::from_str(key)?;
+
+        Ok(Self {
+            master_public_key,
+            wallet_type
+        })
+    }
+
+
+    /**
+        Return the master public key of self 
+    */
+    pub fn master_public_key(&self) -> Xpub {
+        self.master_public_key.clone()
+    }
+
+    /**
+        Return the master private key of self given a valid unlocker 
+    */
+    pub fn master_private_key(&self, unlocker: &Unlocker) -> Result<Xprv, HDWError> {
+        //If the unlocker's corresponding extended public key equals the watch only wallet's
+        //master public key, then return the unlocker's key.
+        if 
+        unlocker.master_private_key.get_xpub().key::<33>() == self.master_public_key().key::<33>() 
+        &&
+        unlocker.master_private_key.get_xpub().chaincode() == self.master_public_key().chaincode()
+        {
+            return Ok(unlocker.master_private_key.clone())
+        }
+
+        
+        //If no match, return an error
+        Err(HDWError::BadKey())
+    }
+
+    /**
+        Return the private key at the given deriveration path given a valid unlocker
+    */
+    pub fn private_key_at(&self, path: &str, unlocker: &Unlocker) -> Result<PrivKey, HDWError> {
+        let path = Path::from_str(path)?;
+        
+        Ok(
+            PrivKey::from_slice(
+                &self.master_private_key(unlocker)?.derive_from_path(&path)?.key::<32>()
+            ).unwrap()
+        )
+    }
+}
+
+impl WatchOnly for HDWallet2 {
+    fn addresses_at(&self, path: &str, count: usize, network: Network) -> Result<Vec<String>, HDWError>
+    where Self: Sized 
+    {
+        let mut addresses: Vec<String> = vec![];
+        let mut p: Path = Path::from_str(path)?;
+        let last_index = p.children.len()-1;
+        for _i in 0..count {
+            addresses.push(self.master_public_key().derive_from_path(&p)?.get_address(&self.wallet_type, network.clone()));
+            
+            //Then increment the deepest index by one
+            match p.children[last_index] {
+                ChildOptions::Normal(x) => {
+                    let n = x + 1;
+                    if n >= (2 as u32).pow(31) { return Err(HDWError::IndexTooLarge(n)) }
+                    p.children[last_index] = ChildOptions::Normal(n);
+                },
+                ChildOptions::Hardened(x) => {
+                    let n = x + 1;
+                    if n >= (2 as u32).pow(32) { return Err(HDWError::IndexTooLarge(n)) }
+                    p.children[last_index] = ChildOptions::Hardened(n);
+                }
+            }
+        }
+
+        Ok(addresses)
+    }
+}

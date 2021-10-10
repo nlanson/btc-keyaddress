@@ -1,7 +1,15 @@
 use crate::{
     hash,
     util,
-    entropy
+    entropy,
+    hdwallet::{
+        ExtendedKey, Xprv,
+        HDWError
+    },
+    key::{
+        PrivKey,
+        Key
+    }
 };
 use super::{ 
     lang,

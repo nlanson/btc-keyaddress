@@ -2,13 +2,24 @@
     Module implementing Multisig HD Wallet data structures
 */
 
-use crate::{address::Address, bip39::Mnemonic, key::PrivKey, key::PubKey, prelude::{ExtendedKey, Key}, script::Script, util::Network};
+use crate::{
+    address::Address,
+    bip39::Mnemonic,
+    key::PrivKey,
+    key::PubKey,
+    key::Key,
+    script::Script,
+    util::Network
+};
 use super::{
     HDWallet,
     WalletType,
     HDWError,
+    ExtendedKey,
+    Xprv, Xpub,
     Path,
     ChildOptions,
+    WatchOnly
 };
 
 pub struct HDMultisig {
@@ -108,5 +119,97 @@ impl HDMultisig {
         }
 
         Ok(addresses)
+    }
+}
+
+
+
+//New and revised Multisig HD Wallet
+
+
+pub struct MultisigHDWallet {
+    master_public_keys: Vec<Xpub>,
+    m: u8,
+    n: u8,
+    wallet_type: MultisigWalletType
+}
+
+pub struct MultiSigUnlocker {
+    master_private_keys: Vec<Xprv>
+}
+
+impl MultiSigUnlocker {
+    pub fn from_mnemonics(mnemonics: &Vec<Mnemonic>) -> Result<Self, HDWError> {
+        Ok(Self{
+            master_private_keys: mnemonics.iter().map(|x| {
+                Xprv::from_mnemonic(x).unwrap()
+            }).collect::<Vec<Xprv>>()
+        })
+    }
+
+    pub fn from_master_privates(keys: &Vec<&str>) -> Result<Self, HDWError> {
+        Ok(Self {
+            master_private_keys: keys.iter().map(|x| {
+                Xprv::from_str(x).unwrap()
+            }).collect::<Vec<Xprv>>()
+        })
+    }
+}
+
+impl MultisigHDWallet {
+    pub fn from_mnemonics(mnemonics: &Vec<Mnemonic>, m: u8, wallet_type: MultisigWalletType) -> Result<Self, HDWError> {
+        let master_public_keys = mnemonics.iter().map(|x| {
+            Xpub::from_mnemonic(x).unwrap()
+        }).collect::<Vec<Xpub>>();
+        let n = master_public_keys.len() as u8;
+
+        Ok(Self{
+            master_public_keys,
+            m,
+            n,
+            wallet_type
+        })
+    }
+
+    pub fn from_master_privates(keys: &Vec<&str>, m: u8) -> Result<Self, HDWError> {
+        //Check if each provided key is the same type
+
+        //Convert each to xpubs
+        todo!()
+    }
+
+    pub fn from_master_publics(keys: &Vec<&str>, m: u8) -> Result<Self, HDWError> {
+        //Check if each provided key is the same type
+        
+        todo!()
+    }
+
+    pub fn redeem_script_at(&self, path: &str) -> Result<Script, HDWError> {
+        //Return the redeem script at the given path
+
+        todo!()
+    }
+
+    pub fn key_for(&self, cosigner_index: usize, path: &str, unlocker: &MultiSigUnlocker) -> Result<PrivKey, HDWError> {
+        //Return the private key at the given path.
+
+        //The Unlocker here can contain as little Xprv keys.
+        //The code will get the xpub at the deriveration path using the stored Xpubs and compare it with the Xpub derived
+        //from any Xprvs provided in the unlocker. 
+
+        //If none match, no private key can be returned. 
+
+        //If there is a match, return the matched key.
+
+        todo!();
+    }
+}
+
+impl WatchOnly for MultisigHDWallet {
+    fn addresses_at(&self, path: &str, count: usize, network: Network) -> Result<Vec<String>, HDWError>
+    where Self: Sized {
+        //Get the addresses at the given path and up count times.
+        
+        todo!()
     }
 }

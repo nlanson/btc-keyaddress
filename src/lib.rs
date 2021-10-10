@@ -15,14 +15,14 @@
             for providing clear reference code to work against, especially with bip32.
 
     Todo:
-        - Unit tests for path deriveration
+        - Unit tests for:
+            > Path deriveration
+            > HD Multisig Wallets
         
-        - Implement HD Multisig Wallets compliant with BIP-48 and BIP-67
-                - BIP-48 describes the deriveration scheme for multisig wallets.
-                - BIP-67 describes the standard creation of multisig scripts from a given set of keys 
-                  by sorting public keys in lexiographical order.
-                - Implementing this would mean creating a new MultiSig HD Wallet Struct and modifying
-                  the script module's multisig script creation method to comply with BIP-67.
+        - HDWallet Struct to only store master_public key and require a seperate struct to retrieve
+          private key info.
+            > Finish implementing new Multisig HDWallet struct.
+            > Rewrite unit tests that use the old HDWallet struct.
 
 
 */

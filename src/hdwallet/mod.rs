@@ -27,6 +27,8 @@ pub use extended_keys::Xpub;
 pub use path::Path;
 pub use hdwallet::WalletType;
 
+use hdwallet::WatchOnly;
+
 
 #[derive(Debug)]
 pub enum HDWError {
