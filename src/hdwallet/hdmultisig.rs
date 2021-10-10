@@ -205,8 +205,13 @@ impl MultisigHDWallet {
     }
 }
 
-impl WatchOnly for MultisigHDWallet {
-    fn addresses_at(&self, path: &str, count: usize, network: Network) -> Result<Vec<String>, HDWError>
+impl WatchOnly<MultiSigUnlocker> for MultisigHDWallet {
+    fn address_at(
+        &self,
+        change: bool,
+        address_index: u32,
+        network: Network
+    ) -> Result<String, HDWError>
     where Self: Sized {
         //Get the addresses at the given path and up count times.
         

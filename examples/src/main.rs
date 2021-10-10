@@ -1,4 +1,5 @@
 use btc_keyaddress::prelude::*;
+use btc_keyaddress::hdwallet::WatchOnly;
 
 fn main() {
     //print_vals();
@@ -8,7 +9,8 @@ fn main() {
     //hdwallet().unwrap()
     //multisig_address();
     //segwit_hdwallet();
-    p2sh_p2wsh();
+    //p2sh_p2wsh();
+    xpub_watch_only();
 }
 
 fn print_vals() {
@@ -164,4 +166,16 @@ fn p2sh_p2wsh() {
        keys[1].export_as_wif(true, Network::Testnet),
        keys[2].export_as_wif(true, Network::Testnet),
     );
+}
+
+fn xpub_watch_only() -> Result<(), HDWError> {
+    let mnemonic = Mnemonic::from_phrase("bridge hawk weather prefer short follow renew judge gadget dial pepper liquid".to_string(), Language::English, "").unwrap();
+    let hdw = btc_keyaddress::hdwallet::HDWallet2::from_mnemonic(&mnemonic, WalletType::P2WPKH).unwrap();
+    let unlocker = btc_keyaddress::hdwallet::Unlocker::from_mnemonic(&mnemonic).unwrap();
+
+    //let mpub = hdw.master_public_key().serialize(&WalletType::P2WPKH, Network::Bitcoin);
+    let mpub = hdw.address_at(false, 0, Network::Bitcoin);
+    println!("{:?}", mpub);
+
+    Ok(())
 }

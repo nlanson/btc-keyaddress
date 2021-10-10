@@ -55,6 +55,15 @@ impl WalletType {
             _ => return Err(())
         }
     }
+
+    pub fn account_path(&self) -> &str {
+        match &self {
+            WalletType::P2PKH => "m/44'/0'/0'",
+            WalletType::P2WPKH => "m/84'/0'/0'",
+            WalletType::P2SH_P2WPKH => "m/49'/0'/0'"
+
+        }
+    }
 }
 
 
@@ -150,15 +159,21 @@ impl HDWallet {
 
 
 pub struct HDWallet2 {
-    master_public_key: Xpub,
+    master_public_key: Option<Xpub>,
+    account_public_key: Xpub,
     pub wallet_type: WalletType
 }
 
-pub trait WatchOnly {
+pub trait WatchOnly<T> {
     /**
         Return a list of addresses at the given deriveration path.
     */
-    fn addresses_at(&self, path: &str, count: usize, network: Network) -> Result<Vec<String>, HDWError>
+    fn address_at(
+        &self,
+        change: bool,
+        address_index: u32,
+        network: Network
+    ) -> Result<String, HDWError>
     where Self: Sized;
 }
 
@@ -185,8 +200,15 @@ impl HDWallet2 {
         Create a watch only wallet from mnemonic phrase
     */
     pub fn from_mnemonic(mnemonic: &Mnemonic, wallet_type: WalletType) -> Result<Self, HDWError> {
+        let master_public_key = Some(Xpub::from_mnemonic(mnemonic)?);
+        
+        let account_public_key = Xprv::from_mnemonic(mnemonic)?
+                                .derive_from_path(&Path::from_str(WalletType::account_path(&wallet_type))?)?
+                                .get_xpub();
+        
         Ok(Self {
-            master_public_key: Xpub::from_mnemonic(mnemonic)?,
+            master_public_key,
+            account_public_key,
             wallet_type
         })
     }
@@ -201,9 +223,13 @@ impl HDWallet2 {
         };
 
         let master_public_key = Xprv::from_str(key)?.get_xpub();
+        let account_public_key = Xprv::from_str(key)?
+                                .derive_from_path(&Path::from_str(WalletType::account_path(&wallet_type))?)?
+                                .get_xpub();
 
         Ok(Self {
-            master_public_key,
+            master_public_key: None,
+            account_public_key,
             wallet_type
         })
     }
@@ -217,10 +243,11 @@ impl HDWallet2 {
             Err(_) => return Err(HDWError::BadKey())
         };
 
-        let master_public_key = Xpub::from_str(key)?;
+        let account_public_key = Xpub::from_str(key)?;
 
         Ok(Self {
-            master_public_key,
+            master_public_key: None,
+            account_public_key,
             wallet_type
         })
     }
@@ -229,8 +256,11 @@ impl HDWallet2 {
     /**
         Return the master public key of self 
     */
-    pub fn master_public_key(&self) -> Xpub {
-        self.master_public_key.clone()
+    pub fn master_public_key(&self) -> Result<Xpub, HDWError> {
+        match &self.master_public_key {
+            Some(x) => Ok(x.clone()),
+            _ => Err(HDWError::WatchOnly)
+        }
     }
 
     /**
@@ -240,9 +270,9 @@ impl HDWallet2 {
         //If the unlocker's corresponding extended public key equals the watch only wallet's
         //master public key, then return the unlocker's key.
         if 
-        unlocker.master_private_key.get_xpub().key::<33>() == self.master_public_key().key::<33>() 
+        unlocker.master_private_key.get_xpub().key::<33>() == self.master_public_key()?.key::<33>() 
         &&
-        unlocker.master_private_key.get_xpub().chaincode() == self.master_public_key().chaincode()
+        unlocker.master_private_key.get_xpub().chaincode() == self.master_public_key()?.chaincode()
         {
             return Ok(unlocker.master_private_key.clone())
         }
@@ -266,31 +296,21 @@ impl HDWallet2 {
     }
 }
 
-impl WatchOnly for HDWallet2 {
-    fn addresses_at(&self, path: &str, count: usize, network: Network) -> Result<Vec<String>, HDWError>
-    where Self: Sized 
+impl WatchOnly<Unlocker> for HDWallet2 {
+    fn address_at(
+        &self,
+        change: bool,
+        address_index: u32,
+        network: Network,
+    ) -> Result<String, HDWError>
+    where Self: Sized
     {
-        let mut addresses: Vec<String> = vec![];
-        let mut p: Path = Path::from_str(path)?;
-        let last_index = p.children.len()-1;
-        for _i in 0..count {
-            addresses.push(self.master_public_key().derive_from_path(&p)?.get_address(&self.wallet_type, network.clone()));
-            
-            //Then increment the deepest index by one
-            match p.children[last_index] {
-                ChildOptions::Normal(x) => {
-                    let n = x + 1;
-                    if n >= (2 as u32).pow(31) { return Err(HDWError::IndexTooLarge(n)) }
-                    p.children[last_index] = ChildOptions::Normal(n);
-                },
-                ChildOptions::Hardened(x) => {
-                    let n = x + 1;
-                    if n >= (2 as u32).pow(32) { return Err(HDWError::IndexTooLarge(n)) }
-                    p.children[last_index] = ChildOptions::Hardened(n);
-                }
-            }
-        }
+        let mut p: Path = Path::empty();
+        p.children.push(ChildOptions::Normal(change as u32));
+        p.children.push(ChildOptions::Normal(address_index));
 
-        Ok(addresses)
+        let address = self.account_public_key.derive_from_path(&p)?.get_address(&self.wallet_type, network.clone());
+
+        Ok(address)
     }
 }

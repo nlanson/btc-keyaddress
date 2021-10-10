@@ -63,6 +63,12 @@ impl Path {
 
         path.join("/")
     }
+
+    pub fn empty() -> Self {
+        Self {
+            children: vec![]
+        }
+    }
 }
 
 #[cfg(test)]

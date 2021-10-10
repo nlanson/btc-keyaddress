@@ -373,28 +373,6 @@ impl ExtendedKey<PubKey> for Xpub {
         self.chaincode
     }
 
-    // fn serialize_legacy(&self) -> String {
-    //     let mut payload: Vec<u8> = vec![];
-    //     payload.push(self.depth); //depth
-    //     self.parent_fingerprint.iter().for_each(|x| payload.push(*x)); //parent fingerprint
-    //     self.index.iter().for_each(|x| payload.push(*x)); //index
-    //     self.chaincode().iter().for_each(|x| payload.push(*x)); //chaincode
-    //     self.key::<33>().iter().for_each(|x| payload.push(*x)); //public key
-        
-    //     check_encode(VersionPrefix::Xpub,&payload)
-    // }
-
-    // fn serialize_segwit(&self) -> String {
-    //     let mut payload: Vec<u8> = vec![];
-    //     payload.push(self.depth); //depth
-    //     self.parent_fingerprint.iter().for_each(|x| payload.push(*x)); //parent fingerprint
-    //     self.index.iter().for_each(|x| payload.push(*x)); //index
-    //     self.chaincode().iter().for_each(|x| payload.push(*x)); //chaincode
-    //     self.key::<33>().iter().for_each(|x| payload.push(*x)); //public key
-        
-    //     check_encode(VersionPrefix::Zpub,&payload)
-    // }
-
     fn serialize(&self, r#type: &WalletType, network: Network) -> String {
         let mut payload: Vec<u8> = vec![];
         payload.push(self.depth); //depth
@@ -447,18 +425,13 @@ mod tests {
     */
     
     use super::*;
-    use crate::{
-        bip39::{
+    use crate::{bip39::{
             Language,
             Mnemonic,
             PhraseLength
-        },
-        hdwallet::HDWallet,
-        hdwallet::WalletType,
-        util::{
+        }, hdwallet::HDWallet2, hdwallet::{Unlocker, WatchOnly}, hdwallet::WalletType, util::{
             decode_02x
-        }
-    };
+        }};
 
     //Data generated on leanrmeabitcoin.com/technical/hd-wallets
     const TEST_MNEMONIC: &str = "glow laugh acquire menu anchor evil occur put hover renew calm purpose";
@@ -466,50 +439,59 @@ mod tests {
     const TEST_MCC: &str = "1d7d2a4c940be028b945302ad79dd2ce2afe5ed55e1a2937a5af57f8401e73dd";
 
     #[test]
-    fn extended_keys_test() {
+    fn extended_keys_test() -> Result<(), HDWError> {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet = HDWallet::new(mnemonic, WalletType::P2PKH).unwrap();
+        let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH).unwrap();
+        let unlocker = Unlocker::from_mnemonic(&mnemonic).unwrap();
 
         //Test if the calculated and expected key and chaincode are equal
-        assert_eq!(decode_02x(TEST_MPRIV), hdw.mpriv_key().key::<32>());
-        assert_eq!(decode_02x(TEST_MCC), hdw.mpriv_key().chaincode());
+        assert_eq!(decode_02x(TEST_MPRIV), hdw.master_private_key(&unlocker)?.key::<32>());
+        assert_eq!(decode_02x(TEST_MCC), hdw.master_private_key(&unlocker)?.chaincode());
+
+        Ok(())
     }
 
     #[test]
-    fn random_extended_keys_test() {
+    fn random_extended_keys_test() -> Result<(), HDWError> {
         for _i in 0..5 {
             let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::TwentyFour, Language::English, "").unwrap();
-            let hdw: HDWallet = HDWallet::new(mnemonic, WalletType::P2PKH).unwrap();
+            let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH)?;
+            let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
 
             //Check lengths of mpriv, mpub and cc as well as compression prefix
             // of mpub.key to check if it is 0x02 or 0x03
-            assert_eq!(hdw.mpriv_key().key::<32>().len(), 32);
-            assert_eq!(hdw.mpriv_key().chaincode().len(), 32);
-            assert_eq!(hdw.mpub_key().key::<33>().len(), 33);
+            assert_eq!(hdw.master_private_key(&unlocker)?.key::<32>().len(), 32);
+            assert_eq!(hdw.master_private_key(&unlocker)?.chaincode().len(), 32);
+            assert_eq!(hdw.master_public_key()?.key::<33>().len(), 33);
             assert!(
-                match hdw.mpub_key().key::<33>()[0] {
+                match hdw.master_public_key()?.key::<33>()[0] {
                     0x02 | 0x03 => true,
                     _ => false
                 }
             );
-            assert_eq!(hdw.mpub_key().chaincode().len(), 32);
+            assert_eq!(hdw.master_public_key()?.chaincode().len(), 32);
         }
+
+        Ok(())
     }
 
     #[test]
-    fn serialize_extended_keys() {
+    fn serialize_extended_keys() -> Result<(), HDWError> {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet = HDWallet::new(mnemonic, WalletType::P2PKH).unwrap();
+        let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH).unwrap();
+        let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
 
         //master xprv serialization test
-        assert_eq!(hdw.mpriv_key().serialize(&WalletType::P2PKH, Network::Bitcoin), 
+        assert_eq!(hdw.master_private_key(&unlocker)?.serialize(&WalletType::P2PKH, Network::Bitcoin), 
         "xprv9s21ZrQH143K2MPKHPWh91wRxLKehoCNsRrwizj2xNaj9zD5SHMNiHJesDEYgJAavgNE1fDWLgYNneHeSA8oVeVXVYomhP1wxdzZtKsLJbc".to_string()
         );
 
         //master xpub serialization test
-        assert_eq!(hdw.mpub_key().serialize(&WalletType::P2PKH, Network::Bitcoin),
+        assert_eq!(hdw.master_public_key()?.serialize(&WalletType::P2PKH, Network::Bitcoin),
         "xpub661MyMwAqRbcEqTnPR3hW9tAWNA97FvEEenYXP8eWi7i2nYDypfdG5d8iWfK8YgesKi2EE5mk9THcTqnveDWwZVMuctjmxeEaUKgtg7CEEc".to_string()
         );
+
+        Ok(())
     }
 
     #[test]
@@ -546,12 +528,13 @@ mod tests {
     }
 
     #[test]
-    fn derive_from_path_tests() {
+    fn derive_from_path_tests()-> Result<(), HDWError> {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet = HDWallet::new(mnemonic, WalletType::P2PKH).unwrap();
+        let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH).unwrap();
+        let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
         let path: Path = Path::from_str("m/44'/0'/0'/0").unwrap();
 
-        let (xprv_at_path, xpub_at_path) = match hdw.mpriv_key().derive_from_path(&path) {
+        let (xprv_at_path, xpub_at_path) = match hdw.master_private_key(&unlocker)?.derive_from_path(&path) {
             Ok(x) => {
                 (x.serialize(&WalletType::P2PKH, Network::Bitcoin), x.get_xpub().serialize(&WalletType::P2PKH, Network::Bitcoin))
             },
@@ -560,31 +543,39 @@ mod tests {
 
         assert_eq!(xprv_at_path, "xprvA2RVpXN1QL4okLkV3NT6ADt7UcqauZdi6Tyv2wBscQ3kq9zvvfsxBBgQTcoj7GZCa7wkmmeLvQHdqVJEQ1D4PGoDgYV8CZj9w9jqGNbGCaT");
         assert_eq!(xpub_at_path, "xpub6FQrE2tuEhd6xppx9Pz6XMpr2eg5K2MZTguWqKbVAjajhxL5UDCCiyztJtCFDrAqPoQfmbVeVX5BKXQ7vxgR42DtsVa3g2YMLZQjbEnxbqi");
+    
+        Ok(())
     }
 
     #[test]
-    fn bip84_test_vectors() {
+    fn bip84_test_vectors() -> Result<(), HDWError> {
         let mnemonic: Mnemonic = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(), Language::English, "").unwrap();
-        let hdw = HDWallet::new(mnemonic, WalletType::P2WPKH).unwrap();
+        let hdw = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2WPKH)?;
+        let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
         
         // Account 0, root = m/84'/0'/0'
-        let account = hdw.get_xprv_key_at("m/84'/0'/0'").unwrap();
+        let account = hdw.master_private_key(&unlocker)?.derive_from_path(&Path::from_str("m/84'/0'/0'")?)?;
         assert_eq!(account.serialize(&WalletType::P2WPKH, Network::Bitcoin), "zprvAdG4iTXWBoARxkkzNpNh8r6Qag3irQB8PzEMkAFeTRXxHpbF9z4QgEvBRmfvqWvGp42t42nvgGpNgYSJA9iefm1yYNZKEm7z6qUWCroSQnE");
         assert_eq!(account.get_xpub().serialize(&WalletType::P2WPKH, Network::Bitcoin), "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs");
 
         // Account 0, first receiving address = m/84'/0'/0'/0/0
-        let account = hdw.get_xprv_key_at("m/84'/0'/0'/0/0").unwrap();
-        assert_eq!(account.get_prv().export_as_wif(true, Network::Bitcoin), "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d");
-        assert_eq!(Address::P2WPKH(account.get_pub(), Network::Bitcoin).to_string().unwrap(), "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu");
+        let address = hdw.address_at(false, 0, Network::Bitcoin)?;
+        let key = hdw.private_key_at("m/84'/0'/0'/0/0", &unlocker)?;
+        assert_eq!(key.export_as_wif(true, Network::Bitcoin), "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d");
+        assert_eq!(address, "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu");
 
         // Account 0, second receiving address = m/84'/0'/0'/0/1
-        let account = hdw.get_xprv_key_at("m/84'/0'/0'/0/1").unwrap();
-        assert_eq!(account.get_prv().export_as_wif(true, Network::Bitcoin), "Kxpf5b8p3qX56DKEe5NqWbNUP9MnqoRFzZwHRtsFqhzuvUJsYZCy");
-        assert_eq!(Address::P2WPKH(account.get_pub(), Network::Bitcoin).to_string().unwrap(), "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g");
+        let address = hdw.address_at(false, 1, Network::Bitcoin)?;
+        let key = hdw.private_key_at("m/84'/0'/0'/0/1", &unlocker)?;
+        assert_eq!(key.export_as_wif(true, Network::Bitcoin), "Kxpf5b8p3qX56DKEe5NqWbNUP9MnqoRFzZwHRtsFqhzuvUJsYZCy");
+        assert_eq!(address, "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g");
 
         // Account 0, first change address = m/84'/0'/0'/1/0
-        let account = hdw.get_xprv_key_at("m/84'/0'/0'/1/0").unwrap();
-        assert_eq!(account.get_prv().export_as_wif(true, Network::Bitcoin), "KxuoxufJL5csa1Wieb2kp29VNdn92Us8CoaUG3aGtPtcF3AzeXvF");
-        assert_eq!(Address::P2WPKH(account.get_pub(), Network::Bitcoin).to_string().unwrap(), "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el");
+        let address = hdw.address_at(true, 0, Network::Bitcoin)?;
+        let key = hdw.private_key_at("m/84'/0'/0'/1/0", &unlocker)?;
+        assert_eq!(key.export_as_wif(true, Network::Bitcoin), "KxuoxufJL5csa1Wieb2kp29VNdn92Us8CoaUG3aGtPtcF3AzeXvF");
+        assert_eq!(address, "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el");
+    
+        Ok(())
     }
 }

@@ -118,7 +118,8 @@ impl fmt::Display for hdwallet::HDWError {
             Self::BadChar(x) => format!("Bad character at index {}", x),
             Self::BadChecksum() => "Checksum unequal.".to_string(),
             Self::BadPrefix(x) => format!("Got bad prefix: {:?}", x),
-            Self::BadPath(x) => format!("'{}' is not a valid path", x)
+            Self::BadPath(x) => format!("'{}' is not a valid path", x),
+            Self::WatchOnly => format!("Cannot get the master public key as this wallet is watch only")
         };
         
         write!(f, "{}", val)

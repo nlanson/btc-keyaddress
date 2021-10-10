@@ -27,7 +27,9 @@ pub use extended_keys::Xpub;
 pub use path::Path;
 pub use hdwallet::WalletType;
 
-use hdwallet::WatchOnly;
+pub use hdwallet::HDWallet2;
+pub use hdwallet::Unlocker;
+pub use hdwallet::WatchOnly;
 
 
 #[derive(Debug)]
@@ -40,5 +42,6 @@ pub enum HDWError {
     BadChar(usize),
     BadChecksum(),
     BadPrefix(Vec<u8>),
-    BadPath(String)
+    BadPath(String),
+    WatchOnly
 }

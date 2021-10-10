@@ -14,7 +14,10 @@ use crate::{
     },
     hdwallet::{
         ExtendedKey, Xprv, Xpub,
-        HDWError
+        HDWError,
+
+        //new wallet
+        HDWallet2, Unlocker, WatchOnly, WalletType
     },
     key::{
         Key,
@@ -172,7 +175,9 @@ mod tests {
         hdwallet::{
             HDWallet,
             HDWError,
-            WalletType
+            WalletType,
+            Unlocker,
+            WatchOnly
         },
         bip39::{
             Mnemonic,
@@ -193,67 +198,95 @@ mod tests {
     const EXPECTED_m0_0_address: &str = "1E8UW1NDvpG7xTBxRTa9FXwvrXNq95dQyp";
     const EXPECTED_m0_1_address: &str = "1Pg7rysbg9D2D94rxfkPiK4XdPM6qzMv42";
 
-    fn create_hdw_from_test_mnemonic() -> HDWallet {
+    fn create_hdw_from_test_mnemonic() -> HDWallet2 {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        HDWallet::new(mnemonic, WalletType::P2PKH).unwrap()
+
+        HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH).unwrap()
+    }
+
+    fn unlocker() -> Unlocker {
+        let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
+        
+        Unlocker::from_mnemonic(&mnemonic).unwrap()
     }
 
     #[test]
-    fn ckd_normal() {
-        let hdw: HDWallet = create_hdw_from_test_mnemonic();
+    fn ckd_normal() -> Result<(), HDWError> {
+        let hdw: HDWallet2 = create_hdw_from_test_mnemonic();
 
         //Get the first child extended private and public key of the master key.
         //Calculate the child extended public key twice  through the master xpub and child xprv
-        let derived_m0 = hdw.mpriv_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize(&WalletType::P2PKH, Network::Bitcoin);
-        let derived_M0_fromxprv = hdw.mpriv_key().get_xchild(ChildOptions::Normal(0)).unwrap().get_xpub().serialize(&WalletType::P2PKH, Network::Bitcoin);
-        let derived_M0_fromxpub = hdw.mpub_key().get_xchild(ChildOptions::Normal(0)).unwrap().serialize(&WalletType::P2PKH, Network::Bitcoin);
+        let derived_m0 = hdw.master_private_key(&unlocker())?
+                            .get_xchild(ChildOptions::Normal(0))?
+                            .serialize(&WalletType::P2PKH, Network::Bitcoin);
+        let derived_M0_fromxprv = hdw.master_private_key(&unlocker())?
+                                    .get_xchild(ChildOptions::Normal(0))?
+                                    .get_xpub()
+                                    .serialize(&WalletType::P2PKH, Network::Bitcoin);
+        let derived_M0_fromxpub = hdw.master_public_key()?
+                                    .get_xchild(ChildOptions::Normal(0))?
+                                    .serialize(&WalletType::P2PKH, Network::Bitcoin);
 
         //Test is derived values are equal to expected values and if derived xpubs are both identical
         assert_eq!(derived_m0, EXPECTED_m0.to_string());
         assert_eq!(derived_M0_fromxprv, derived_M0_fromxpub);
         assert_eq!(derived_M0_fromxprv, EXPECTED_M0.to_string());
         assert_eq!(derived_M0_fromxpub, EXPECTED_M0.to_string());
+
+        Ok(())
     }
 
     #[test]
-    fn ckd_hardened() {
-        let hdw: HDWallet = create_hdw_from_test_mnemonic();
+    fn ckd_hardened() -> Result<(), HDWError> {
+        let hdw: HDWallet2 = create_hdw_from_test_mnemonic();
 
         //Calculate the hardened children of the master keys.
         //Deriving the corresponding xpub of a hardened xprv is not possible. So pattern match the error.
-        let derived_m0h = hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().serialize(&WalletType::P2PKH, Network::Bitcoin);
-        let derived_M0h_fromxpub = match hdw.mpub_key().get_xchild(ChildOptions::Hardened(0)) {
-            Ok(_) => true,
-            Err(_) => false
-        }; 
-        let derived_M0h_fromxprv = hdw.mpriv_key().get_xchild(ChildOptions::Hardened(0)).unwrap().get_xpub().serialize(&WalletType::P2PKH, Network::Bitcoin);
+        let derived_m0h = hdw
+                            .master_private_key(&unlocker())?
+                            .get_xchild(ChildOptions::Hardened(0))?
+                            .serialize(&WalletType::P2PKH, Network::Bitcoin);
+        let derived_M0h_fromxpub = match hdw
+                                    .master_public_key()?
+                                    .get_xchild(ChildOptions::Hardened(0)) 
+                                    {
+                                        Ok(_) => true,
+                                        Err(_) => false
+                                    };
+        let derived_M0h_fromxprv = hdw
+                                    .master_private_key(&unlocker())?
+                                    .get_xchild(ChildOptions::Hardened(0))?
+                                    .get_xpub()
+                                    .serialize(&WalletType::P2PKH, Network::Bitcoin);
 
         //Test is derived values are equal to expected values and if hardened xpub deriveration failed
         assert_eq!(derived_m0h, EXPECTED_m0h);
         assert_eq!(derived_M0h_fromxpub, false);
         assert_eq!(derived_M0h_fromxprv, EXPECTED_M0h);
+
+        Ok(())
     }
     
     #[test]
-    fn ckd_address_test() {
-        let hdw: HDWallet = create_hdw_from_test_mnemonic();
+    fn ckd_address_test() -> Result<(), HDWError> {
+        let hdw: HDWallet2 = create_hdw_from_test_mnemonic();
 
         //Get the addresses at m/0/0 and m/0/1 using both the public and private keys
-        let m0_0_address_from_xprv: String = hdw.mpriv_key()
-                                                .get_xchild(ChildOptions::Normal(0)).unwrap()
-                                                .get_xchild(ChildOptions::Normal(0)).unwrap()
+        let m0_0_address_from_xprv: String = hdw.master_private_key(&unlocker())?
+                                                .get_xchild(ChildOptions::Normal(0))?
+                                                .get_xchild(ChildOptions::Normal(0))?
                                                 .get_address(&WalletType::P2PKH, Network::Bitcoin);
-        let m0_0_address_from_xpub: String = hdw.mpub_key()
-                                                .get_xchild(ChildOptions::Normal(0)).unwrap()
-                                                .get_xchild(ChildOptions::Normal(0)).unwrap()
+        let m0_0_address_from_xpub: String = hdw.master_public_key()?
+                                                .get_xchild(ChildOptions::Normal(0))?
+                                                .get_xchild(ChildOptions::Normal(0))?
                                                 .get_address(&WalletType::P2PKH, Network::Bitcoin);
-        let m0_1_address_from_xprv: String = hdw.mpriv_key()
-                                                .get_xchild(ChildOptions::Normal(0)).unwrap()
-                                                .get_xchild(ChildOptions::Normal(1)).unwrap()
+        let m0_1_address_from_xprv: String = hdw.master_private_key(&unlocker())?
+                                                .get_xchild(ChildOptions::Normal(0))?
+                                                .get_xchild(ChildOptions::Normal(1))?
                                                 .get_address(&WalletType::P2PKH, Network::Bitcoin);
-        let m0_1_address_from_xpub: String = hdw.mpub_key()
-                                                .get_xchild(ChildOptions::Normal(0)).unwrap()
-                                                .get_xchild(ChildOptions::Normal(1)).unwrap()
+        let m0_1_address_from_xpub: String = hdw.master_public_key()?
+                                                .get_xchild(ChildOptions::Normal(0))?
+                                                .get_xchild(ChildOptions::Normal(1))?
                                                 .get_address(&WalletType::P2PKH, Network::Bitcoin);
 
         //Compare the derived addresses to the expected address as 
@@ -263,5 +296,7 @@ mod tests {
         assert_eq!(m0_0_address_from_xprv, EXPECTED_m0_0_address);
         assert_eq!(m0_1_address_from_xprv, m0_1_address_from_xpub);
         assert_eq!(m0_1_address_from_xprv, EXPECTED_m0_1_address);
+
+        Ok(())
     }
 }
