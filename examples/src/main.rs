@@ -170,7 +170,7 @@ fn p2sh_p2wsh() {
 
 fn xpub_watch_only() -> Result<(), HDWError> {
     let mnemonic = Mnemonic::from_phrase("bridge hawk weather prefer short follow renew judge gadget dial pepper liquid".to_string(), Language::English, "").unwrap();
-    let hdw = btc_keyaddress::hdwallet::HDWallet2::from_mnemonic(&mnemonic, WalletType::P2WPKH).unwrap();
+    let hdw = btc_keyaddress::hdwallet::HDWallet2::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0).unwrap();
     let unlocker = btc_keyaddress::hdwallet::Unlocker::from_mnemonic(&mnemonic).unwrap();
 
     //let mpub = hdw.master_public_key().serialize(&WalletType::P2WPKH, Network::Bitcoin);

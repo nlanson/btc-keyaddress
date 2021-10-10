@@ -56,11 +56,11 @@ impl WalletType {
         }
     }
 
-    pub fn account_path(&self) -> &str {
+    pub fn path(&self) -> Path {
         match &self {
-            WalletType::P2PKH => "m/44'/0'/0'",
-            WalletType::P2WPKH => "m/84'/0'/0'",
-            WalletType::P2SH_P2WPKH => "m/49'/0'/0'"
+            WalletType::P2PKH => Path::from_str("m/44'/0'").unwrap(),
+            WalletType::P2WPKH => Path::from_str("m/84'/0'").unwrap(),
+            WalletType::P2SH_P2WPKH => Path::from_str("m/49'/0'").unwrap()
 
         }
     }
@@ -161,7 +161,8 @@ impl HDWallet {
 pub struct HDWallet2 {
     master_public_key: Option<Xpub>,
     account_public_key: Xpub,
-    pub wallet_type: WalletType
+    pub wallet_type: WalletType,
+    account_index: u32
 }
 
 pub trait WatchOnly<T> {
@@ -199,24 +200,26 @@ impl HDWallet2 {
     /**
         Create a watch only wallet from mnemonic phrase
     */
-    pub fn from_mnemonic(mnemonic: &Mnemonic, wallet_type: WalletType) -> Result<Self, HDWError> {
+    pub fn from_mnemonic(mnemonic: &Mnemonic, wallet_type: WalletType, account_index: u32) -> Result<Self, HDWError> {
         let master_public_key = Some(Xpub::from_mnemonic(mnemonic)?);
         
         let account_public_key = Xprv::from_mnemonic(mnemonic)?
-                                .derive_from_path(&Path::from_str(WalletType::account_path(&wallet_type))?)?
+                                .derive_from_path(&Self::account_path(&wallet_type, account_index))?
                                 .get_xpub();
         
         Ok(Self {
             master_public_key,
             account_public_key,
-            wallet_type
+            wallet_type,
+            account_index
         })
     }
+
 
     /**
         Create a watch only wallet from a master private key
     */
-    pub fn from_master_private(key: &str) -> Result<Self, HDWError> {
+    pub fn from_master_private(key: &str, account_index: u32) -> Result<Self, HDWError> {
         let wallet_type = match WalletType::from_xkey(key) {
             Ok(x) => x,
             Err(_) => return Err(HDWError::BadKey())
@@ -224,20 +227,22 @@ impl HDWallet2 {
 
         let master_public_key = Xprv::from_str(key)?.get_xpub();
         let account_public_key = Xprv::from_str(key)?
-                                .derive_from_path(&Path::from_str(WalletType::account_path(&wallet_type))?)?
+                                .derive_from_path(&Self::account_path(&wallet_type, account_index))?
                                 .get_xpub();
 
         Ok(Self {
-            master_public_key: None,
+            master_public_key: Some(master_public_key),
             account_public_key,
-            wallet_type
+            wallet_type,
+            account_index
         })
     }
+
 
     /**
         Create a watch only wallet from a master public key
     */
-    pub fn from_master_public(key: &str) -> Result<Self, HDWError> {
+    pub fn from_master_public(key: &str, account_index: u32) -> Result<Self, HDWError> {
         let wallet_type = match WalletType::from_xkey(key) {
             Ok(x) => x,
             Err(_) => return Err(HDWError::BadKey())
@@ -248,8 +253,51 @@ impl HDWallet2 {
         Ok(Self {
             master_public_key: None,
             account_public_key,
-            wallet_type
+            wallet_type,
+            account_index
         })
+    }
+
+
+    /**
+        Create the path to the account level given a wallet type and account index.
+    */
+    fn account_path(wallet_type: &WalletType, account_index: u32) -> Path {
+        let mut path = WalletType::path(wallet_type);
+        path.children.push(ChildOptions::Hardened(account_index));
+
+        path
+    }
+
+    /**
+        Create the path to the address level given self, change boolean and address index
+    */
+    fn address_path(&self, change: bool, address_index: u32) -> Path {
+        let mut path = Self::account_path(&self.wallet_type, self.account_index);
+        path.children.push(ChildOptions::Normal(change as u32));
+        path.children.push(ChildOptions::Normal(address_index));
+
+        path
+    }
+
+    /**
+        Return the master private key of self given a valid unlocker 
+    */
+    pub fn master_private_key(&self, unlocker: &Unlocker) -> Result<Xprv, HDWError> {
+        //If the account key derived from the unlocker is equal to the stored account key,
+        //return the master private key in the unlocker.
+        let derived_account_key = unlocker.master_private_key
+                                    .derive_from_path(&Self::account_path(&self.wallet_type, self.account_index))?
+                                    .get_xpub()
+                                    .key::<33>();
+
+        if derived_account_key == self.account_public_key().key::<33>() {
+            return Ok(unlocker.master_private_key.clone())
+        }
+
+        
+        //If no match, return an error
+        Err(HDWError::BadKey())
     }
 
 
@@ -263,35 +311,53 @@ impl HDWallet2 {
         }
     }
 
-    /**
-        Return the master private key of self given a valid unlocker 
-    */
-    pub fn master_private_key(&self, unlocker: &Unlocker) -> Result<Xprv, HDWError> {
-        //If the unlocker's corresponding extended public key equals the watch only wallet's
-        //master public key, then return the unlocker's key.
-        if 
-        unlocker.master_private_key.get_xpub().key::<33>() == self.master_public_key()?.key::<33>() 
-        &&
-        unlocker.master_private_key.get_xpub().chaincode() == self.master_public_key()?.chaincode()
-        {
-            return Ok(unlocker.master_private_key.clone())
-        }
 
-        
-        //If no match, return an error
-        Err(HDWError::BadKey())
+    /**
+        Returns the extended private key for the account level
+    */
+    pub fn account_private_key(&self, unlocker: &Unlocker) -> Result<Xprv, HDWError> {
+        Ok(
+            unlocker.master_private_key
+                .derive_from_path(&Self::account_path(&self.wallet_type, self.account_index))?
+        )                          
     }
+
+
+    /**
+        Return the account level extended public key.
+        
+        This can be used to import the wallet as watch only
+    */
+    pub fn account_public_key(&self) -> Xpub {
+        self.account_public_key.clone()
+    }
+
 
     /**
         Return the private key at the given deriveration path given a valid unlocker
     */
-    pub fn private_key_at(&self, path: &str, unlocker: &Unlocker) -> Result<PrivKey, HDWError> {
-        let path = Path::from_str(path)?;
+    pub fn private_key_at(&self, change: bool, address_index: u32, unlocker: &Unlocker) -> Result<PrivKey, HDWError> {
+        let path = self.address_path(change, address_index);
         
         Ok(
             PrivKey::from_slice(
                 &self.master_private_key(unlocker)?.derive_from_path(&path)?.key::<32>()
             ).unwrap()
+        )
+    }
+
+
+    /**
+        Returns the public key at address level given a change boolean and address index
+    */
+    pub fn public_key_at(&self, change: bool, address_index: u32) -> Result<PubKey, HDWError> {
+        //Deriving path working from the account level
+        let mut path: Path = Path::empty();
+        path.children.push(ChildOptions::Normal(change as u32));
+        path.children.push(ChildOptions::Normal(address_index));
+
+        Ok(
+            self.account_public_key().derive_from_path(&path)?.get_pub()
         )
     }
 }
@@ -305,6 +371,7 @@ impl WatchOnly<Unlocker> for HDWallet2 {
     ) -> Result<String, HDWError>
     where Self: Sized
     {
+        //Deriving path working from the account level
         let mut p: Path = Path::empty();
         p.children.push(ChildOptions::Normal(change as u32));
         p.children.push(ChildOptions::Normal(address_index));

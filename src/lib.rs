@@ -22,8 +22,6 @@
         - HDWallet Struct to only store master_public key and require a seperate struct to retrieve
           private key info.
             > Finish implementing new Multisig HDWallet struct.
-            > Write methods relating to account level keys
-            > WalletType enum to return Path obj instead of &str in account path method.
 
 
 */

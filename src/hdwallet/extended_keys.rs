@@ -441,7 +441,7 @@ mod tests {
     #[test]
     fn extended_keys_test() -> Result<(), HDWError> {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH).unwrap();
+        let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH, 0).unwrap();
         let unlocker = Unlocker::from_mnemonic(&mnemonic).unwrap();
 
         //Test if the calculated and expected key and chaincode are equal
@@ -455,7 +455,7 @@ mod tests {
     fn random_extended_keys_test() -> Result<(), HDWError> {
         for _i in 0..5 {
             let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::TwentyFour, Language::English, "").unwrap();
-            let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH)?;
+            let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH, 0)?;
             let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
 
             //Check lengths of mpriv, mpub and cc as well as compression prefix
@@ -478,7 +478,7 @@ mod tests {
     #[test]
     fn serialize_extended_keys() -> Result<(), HDWError> {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH).unwrap();
+        let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH, 0).unwrap();
         let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
 
         //master xprv serialization test
@@ -530,7 +530,7 @@ mod tests {
     #[test]
     fn derive_from_path_tests()-> Result<(), HDWError> {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH).unwrap();
+        let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH, 0).unwrap();
         let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
         let path: Path = Path::from_str("m/44'/0'/0'/0").unwrap();
 
@@ -550,7 +550,7 @@ mod tests {
     #[test]
     fn bip84_test_vectors() -> Result<(), HDWError> {
         let mnemonic: Mnemonic = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(), Language::English, "").unwrap();
-        let hdw = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2WPKH)?;
+        let hdw = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0)?;
         let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
         
         // Account 0, root = m/84'/0'/0'
@@ -560,19 +560,19 @@ mod tests {
 
         // Account 0, first receiving address = m/84'/0'/0'/0/0
         let address = hdw.address_at(false, 0, Network::Bitcoin)?;
-        let key = hdw.private_key_at("m/84'/0'/0'/0/0", &unlocker)?;
+        let key = hdw.private_key_at(false, 0, &unlocker)?;
         assert_eq!(key.export_as_wif(true, Network::Bitcoin), "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d");
         assert_eq!(address, "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu");
 
         // Account 0, second receiving address = m/84'/0'/0'/0/1
         let address = hdw.address_at(false, 1, Network::Bitcoin)?;
-        let key = hdw.private_key_at("m/84'/0'/0'/0/1", &unlocker)?;
+        let key = hdw.private_key_at(false, 1, &unlocker)?;
         assert_eq!(key.export_as_wif(true, Network::Bitcoin), "Kxpf5b8p3qX56DKEe5NqWbNUP9MnqoRFzZwHRtsFqhzuvUJsYZCy");
         assert_eq!(address, "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g");
 
         // Account 0, first change address = m/84'/0'/0'/1/0
         let address = hdw.address_at(true, 0, Network::Bitcoin)?;
-        let key = hdw.private_key_at("m/84'/0'/0'/1/0", &unlocker)?;
+        let key = hdw.private_key_at(true, 0, &unlocker)?;
         assert_eq!(key.export_as_wif(true, Network::Bitcoin), "KxuoxufJL5csa1Wieb2kp29VNdn92Us8CoaUG3aGtPtcF3AzeXvF");
         assert_eq!(address, "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el");
     
