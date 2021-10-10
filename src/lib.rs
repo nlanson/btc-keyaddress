@@ -17,7 +17,8 @@
     Todo:
         - Unit tests for:
             > Path deriveration
-            > HD Multisig Wallets
+            > HDWallets (Single and multi sig)
+            > P2SH nested Segwit address generation (Stand alone and in HD Wallets imported from `ypub` keys)
         
         - HDWallet Struct to only store master_public key and require a seperate struct to retrieve
           private key info.

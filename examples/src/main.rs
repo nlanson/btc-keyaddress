@@ -2,15 +2,7 @@ use btc_keyaddress::prelude::*;
 use btc_keyaddress::hdwallet::WatchOnly;
 
 fn main() {
-    //print_vals();
-    //bip39();
-    //println!("{:?}", verify_mnemonic_phrase());
-    //println!("{:?}", verify_bad_phrase());
-    //hdwallet().unwrap()
-    //multisig_address();
-    //segwit_hdwallet();
-    //p2sh_p2wsh();
-    xpub_watch_only();
+    
 }
 
 fn print_vals() {
@@ -31,56 +23,16 @@ fn print_vals() {
     );
 }
 
-fn bip39() -> Result<Mnemonic, MnemonicErr> {
-    let mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "")?;
-    Ok(mnemonic)
-}
-
-fn verify_mnemonic_phrase() -> Result<(), MnemonicErr> {
-    let correct_phrase: Vec<&str> = vec!["forget", "arrow", "shadow", "era", "gap", "pretty", "have", "fire", "street", "law", "valve", "sunset"];
-    let phrase: Vec<String> = correct_phrase.iter().map(|x| x.to_string()).collect();
-    Mnemonic::verify_phrase(&phrase, &Language::English)?;
-
-    Ok(())
-}
-
-fn verify_bad_phrase()-> Result<(), MnemonicErr> {
-    let bad_phrase: Vec<&str> = vec!["govern", "shadow", "era", "gap", "pretty", "have", "fire", "street", "law", "valve", "sunset", "forget"];
-    let phrase: Vec<String> = bad_phrase.iter().map(|x| x.to_string()).collect();
-    Mnemonic::verify_phrase(&phrase, &Language::English)?; //Will panic on unwrap
-
-    Ok(())
-}
-
 fn hdwallet() -> Result<(), HDWError> {
+    //Create new mnemonic
     let phrase: String = "glow laugh acquire menu anchor evil occur put hover renew calm purpose".to_string();
     let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
-    //let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
-    let hdw: HDWallet = HDWallet::new(mnemonic.clone(), WalletType::P2PKH).unwrap();
 
-    println!("
-    mnemonic: {}\n
-    mpriv: {}\n
-    mpub:  {}\n
-    address (m/0/0):   {}
-    ", mnemonic.phrase.join(" "),
-       hdw.mpriv_key().serialize(&WalletType::P2PKH, Network::Bitcoin),
-       hdw.mpub_key().serialize(&WalletType::P2PKH, Network::Bitcoin),
-       Address::P2PKH(
-           hdw.mpriv_key()
-           .get_xchild(ChildOptions::Normal(0))?
-           .get_xchild(ChildOptions::Normal(0))?
-           .get_pub(),
-           Network::Bitcoin
-        )
-    );
-
-    let xprv = hdw.get_xprv_key_at("m/44'/0'/0'/0/0").unwrap();
-    println!("Key pair at 'm/44'/0'/0'/0':");
-    println!("{}", xprv.get_prv().export_as_wif(true, Network::Bitcoin));
-    println!("{}", xprv.get_xpub().serialize(&WalletType::P2PKH, Network::Bitcoin));
-    println!("{:?}", hdw.get_addresses("m/44'/0'/0'/0/0", 10, Network::Bitcoin).unwrap());
+    //Create new HDWallet from the mnemonic created above, use Segwit P2WPKH and use account index 0.
+    let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0)?;
     
+    //Get the first external receiving address for the bitcoin testnet
+    hdw.address_at(false, 0, Network::Bitcoin);
 
     Ok(())
 }
@@ -104,15 +56,6 @@ fn multisig_address() {
     ", address,
        keys[0].export_as_wif(true, Network::Testnet)
     );
-}
-
-fn segwit_hdwallet() {
-    let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
-    let hdw = HDWallet::new(mnemonic.clone(), WalletType::P2PKH).unwrap();
-    let addresses = hdw.get_addresses("m/84'/0'/0'/0/0", 10, Network::Bitcoin).unwrap();
-
-    println!("Phrase: {}", mnemonic.phrase.join(" "));
-    println!("Addresses: {:?}", addresses);
 }
 
 fn p2wsh_address() {
@@ -166,16 +109,4 @@ fn p2sh_p2wsh() {
        keys[1].export_as_wif(true, Network::Testnet),
        keys[2].export_as_wif(true, Network::Testnet),
     );
-}
-
-fn xpub_watch_only() -> Result<(), HDWError> {
-    let mnemonic = Mnemonic::from_phrase("bridge hawk weather prefer short follow renew judge gadget dial pepper liquid".to_string(), Language::English, "").unwrap();
-    let hdw = btc_keyaddress::hdwallet::HDWallet2::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0).unwrap();
-    let unlocker = btc_keyaddress::hdwallet::Unlocker::from_mnemonic(&mnemonic).unwrap();
-
-    //let mpub = hdw.master_public_key().serialize(&WalletType::P2WPKH, Network::Bitcoin);
-    let mpub = hdw.address_at(false, 0, Network::Bitcoin);
-    println!("{:?}", mpub);
-
-    Ok(())
 }

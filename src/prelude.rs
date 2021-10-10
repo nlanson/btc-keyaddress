@@ -29,7 +29,9 @@ pub use crate::{
         ExtendedKey,
         HDWError,
         Path,
-        WalletType
+        WalletType,
+        WatchOnly,
+        Unlocker
     }, 
 
     util::{

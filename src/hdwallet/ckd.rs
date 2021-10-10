@@ -17,7 +17,7 @@ use crate::{
         HDWError,
 
         //new wallet
-        HDWallet2, Unlocker, WatchOnly, WalletType
+        HDWallet, Unlocker, WatchOnly, WalletType
     },
     key::{
         Key,
@@ -173,7 +173,6 @@ pub fn derive_xpub(parent: &Xpub, options: ChildOptions) -> Result<Xpub, HDWErro
 mod tests {
     use crate::{
         hdwallet::{
-            HDWallet,
             HDWError,
             WalletType,
             Unlocker,
@@ -198,10 +197,10 @@ mod tests {
     const EXPECTED_m0_0_address: &str = "1E8UW1NDvpG7xTBxRTa9FXwvrXNq95dQyp";
     const EXPECTED_m0_1_address: &str = "1Pg7rysbg9D2D94rxfkPiK4XdPM6qzMv42";
 
-    fn create_hdw_from_test_mnemonic() -> HDWallet2 {
+    fn create_hdw_from_test_mnemonic() -> HDWallet {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
 
-        HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH, 0).unwrap()
+        HDWallet::from_mnemonic(&mnemonic, WalletType::P2PKH, 0).unwrap()
     }
 
     fn unlocker() -> Unlocker {
@@ -212,7 +211,7 @@ mod tests {
 
     #[test]
     fn ckd_normal() -> Result<(), HDWError> {
-        let hdw: HDWallet2 = create_hdw_from_test_mnemonic();
+        let hdw: HDWallet = create_hdw_from_test_mnemonic();
 
         //Get the first child extended private and public key of the master key.
         //Calculate the child extended public key twice  through the master xpub and child xprv
@@ -238,7 +237,7 @@ mod tests {
 
     #[test]
     fn ckd_hardened() -> Result<(), HDWError> {
-        let hdw: HDWallet2 = create_hdw_from_test_mnemonic();
+        let hdw: HDWallet = create_hdw_from_test_mnemonic();
 
         //Calculate the hardened children of the master keys.
         //Deriving the corresponding xpub of a hardened xprv is not possible. So pattern match the error.
@@ -269,7 +268,7 @@ mod tests {
     
     #[test]
     fn ckd_address_test() -> Result<(), HDWError> {
-        let hdw: HDWallet2 = create_hdw_from_test_mnemonic();
+        let hdw: HDWallet = create_hdw_from_test_mnemonic();
 
         //Get the addresses at m/0/0 and m/0/1 using both the public and private keys
         let m0_0_address_from_xprv: String = hdw.master_private_key(&unlocker())?

@@ -429,7 +429,7 @@ mod tests {
             Language,
             Mnemonic,
             PhraseLength
-        }, hdwallet::HDWallet2, hdwallet::{Unlocker, WatchOnly}, hdwallet::WalletType, util::{
+        }, hdwallet::HDWallet, hdwallet::{Unlocker, WatchOnly}, hdwallet::WalletType, util::{
             decode_02x
         }};
 
@@ -441,7 +441,7 @@ mod tests {
     #[test]
     fn extended_keys_test() -> Result<(), HDWError> {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH, 0).unwrap();
+        let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2PKH, 0).unwrap();
         let unlocker = Unlocker::from_mnemonic(&mnemonic).unwrap();
 
         //Test if the calculated and expected key and chaincode are equal
@@ -455,7 +455,7 @@ mod tests {
     fn random_extended_keys_test() -> Result<(), HDWError> {
         for _i in 0..5 {
             let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::TwentyFour, Language::English, "").unwrap();
-            let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH, 0)?;
+            let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2PKH, 0)?;
             let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
 
             //Check lengths of mpriv, mpub and cc as well as compression prefix
@@ -478,7 +478,7 @@ mod tests {
     #[test]
     fn serialize_extended_keys() -> Result<(), HDWError> {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH, 0).unwrap();
+        let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2PKH, 0).unwrap();
         let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
 
         //master xprv serialization test
@@ -530,7 +530,7 @@ mod tests {
     #[test]
     fn derive_from_path_tests()-> Result<(), HDWError> {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet2 = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2PKH, 0).unwrap();
+        let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2PKH, 0).unwrap();
         let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
         let path: Path = Path::from_str("m/44'/0'/0'/0").unwrap();
 
@@ -550,7 +550,7 @@ mod tests {
     #[test]
     fn bip84_test_vectors() -> Result<(), HDWError> {
         let mnemonic: Mnemonic = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(), Language::English, "").unwrap();
-        let hdw = HDWallet2::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0)?;
+        let hdw = HDWallet::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0)?;
         let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
         
         // Account 0, root = m/84'/0'/0'
