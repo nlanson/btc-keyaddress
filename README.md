@@ -59,7 +59,7 @@ let  mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "<your pa
 ```rust
 //Create a spendable HDWallet from a mnemonic phrase
 //Use WalletType::P2PKH or WalletType::P2SH_P2WPKH for legacy or non native segwit wallets.
-let  hdw = HDWallet::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0).unwrap();
+let  hdw = HDWallet::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0, Network::Bitcoin).unwrap();
 let  unlocker = Unlocker::from_mnemonic(&mnemonic).unwrap();
 let  first_receiving_address = hdw.address_at(false, 0, Network::Bitcoin).unwrap();
 let  signing_key = hdw.private_key_at(false, 0, &unlocker).unwrap();
