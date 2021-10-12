@@ -34,7 +34,7 @@ pub fn try_into<T, const N: usize>(v: Vec<T>) -> [T; N] {
         .unwrap_or_else(|v: Vec<T>| panic!("Expected {}, found {}", N, v.len()))
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum Network {
     Bitcoin,
     Testnet

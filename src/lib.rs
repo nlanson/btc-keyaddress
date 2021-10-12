@@ -20,9 +20,15 @@
             > HDWallets (Single and multi sig)
             > P2SH nested Segwit address generation (Stand alone and in HD Wallets imported from `ypub` keys)
         
-        - HDWallet Struct to only store master_public key and require a seperate struct to retrieve
-          private key info.
-            > Finish implementing new Multisig HDWallet struct.
+        - Multisig HDWallets
+            > Finish implementing wallet creation (Checking each key is the same type, converting to account pubs, etc...)
+            > Create redeem scripts and addresses from account xpubs.
+            > Write path methods similar to single sig HDWallets where the path upto the account is stored in a method
+              and if a receiving address needs to be created only the change boolean and address index needs to be supplied.
+              The WalletType enum needs to return a path to the account level and from there a method to create a path to the
+              address level can be written.
+            > Write methods to get account and address level keys and addresses
+            > What deriveration scheme to use? (A combination of BIP-45 & BIP-48 or BIP-87)
 
 
 */

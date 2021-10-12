@@ -200,7 +200,7 @@ mod tests {
     fn create_hdw_from_test_mnemonic() -> HDWallet {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
 
-        HDWallet::from_mnemonic(&mnemonic, WalletType::P2PKH, 0).unwrap()
+        HDWallet::from_mnemonic(&mnemonic, WalletType::P2PKH, 0, Network::Bitcoin).unwrap()
     }
 
     fn unlocker() -> Unlocker {

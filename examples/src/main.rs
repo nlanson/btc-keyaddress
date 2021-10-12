@@ -29,10 +29,10 @@ fn hdwallet() -> Result<(), HDWError> {
     let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
 
     //Create new HDWallet from the mnemonic created above, use Segwit P2WPKH and use account index 0.
-    let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0)?;
+    let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0, Network::Bitcoin)?;
     
     //Get the first external receiving address for the bitcoin testnet
-    hdw.address_at(false, 0, Network::Bitcoin);
+    hdw.address_at(false, 0);
 
     Ok(())
 }

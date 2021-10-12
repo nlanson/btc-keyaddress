@@ -118,25 +118,39 @@ use super::{
 //     }
 // }
 
+#[derive(Clone, Debug)]
+#[allow(non_camel_case_types)]
 pub enum MultisigWalletType {
     P2SH,
     P2WSH,
     P2SH_P2WSH
 }
 
+impl MultisigWalletType {
+    pub fn path(&self) -> Path {
+        //not final
+        match &self {
+            MultisigWalletType::P2SH => Path::from_str("m/45'/0'").unwrap(), 
+            MultisigWalletType::P2WSH => Path::from_str("m/48'/0'").unwrap(),
+            MultisigWalletType::P2SH_P2WSH => Path::from_str("m/48'/0'").unwrap()
 
-pub struct MultisigHDWallet {
-    master_public_keys: Vec<Xpub>,
-    m: u8,
-    n: u8,
-    wallet_type: MultisigWalletType
+        }
+    }
 }
 
-pub struct MultiSigUnlocker {
+
+pub struct MultisigHDWallet {
+    account_public_keys: Vec<Xpub>,
+    required_keys: u8,
+    wallet_type: MultisigWalletType,
+    network: Network
+}
+
+pub struct MultisigUnlocker {
     master_private_keys: Vec<Xprv>
 }
 
-impl MultiSigUnlocker {
+impl MultisigUnlocker {
     pub fn from_mnemonics(mnemonics: &Vec<Mnemonic>) -> Result<Self, HDWError> {
         Ok(Self{
             master_private_keys: mnemonics.iter().map(|x| {
@@ -155,60 +169,47 @@ impl MultiSigUnlocker {
 }
 
 impl MultisigHDWallet {
-    pub fn from_mnemonics(mnemonics: &Vec<Mnemonic>, m: u8, wallet_type: MultisigWalletType) -> Result<Self, HDWError> {
-        let master_public_keys = mnemonics.iter().map(|x| {
-            Xpub::from_mnemonic(x).unwrap()
-        }).collect::<Vec<Xpub>>();
-        let n = master_public_keys.len() as u8;
-
-        Ok(Self{
-            master_public_keys,
-            m,
-            n,
-            wallet_type
-        })
+    /**
+        Create multisig wallet from a list of mnemonics
+    */
+    pub fn from_mnemonics(mnemonics: &Vec<Mnemonic>, required_keys: u8, wallet_type: MultisigWalletType) -> Result<Self, HDWError> {
+        todo!();
     }
 
-    pub fn from_master_privates(keys: &Vec<&str>, m: u8) -> Result<Self, HDWError> {
-        //Check if each provided key is the same type
+    /**
+        Create multisig wallet from a list of master private keys
+    */
+    pub fn from_master_privates(keys: &Vec<&str>, required_keys: u8) -> Result<Self, HDWError> {
+        //Check if key master private key is of the same type.
+        //Only create wallet if they are the same type.
 
-        //Convert each to xpubs
+        //Create a Vec of master publics and account publics from the master private keys.
         todo!()
     }
 
-    pub fn from_master_publics(keys: &Vec<&str>, m: u8) -> Result<Self, HDWError> {
-        //Check if each provided key is the same type
+    /**
+        Create multisig wallet from a list of account public keys
+    */
+    pub fn from_account_publics(keys: &Vec<&str>, required_keys: u8) -> Result<Self, HDWError> {
+        //Check if key account key is of the same type.
+        //Only create wallet if they are the same type.
         
         todo!()
     }
 
-    pub fn redeem_script_at(&self, path: &str) -> Result<Script, HDWError> {
-        //Return the redeem script at the given path
-
-        todo!()
-    }
-
-    pub fn key_for(&self, cosigner_index: usize, path: &str, unlocker: &MultiSigUnlocker) -> Result<PrivKey, HDWError> {
-        //Return the private key at the given path.
-
-        //The Unlocker here can contain as little Xprv keys.
-        //The code will get the xpub at the deriveration path using the stored Xpubs and compare it with the Xpub derived
-        //from any Xprvs provided in the unlocker. 
-
-        //If none match, no private key can be returned. 
-
-        //If there is a match, return the matched key.
-
-        todo!();
+    /**
+        Returns the total number of keys in the multisig setup
+    */
+    fn n(&self) -> u8 {
+        self.account_public_keys.len() as u8
     }
 }
 
-impl WatchOnly<MultiSigUnlocker> for MultisigHDWallet {
+impl WatchOnly<MultisigUnlocker> for MultisigHDWallet {
     fn address_at(
         &self,
         change: bool,
-        address_index: u32,
-        network: Network
+        address_index: u32
     ) -> Result<String, HDWError>
     where Self: Sized {
         //Get the addresses at the given path and up count times.
