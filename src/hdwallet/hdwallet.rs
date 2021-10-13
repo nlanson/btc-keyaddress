@@ -21,7 +21,7 @@ use crate::{
     util::Network
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum WalletType {
     P2PKH,
@@ -86,29 +86,6 @@ impl WalletType {
             &[0x04, 0xb2, 0x47, 0x46] => Ok(Network::Bitcoin),
             _ => return Err(HDWError::BadKey())
         }
-    } 
-
-    /**
-        Returns the deriveration path for "m/purpose/coin_type" given a wallet type
-        and network.
-    */
-    pub fn path(&self, network: Network) -> Path {
-        let mut path = String::from("m/");
-
-        //Purpose field
-        match &self {
-            WalletType::P2PKH => path.push_str("44'/"),
-            WalletType::P2WPKH => path.push_str("84'/"),
-            WalletType::P2SH_P2WPKH => path.push_str("49'/"),
-        }
-
-        //Coin type field
-        match network {
-            Network::Bitcoin => path.push_str("0'"),
-            Network::Testnet => path.push_str("1'")
-        }
-
-        Path::from_str(&path).unwrap()
     }
 }
 
@@ -116,9 +93,19 @@ impl WalletType {
 
 #[derive(Debug, Clone)]
 pub struct HDWallet {
+    //The stored account level key
+    //This is the only key required to generate addresses
     account_public_key: Xpub,
+
+    //The type of wallet
+    //This is used in determining the purpose level path and to generate addresses
     pub wallet_type: WalletType,
+
+    //The BIP-44/49/84 account number
     account_index: u32,
+    
+    //The network the HD wallet is going to be used on.
+    //This is used to determine the coin-type level path and in generating addresses
     pub network: Network
 }
 
@@ -260,12 +247,40 @@ impl HDWallet {
 
 
     /**
-        Create the path to the account level given a wallet type and account index.
+        Returns a path from the root to purpose level
+    */
+    fn purpose_path(wallet_type: &WalletType) -> Path {
+        let mut path = String::from("m/");
 
+        //Purpose field
+        match wallet_type {
+            WalletType::P2PKH => path.push_str("44'"),
+            WalletType::P2WPKH => path.push_str("84'"),
+            WalletType::P2SH_P2WPKH => path.push_str("49'"),
+        }
+
+        Path::from_str(&path).unwrap()
+    }
+
+    /**
+        Returns a path from the root to coin type level
+    */
+    fn coin_type_path(wallet_type: &WalletType, network: Network) -> Path {
+        let mut path = Self::purpose_path(wallet_type);
+        path.children.push(ChildOptions::Hardened(match network {
+            Network::Bitcoin => 0,
+            Network::Testnet => 1
+        }));
+
+        path
+    }
+
+    /**
         Returns a path from the root to account level
     */
     fn account_path(wallet_type: &WalletType, account_index: u32, network: Network) -> Path {
-        let mut path = WalletType::path(wallet_type, network);
+        let mut path = Self::coin_type_path(wallet_type, network);
+        //WalletType::path(wallet_type, network);
         path.children.push(ChildOptions::Hardened(account_index));
 
         path

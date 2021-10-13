@@ -45,5 +45,6 @@ pub enum HDWError {
     BadPrefix(Vec<u8>),
     BadPath(String),
     WatchOnly,
-    DefaultError
+    DefaultError,
+    IndexMissing
 }

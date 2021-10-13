@@ -120,7 +120,8 @@ impl fmt::Display for hdwallet::HDWError {
             Self::BadPrefix(x) => format!("Got bad prefix: {:?}.", x),
             Self::BadPath(x) => format!("'{}' is not a valid path.", x),
             Self::WatchOnly => format!("Cannot get the master public key as this wallet is watch only."),
-            Self::DefaultError => format!("Method is unsupported for the wallet type.")
+            Self::DefaultError => format!("Method is unsupported for the wallet type."),
+            Self::IndexMissing => format!("Index needs to be Some(u32)")
         };
         
         write!(f, "{}", val)
