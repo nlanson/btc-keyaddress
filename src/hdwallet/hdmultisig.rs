@@ -34,7 +34,8 @@ use super::{
     Path,
     ChildOptions,
     WatchOnly,
-    Locked
+    Locked,
+    Unlocker
 };
 
 // pub struct HDMultisig {
@@ -192,7 +193,7 @@ pub struct MultisigHDWallet {
     
     //The required amount of keys for unlocking an m-of-n multisig script
     //Used in script creation
-    required_keys: u8,
+    quorum: u8,
 
     //The type of wallet
     //Used to determine what derivation scheme to use and the script-type field
@@ -207,28 +208,6 @@ pub struct MultisigHDWallet {
     //The BIP-48 account number
     //Not required for legacy P2SH wallets
     account: Option<u32>
-}
-
-pub struct MultisigUnlocker {
-    master_private_keys: Vec<Xprv>
-}
-
-impl MultisigUnlocker {
-    pub fn from_mnemonics(mnemonics: &Vec<Mnemonic>) -> Result<Self, HDWError> {
-        Ok(Self{
-            master_private_keys: mnemonics.iter().map(|x| {
-                Xprv::from_mnemonic(x).unwrap()
-            }).collect::<Vec<Xprv>>()
-        })
-    }
-
-    pub fn from_master_privates(keys: &Vec<&str>) -> Result<Self, HDWError> {
-        Ok(Self {
-            master_private_keys: keys.iter().map(|x| {
-                Xprv::from_str(x).unwrap()
-            }).collect::<Vec<Xprv>>()
-        })
-    }
 }
 
 impl MultisigHDWallet {
@@ -293,7 +272,7 @@ impl MultisigHDWallet {
     */
     pub fn from_mnemonics(
         mnemonics: &Vec<Mnemonic>,
-        required_keys: u8,
+        quorum: u8,
         wallet_type: MultisigWalletType,
         network: Network,
         account_index: Option<u32>
@@ -311,7 +290,7 @@ impl MultisigHDWallet {
         Ok(
             Self {
                 shared_public_keys,
-                required_keys,
+                quorum,
                 wallet_type,
                 network,
                 account: account_index
@@ -324,7 +303,7 @@ impl MultisigHDWallet {
     */
     pub fn from_master_privates(
         keys: &Vec<&str>,
-        required_keys: u8,
+        quorum: u8,
         account_index: Option<u32>
     ) -> Result<Self, HDWError> {
         //Derive the wallet type and network from given keys
@@ -347,7 +326,7 @@ impl MultisigHDWallet {
         Ok(
             Self {
                 shared_public_keys,
-                required_keys,
+                quorum,
                 wallet_type,
                 network,
                 account: account_index
@@ -356,45 +335,115 @@ impl MultisigHDWallet {
     }
 
     /**
-        Create multisig wallet from a list of account public keys
+        Create multisig wallet from a list of share level public keys
     */
-    pub fn from_account_publics(keys: &Vec<&str>, required_keys: u8) -> Result<Self, HDWError> {
-        //Check if key account key is of the same type.
-        //Only create wallet if they are the same type.
+    pub fn from_account_publics(keys: &Vec<&str>, quorum: u8, account_index: Option<u32>) -> Result<Self, HDWError> {
+        //Derive the wallet type and network from given keys
+        let wallet_type = MultisigWalletType::from_xkeys(keys)?;
+        let network = MultisigWalletType::network_from_xkeys(keys)?;
         
-        todo!()
+        //Convert each key string to a Xpub struct
+        let mut shared_public_keys = keys.iter().map(|x| {
+            Xpub::from_str(x).unwrap()
+        }).collect::<Vec<Xpub>>();
+
+        //If BIP-45 is used, sort the shared keys in lexicographical order.
+        if wallet_type == MultisigWalletType::P2SH { Self::sort_keys(&mut shared_public_keys) }
+
+        //Return self
+        Ok(
+            Self {
+                shared_public_keys,
+                quorum,
+                wallet_type,
+                network,
+                account: account_index
+            }
+        )
+    }
+
+    fn address_path_from_shared(&self, cosigner_index: Option<u8>, change: bool, address_index: u32) -> Path {
+        let mut path = Path::empty();
+        
+        //If using BIP-45, push the cosigner index
+        if self.wallet_type == MultisigWalletType::P2SH {
+            path.children.push(ChildOptions::Normal(cosigner_index.unwrap() as u32));
+            
+        }
+
+        //Push the change and address values
+        path.children.push(ChildOptions::Normal(change as u32));
+        path.children.push(ChildOptions::Normal(address_index));
+
+        path
     }
 
     /**
         Returns the total number of keys in the multisig setup
     */
-    fn n(&self) -> u8 {
+    fn total(&self) -> u8 {
         self.shared_public_keys.len() as u8
     }
 
-    fn unlock(&self, unlocker: &MultisigUnlocker) -> Result<(), HDWError> {
-        //Given an unlocker struct that contains at least one master private key,
-        //check to see if any of the keys in the unlocker correspond to any of the shared keys
-        //in self.
+    //Unlocks one of the keys in the multisig setup
+    fn unlock(&self, unlocker: &Unlocker) -> Result<(), HDWError> {
+        //Derive the share level key from the unlocker
+        let shared_key = unlocker.master_private_key.derive_from_path(&Self::path_to_shared_keys(self.wallet_type, self.network, self.account)?)?;
+        
+        //For each stored key, check if the derived key is equal.
+        //If it is equal, return
+        for i in 0..self.shared_public_keys.len() {
+            if shared_key.key::<33>() == self.shared_public_keys[i].key::<33>() {
+                return Ok(())
+            }
+        }
 
-        //Need to decide how data will be handled after unlock.
-        //   - How the user will know what keys in the unlocker are correct
-        //   - How to know if all the keys were valid
-
-
-        todo!();
+        //Else return an error
+        Err(HDWError::BadKey())
     }
 }
 
 impl WatchOnly for MultisigHDWallet {
-    fn address_at(
+    fn redeem_script_at(
         &self,
         change: bool,
-        address_index: u32
+        address_index: u32,
+        cosigner_index: Option<u8>
+    ) -> Result<Script, HDWError> {
+        //Get the derivation path from the shared level to address level
+        let path_to_address = self.address_path_from_shared(cosigner_index, change, address_index);
+        
+        //Create a vec of public keys by iterating over each stored key and deriving the requried child.
+        let mut keys: Vec<PubKey> = vec![];
+        self.shared_public_keys.iter().for_each(|k| {
+            keys.push(k.derive_from_path(&path_to_address).unwrap().get_pub())
+        });
+
+        //Create a multisig script from the quorum and key vector
+        match Script::multisig(self.quorum, &keys) {
+            Ok(script) => return Ok(script),
+            Err(_) => return Err(HDWError::BadKey())
+        }
+    }
+    
+    fn multisig_address_at(
+        &self,
+        change: bool,
+        address_index: u32,
+        cosigner_index: Option<u8>
     ) -> Result<String, HDWError>
     where Self: Sized {
         //Get the addresses at the given path and up count times.
-        
-        todo!()
+        let redeem_script: Script = self.redeem_script_at(change, address_index, cosigner_index)?;
+
+        //Get the address depending on the wallet type
+        match self.wallet_type {
+            MultisigWalletType::P2SH => Ok(Address::P2SH(redeem_script, self.network).to_string().unwrap()),
+            MultisigWalletType::P2WSH => Ok(Address::P2WSH(redeem_script, self.network).to_string().unwrap()),
+            MultisigWalletType::P2SH_P2WSH => {
+                let wrapped_script = Script::p2sh_p2wsh(&redeem_script);
+                Ok(Address::P2SH(wrapped_script, self.network).to_string().unwrap())
+            },
+        }
     }
 }

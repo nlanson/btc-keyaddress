@@ -17,6 +17,9 @@ use crate::{
         ExtendedKey, Xprv, Xpub, 
         HDWError, ChildOptions, Path
     },
+    script::{
+        Script, ScriptErr
+    },
     encoding::bs58check::decode,
     util::Network
 };
@@ -117,14 +120,17 @@ pub trait WatchOnly {
     /**
         Return the account level wallet xpub key.
         This key can be used to import watch only wallets
-        with other providers. (Singlesig)
+        with other providers.
+
+        Singlesig only
     */
     fn account_public_key(&self) -> Xpub { unimplemented!() }
 
     /**
         Return the address level public key
         derived from the account public key. 
-        (Singlesig)
+        
+        Singlesig only
     */
     fn address_public_key(
         &self,
@@ -140,6 +146,25 @@ pub trait WatchOnly {
         change: bool,
         address_index: u32
     ) -> Result<String, HDWError> { Err(HDWError::DefaultError) }
+
+    /**
+        Return the redeem script at a given BIP-44/49/84 compliant deriveration path.
+
+        Multisig only
+    */
+    fn redeem_script_at(
+        &self,
+        change: bool,
+        address_index: u32,
+        cosigner_index: Option<u8>
+    ) -> Result<Script, HDWError> { Err(HDWError::DefaultError) }
+
+    fn multisig_address_at(
+        &self,
+        change: bool,
+        address_index: u32,
+        cosigner_index: Option<u8>
+    ) -> Result<String, HDWError> { Err(HDWError::DefaultError) }
 }
 
 /**
@@ -148,17 +173,17 @@ pub trait WatchOnly {
 */
 #[allow(unused_variables)]
 pub trait Locked<T> {
-    //Returns the master private key (Singlesig)
+    //Returns the master private key Singlesig only
     fn master_private_key(&self, unlocker: &T) -> Result<Xprv, HDWError> { Err(HDWError::DefaultError) }
 
-    //Returns the account private key (Singlesig)
+    //Returns the account private key Singlesig only
     fn account_private_key(&self, unlocker: &T)-> Result<Xprv, HDWError> { Err(HDWError::DefaultError) }
 
     //Returns the address level private key given a change boolean and address index (Singlesig)
     fn address_private_key(&self, change: bool, address_index: u32, unlocker: &T)-> Result<PrivKey, HDWError> { Err(HDWError::DefaultError) }
 
     /**
-        Returns the extended private key at a custom path (Singlesig)
+        Returns the extended private key at a custom path. Singlesig only
         
         The resulting Xprv key can be used to derive addresses and keys at the path using methods written in
         the Xprv and ExtendedKeys struct and trait. 

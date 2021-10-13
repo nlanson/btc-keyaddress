@@ -24,6 +24,10 @@ pub use hdwallet::WatchOnly;
 pub use hdwallet::WalletType;
 pub use hdwallet::Locked;
 
+//Multisig HDWallet
+pub use hdmultisig::MultisigHDWallet;
+pub use hdmultisig::MultisigWalletType;
+
 pub use ckd::derive_xprv;
 pub use ckd::derive_xpub;
 pub use ckd::ChildOptions;

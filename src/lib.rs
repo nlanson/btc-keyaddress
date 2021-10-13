@@ -28,6 +28,10 @@
               The WalletType enum needs to return a path to the account level and from there a method to create a path to the
               address level can be written.
             > Write methods to get account and address level keys and addresses
+            > Multisig Unlocker struct may have to take in one sig at a time to avoid confusion and invalid keys.
+                Unlock 1 key at a time to retrieve its info such as cosigner index and private keys.
+                When signing a tx, the wallet can be 'unlocked' the required amount of times to retrieve necessary keys.
+                This can be used to prove that someone owns a specific cosigner index as well with BIP-45.
         
         - P2TR address generation
 

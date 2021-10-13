@@ -31,7 +31,10 @@ pub use crate::{
         Path,
         WalletType,
         WatchOnly,
-        Unlocker
+        Unlocker,
+        Locked,
+        MultisigHDWallet,
+        MultisigWalletType
     }, 
 
     util::{

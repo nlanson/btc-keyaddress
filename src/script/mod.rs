@@ -46,7 +46,8 @@ impl Script {
         Creates the redeem script for a m-of-n multisig wallet
         BIP-11 and BIP-67 compliant
     */
-    pub fn multisig(m: u8, n: u8, keys: &Vec<PubKey>) -> Result<Self, ScriptErr> {
+    pub fn multisig(m: u8, keys: &Vec<PubKey>) -> Result<Self, ScriptErr> {
+        let n = keys.len() as u8;
         if n != keys.len() as u8 { return Err(ScriptErr::KeyCountDoesNotMatch()) }
         if m > 15 { return Err(ScriptErr::MaxKeyCountExceeded()) }
 
@@ -113,7 +114,7 @@ mod tests {
             PubKey::from_str("021f2f6e1e50cb6a953935c3601284925decd3fd21bc445712576873fb8c6ebc18").unwrap(),
         ];
 
-        let script = Script::multisig(2, 3, &keys).unwrap();
+        let script = Script::multisig(2, &keys).unwrap();
         let address = Address::P2SH(script, Network::Bitcoin).to_string().unwrap();
 
         assert_eq!(address, "3Q4sF6tv9wsdqu2NtARzNCpQgwifm2rAba");

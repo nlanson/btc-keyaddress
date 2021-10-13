@@ -41,7 +41,7 @@ let redeem_script = Script::multisig(2, 3, &public_keys).unwrap();
 let address = Address::P2SH(script, Network::Bitcoin).to_string().unwrap();
 
 //Multisig P2WSH
-let redeem_script = Script::multisig(2, 3, &public_keys).unwrap();
+let redeem_script = Script::multisig(2, &public_keys).unwrap();
 let address = Address:P2WSH(script, Network::Bitcoin).to_string().unwrap();
 ```
 
