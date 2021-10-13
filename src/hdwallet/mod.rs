@@ -22,6 +22,7 @@ pub use hdwallet::HDWallet;
 pub use hdwallet::Unlocker;
 pub use hdwallet::WatchOnly;
 pub use hdwallet::WalletType;
+pub use hdwallet::Locked;
 
 pub use ckd::derive_xprv;
 pub use ckd::derive_xpub;
@@ -43,5 +44,6 @@ pub enum HDWError {
     BadChecksum(),
     BadPrefix(Vec<u8>),
     BadPath(String),
-    WatchOnly
+    WatchOnly,
+    DefaultError
 }

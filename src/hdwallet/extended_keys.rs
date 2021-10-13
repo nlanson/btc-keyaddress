@@ -27,7 +27,8 @@ use crate::{
         },
         HDWError,
         Path,
-        WalletType
+        WalletType,
+        Locked
     },
     bip39::Mnemonic,
     hash,
@@ -462,14 +463,14 @@ mod tests {
             // of mpub.key to check if it is 0x02 or 0x03
             assert_eq!(hdw.master_private_key(&unlocker)?.key::<32>().len(), 32);
             assert_eq!(hdw.master_private_key(&unlocker)?.chaincode().len(), 32);
-            assert_eq!(hdw.master_public_key()?.key::<33>().len(), 33);
+            assert_eq!(hdw.master_public_key(&unlocker)?.key::<33>().len(), 33);
             assert!(
-                match hdw.master_public_key()?.key::<33>()[0] {
+                match hdw.master_public_key(&unlocker)?.key::<33>()[0] {
                     0x02 | 0x03 => true,
                     _ => false
                 }
             );
-            assert_eq!(hdw.master_public_key()?.chaincode().len(), 32);
+            assert_eq!(hdw.master_public_key(&unlocker)?.chaincode().len(), 32);
         }
 
         Ok(())
@@ -487,7 +488,7 @@ mod tests {
         );
 
         //master xpub serialization test
-        assert_eq!(hdw.master_public_key()?.serialize(&WalletType::P2PKH, Network::Bitcoin),
+        assert_eq!(hdw.master_public_key(&unlocker)?.serialize(&WalletType::P2PKH, Network::Bitcoin),
         "xpub661MyMwAqRbcEqTnPR3hW9tAWNA97FvEEenYXP8eWi7i2nYDypfdG5d8iWfK8YgesKi2EE5mk9THcTqnveDWwZVMuctjmxeEaUKgtg7CEEc".to_string()
         );
 
@@ -559,19 +560,19 @@ mod tests {
 
         // Account 0, first receiving address = m/84'/0'/0'/0/0
         let address = hdw.address_at(false, 0)?;
-        let key = hdw.private_key_at(false, 0, &unlocker)?;
+        let key = hdw.address_private_key(false, 0, &unlocker)?;
         assert_eq!(key.export_as_wif(true, Network::Bitcoin), "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d");
         assert_eq!(address, "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu");
 
         // Account 0, second receiving address = m/84'/0'/0'/0/1
         let address = hdw.address_at(false, 1)?;
-        let key = hdw.private_key_at(false, 1, &unlocker)?;
+        let key = hdw.address_private_key(false, 1, &unlocker)?;
         assert_eq!(key.export_as_wif(true, Network::Bitcoin), "Kxpf5b8p3qX56DKEe5NqWbNUP9MnqoRFzZwHRtsFqhzuvUJsYZCy");
         assert_eq!(address, "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g");
 
         // Account 0, first change address = m/84'/0'/0'/1/0
         let address = hdw.address_at(true, 0)?;
-        let key = hdw.private_key_at(true, 0, &unlocker)?;
+        let key = hdw.address_private_key(true, 0, &unlocker)?;
         assert_eq!(key.export_as_wif(true, Network::Bitcoin), "KxuoxufJL5csa1Wieb2kp29VNdn92Us8CoaUG3aGtPtcF3AzeXvF");
         assert_eq!(address, "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el");
     

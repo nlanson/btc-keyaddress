@@ -29,6 +29,8 @@
               address level can be written.
             > Write methods to get account and address level keys and addresses
             > What deriveration scheme to use? (A combination of BIP-45 & BIP-48 or BIP-87)
+        
+        - P2TR address generation
 
 
 */

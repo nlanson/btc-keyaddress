@@ -15,9 +15,7 @@ use crate::{
     hdwallet::{
         ExtendedKey, Xprv, Xpub,
         HDWError,
-
-        //new wallet
-        HDWallet, Unlocker, WatchOnly, WalletType
+        HDWallet, Unlocker, WatchOnly, WalletType, Locked
     },
     key::{
         Key,
@@ -222,7 +220,7 @@ mod tests {
                                     .get_xchild(ChildOptions::Normal(0))?
                                     .get_xpub()
                                     .serialize(&WalletType::P2PKH, Network::Bitcoin);
-        let derived_M0_fromxpub = hdw.master_public_key()?
+        let derived_M0_fromxpub = hdw.master_public_key(&unlocker())?
                                     .get_xchild(ChildOptions::Normal(0))?
                                     .serialize(&WalletType::P2PKH, Network::Bitcoin);
 
@@ -246,7 +244,7 @@ mod tests {
                             .get_xchild(ChildOptions::Hardened(0))?
                             .serialize(&WalletType::P2PKH, Network::Bitcoin);
         let derived_M0h_fromxpub = match hdw
-                                    .master_public_key()?
+                                    .master_public_key(&unlocker())?
                                     .get_xchild(ChildOptions::Hardened(0)) 
                                     {
                                         Ok(_) => true,
@@ -275,7 +273,7 @@ mod tests {
                                                 .get_xchild(ChildOptions::Normal(0))?
                                                 .get_xchild(ChildOptions::Normal(0))?
                                                 .get_address(&WalletType::P2PKH, Network::Bitcoin);
-        let m0_0_address_from_xpub: String = hdw.master_public_key()?
+        let m0_0_address_from_xpub: String = hdw.master_public_key(&unlocker())?
                                                 .get_xchild(ChildOptions::Normal(0))?
                                                 .get_xchild(ChildOptions::Normal(0))?
                                                 .get_address(&WalletType::P2PKH, Network::Bitcoin);
@@ -283,7 +281,7 @@ mod tests {
                                                 .get_xchild(ChildOptions::Normal(0))?
                                                 .get_xchild(ChildOptions::Normal(1))?
                                                 .get_address(&WalletType::P2PKH, Network::Bitcoin);
-        let m0_1_address_from_xpub: String = hdw.master_public_key()?
+        let m0_1_address_from_xpub: String = hdw.master_public_key(&unlocker())?
                                                 .get_xchild(ChildOptions::Normal(0))?
                                                 .get_xchild(ChildOptions::Normal(1))?
                                                 .get_address(&WalletType::P2PKH, Network::Bitcoin);

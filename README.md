@@ -62,7 +62,8 @@ let  mnemonic = Mnemonic::new(PhraseLength::Twelve, Language::English, "<your pa
 let  hdw = HDWallet::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0, Network::Bitcoin).unwrap();
 let  unlocker = Unlocker::from_mnemonic(&mnemonic).unwrap();
 let  first_receiving_address = hdw.address_at(false, 0, Network::Bitcoin).unwrap();
-let  signing_key = hdw.private_key_at(false, 0, &unlocker).unwrap();
+let  signing_key = hdw.address_private_key(false, 0, &unlocker).unwrap();
+let  custom_path_address = hdw.custom_path_extended_private_key("<a non standard derivation path>", &unlocker)?.get_address(&hdw.wallet_type, hdw.network);
 
 //Create a watch only HDWallet from an account level xpub key
 //Since an unlocker cannot be created from an xpub key, private keys cannot be retrieved.

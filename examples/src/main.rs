@@ -2,7 +2,7 @@ use btc_keyaddress::prelude::*;
 use btc_keyaddress::hdwallet::WatchOnly;
 
 fn main() {
-    
+    hdwallet();
 }
 
 fn print_vals() {
@@ -25,14 +25,17 @@ fn print_vals() {
 
 fn hdwallet() -> Result<(), HDWError> {
     //Create new mnemonic
-    let phrase: String = "glow laugh acquire menu anchor evil occur put hover renew calm purpose".to_string();
+    let phrase: String = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string();
     let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
 
     //Create new HDWallet from the mnemonic created above, use Segwit P2WPKH and use account index 0.
-    let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0, Network::Bitcoin)?;
+    let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0, Network::Testnet)?;
     
     //Get the first external receiving address for the bitcoin testnet
-    hdw.address_at(false, 0);
+    for i in 0..=9 {
+        println!("{}", hdw.address_at(false, i)?);
+    }
+    
 
     Ok(())
 }

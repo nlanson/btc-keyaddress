@@ -110,16 +110,17 @@ impl fmt::Display for bip39::Mnemonic {
 impl fmt::Display for hdwallet::HDWError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let val = match self {
-            Self::IndexTooLarge(x) => format!("The index {} is too large", x),
-            Self::IndexReserved(x) => format!("The index {} is reserved for hardened keys", x),
+            Self::IndexTooLarge(x) => format!("The index {} is too large.", x),
+            Self::IndexReserved(x) => format!("The index {} is reserved for hardened keys.", x),
             Self::CantHarden() => "cannot produce hardened child public key".to_string(),
             Self::BadKey() => "Cannot use this key. Likely a bad slice.".to_string(),
-            Self::BadArithmatic() => "Bad arithmatic".to_string(),
-            Self::BadChar(x) => format!("Bad character at index {}", x),
+            Self::BadArithmatic() => "Bad arithmatic.".to_string(),
+            Self::BadChar(x) => format!("Bad character at index {}.", x),
             Self::BadChecksum() => "Checksum unequal.".to_string(),
-            Self::BadPrefix(x) => format!("Got bad prefix: {:?}", x),
-            Self::BadPath(x) => format!("'{}' is not a valid path", x),
-            Self::WatchOnly => format!("Cannot get the master public key as this wallet is watch only")
+            Self::BadPrefix(x) => format!("Got bad prefix: {:?}.", x),
+            Self::BadPath(x) => format!("'{}' is not a valid path.", x),
+            Self::WatchOnly => format!("Cannot get the master public key as this wallet is watch only."),
+            Self::DefaultError => format!("Method is unsupported for the wallet type.")
         };
         
         write!(f, "{}", val)
