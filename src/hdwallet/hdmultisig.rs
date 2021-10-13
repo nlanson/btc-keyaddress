@@ -1,9 +1,7 @@
 /*
     Module implementing Multisig HD Wallet data structures
 
-    Todo:
-        - Make the path to shared public key method a standalone method.
-        - Write method to create multisig hd wallet from extended keys
+    Todo:.
         - Write method to create redeem scripts given a change boolean and address index.
             This will need to take into account the use of cosigner indexes in BIP-45. 
             A single method taking in self, an optional cosigned index, change boolean and address index
@@ -133,7 +131,7 @@ use super::{
 //     }
 // }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum MultisigWalletType {
     P2SH = 0,
@@ -142,11 +140,10 @@ pub enum MultisigWalletType {
 }
 
 impl MultisigWalletType {
-    pub fn from_xkeys(keys: Vec<&str>) -> Result<Self, HDWError> {
-        //Given a vector of extended keys, return the type of multisig wallet to use.
-        //If all of the keys are the same type, return the MultisigWalletType.
-        //If even one of the keys is a different type, return an error.
-
+    //Given a vector of extended keys, return the type of multisig wallet to use.
+    //If all of the keys are the same type, return the MultisigWalletType.
+    //If even one of the keys is a different type, return an error.
+    pub fn from_xkeys(keys: &Vec<&str>) -> Result<Self, HDWError> {
         //Get the wallet type for each individual key as if it was a PKH wallet
         let key_type = keys.iter().map(|x| {
             WalletType::from_xkey(x).unwrap()
@@ -165,12 +162,31 @@ impl MultisigWalletType {
         //Else return an error
         Err(HDWError::BadKey())
     }
+
+    /**
+        Given a vec of extended keys, this function will return the Network
+        that the extended key is used for only if all the extended keys use the same network.
+    */
+    pub fn network_from_xkeys(keys: &Vec<&str>) -> Result<Network, HDWError> {
+        //Collect the network of each key
+        let networks = keys.iter().map(|x| {
+            WalletType::network_from_xkey(x).unwrap()
+        }).collect::<Vec<Network>>();
+
+        //Check if they are all the same
+        if networks.iter().all(|n| *n == networks[0]) {
+            return Ok(networks[0])
+        }
+
+        //Return error if not
+        Err(HDWError::BadKey())
+    }
 }
 
 
 pub struct MultisigHDWallet {
     //List of the shared public keys.
-    //For BIP-45 this is the purpose level keys
+    //For BIP-45 this is the purpose level keys and are sorted in lexicographical order
     //For BIP-48 this is the script-type level keys
     shared_public_keys: Vec<Xpub>,  
     
@@ -217,15 +233,16 @@ impl MultisigUnlocker {
 
 impl MultisigHDWallet {
     /**
-        Create multisig wallet from a list of mnemonics
+        Create a derivation path to the shared keys level.
+        
+        For BIP-45, this is the purpose level.
+        For BIP-48, this is the script-type level.
     */
-    pub fn from_mnemonics(
-        mnemonics: &Vec<Mnemonic>,
-        required_keys: u8,
+    fn path_to_shared_keys(
         wallet_type: MultisigWalletType,
         network: Network,
         account_index: Option<u32>
-    ) -> Result<Self, HDWError> {
+    ) -> Result<Path, HDWError> {
         //Creating the path to the shared level.
         //Purpose for BIP-45 and script-type for BIP-48
         let path: Path = match wallet_type {
@@ -255,12 +272,41 @@ impl MultisigHDWallet {
                 path
             }
         };
+
+        Ok(path)
+    }
+
+    /**
+        Sorts a given list of extended public keys.
         
-        let shared_public_keys = mnemonics.iter().map(|x| {
+        This is used when creating a BIP-45 hd wallet to determine the 
+        cosigner indexes
+    */
+    fn sort_keys(keys: &mut Vec<Xpub>) {
+        keys.sort_by(|a, b| {
+            a.get_pub().hex().cmp(&b.get_pub().hex())
+        });
+    }
+    
+    /**
+        Create multisig wallet from a list of mnemonics
+    */
+    pub fn from_mnemonics(
+        mnemonics: &Vec<Mnemonic>,
+        required_keys: u8,
+        wallet_type: MultisigWalletType,
+        network: Network,
+        account_index: Option<u32>
+    ) -> Result<Self, HDWError> {
+        let path: Path = Self::path_to_shared_keys(wallet_type, network, account_index)?;
+        let mut shared_public_keys = mnemonics.iter().map(|x| {
             Xprv::from_mnemonic(x).unwrap()
                 .derive_from_path(&path).unwrap()
                 .get_xpub()
         }).collect::<Vec<Xpub>>();
+        
+        //If BIP-45 is used, sort the shared keys in lexicographical order.
+        if wallet_type == MultisigWalletType::P2SH { Self::sort_keys(&mut shared_public_keys) }
 
         Ok(
             Self {
@@ -276,12 +322,37 @@ impl MultisigHDWallet {
     /**
         Create multisig wallet from a list of master private keys
     */
-    pub fn from_master_privates(keys: &Vec<&str>, required_keys: u8) -> Result<Self, HDWError> {
-        //Check if key master private key is of the same type.
-        //Only create wallet if they are the same type.
+    pub fn from_master_privates(
+        keys: &Vec<&str>,
+        required_keys: u8,
+        account_index: Option<u32>
+    ) -> Result<Self, HDWError> {
+        //Derive the wallet type and network from given keys
+        let wallet_type = MultisigWalletType::from_xkeys(keys)?;
+        let network = MultisigWalletType::network_from_xkeys(keys)?;
 
-        //Create a Vec of master publics and account publics from the master private keys.
-        todo!()
+        //Get the path to shared keys from wallet type, network and account index if given one.
+        //Then for each key derive child keys to the shared path.
+        let path: Path = Self::path_to_shared_keys(wallet_type, network, account_index)?;
+        let mut shared_public_keys: Vec<Xpub> = keys.iter().map(|x| {
+            Xprv::from_str(x).unwrap()
+                .derive_from_path(&path).unwrap()
+                .get_xpub()
+        }).collect::<Vec<Xpub>>();
+
+        //If BIP-45 is used, sort the shared keys in lexicographical order.
+        if wallet_type == MultisigWalletType::P2SH { Self::sort_keys(&mut shared_public_keys) }
+
+        //Return self
+        Ok(
+            Self {
+                shared_public_keys,
+                required_keys,
+                wallet_type,
+                network,
+                account: account_index
+            }
+        )
     }
 
     /**
@@ -299,6 +370,19 @@ impl MultisigHDWallet {
     */
     fn n(&self) -> u8 {
         self.shared_public_keys.len() as u8
+    }
+
+    fn unlock(&self, unlocker: &MultisigUnlocker) -> Result<(), HDWError> {
+        //Given an unlocker struct that contains at least one master private key,
+        //check to see if any of the keys in the unlocker correspond to any of the shared keys
+        //in self.
+
+        //Need to decide how data will be handled after unlock.
+        //   - How the user will know what keys in the unlocker are correct
+        //   - How to know if all the keys were valid
+
+
+        todo!();
     }
 }
 
