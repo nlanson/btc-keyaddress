@@ -21,17 +21,9 @@
             > P2SH nested Segwit address generation (Stand alone and in HD Wallets imported from `ypub` keys)
         
         - Multisig HDWallets
-            > Finish implementing wallet creation (Checking each key is the same type, converting to account pubs, etc...)
-            > Create redeem scripts and addresses from account xpubs.
-            > Write path methods similar to single sig HDWallets where the path upto the account is stored in a method
-              and if a receiving address needs to be created only the change boolean and address index needs to be supplied.
-              The WalletType enum needs to return a path to the account level and from there a method to create a path to the
-              address level can be written.
-            > Write methods to get account and address level keys and addresses
-            > Multisig Unlocker struct may have to take in one sig at a time to avoid confusion and invalid keys.
-                Unlock 1 key at a time to retrieve its info such as cosigner index and private keys.
-                When signing a tx, the wallet can be 'unlocked' the required amount of times to retrieve necessary keys.
-                This can be used to prove that someone owns a specific cosigner index as well with BIP-45.
+            > Finish and clean up.
+            > Multisig Wallet Builder struct
+            > Split BIP-45 and BIP-48 into either traits or structs.
         
         - P2TR address generation
 

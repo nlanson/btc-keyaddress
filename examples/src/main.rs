@@ -127,13 +127,17 @@ fn multisig_hdwallet() -> Result<(), HDWError> {
 
     
     let mnemonics = vec![mnemonic1, mnemonic2, mnemonic3];
-    let wallet_type = MultisigWalletType::P2WSH;
+    let wallet_type = MultisigWalletType::P2SH;
     let quorum: u8 = 2;
     let network = Network::Bitcoin;
     let account_index = Some(0 as u32);
     let mhdw = MultisigHDWallet::from_mnemonics(&mnemonics, quorum, wallet_type, network, account_index)?;
 
-    println!("{}", mhdw.multisig_address_at(false, 0, None)?);
+    for i in 0..=9 {
+        println!("{}", mhdw.address_at(false, i, Some(0))?);
+    }
+    
+    
 
     Ok(())
      

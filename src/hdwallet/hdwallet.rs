@@ -121,22 +121,18 @@ pub trait WatchOnly {
         Return the account level wallet xpub key.
         This key can be used to import watch only wallets
         with other providers.
-
-        Singlesig only
     */
-    fn account_public_key(&self) -> Xpub { unimplemented!() }
+    fn account_public_key(&self) -> Xpub;
 
     /**
         Return the address level public key
         derived from the account public key. 
-        
-        Singlesig only
     */
     fn address_public_key(
         &self,
         change: bool,
         address_index: u32
-    ) -> Result<PubKey, HDWError> { Err(HDWError::DefaultError) }
+    ) -> Result<PubKey, HDWError>;
     
     /**
         Return an addresses at the given BIP-44/49/84 compliant deriveration path.
@@ -145,26 +141,7 @@ pub trait WatchOnly {
         &self,
         change: bool,
         address_index: u32
-    ) -> Result<String, HDWError> { Err(HDWError::DefaultError) }
-
-    /**
-        Return the redeem script at a given BIP-44/49/84 compliant deriveration path.
-
-        Multisig only
-    */
-    fn redeem_script_at(
-        &self,
-        change: bool,
-        address_index: u32,
-        cosigner_index: Option<u8>
-    ) -> Result<Script, HDWError> { Err(HDWError::DefaultError) }
-
-    fn multisig_address_at(
-        &self,
-        change: bool,
-        address_index: u32,
-        cosigner_index: Option<u8>
-    ) -> Result<String, HDWError> { Err(HDWError::DefaultError) }
+    ) -> Result<String, HDWError>;
 }
 
 /**
@@ -173,23 +150,23 @@ pub trait WatchOnly {
 */
 #[allow(unused_variables)]
 pub trait Locked<T> {
-    //Returns the master private key Singlesig only
-    fn master_private_key(&self, unlocker: &T) -> Result<Xprv, HDWError> { Err(HDWError::DefaultError) }
+    //Returns the master private key
+    fn master_private_key(&self, unlocker: &T) -> Result<Xprv, HDWError>;
 
-    //Returns the account private key Singlesig only
-    fn account_private_key(&self, unlocker: &T)-> Result<Xprv, HDWError> { Err(HDWError::DefaultError) }
+    //Returns the account private key
+    fn account_private_key(&self, unlocker: &T)-> Result<Xprv, HDWError>;
 
-    //Returns the address level private key given a change boolean and address index (Singlesig)
-    fn address_private_key(&self, change: bool, address_index: u32, unlocker: &T)-> Result<PrivKey, HDWError> { Err(HDWError::DefaultError) }
+    //Returns the address level private key given a change boolean and address index
+    fn address_private_key(&self, change: bool, address_index: u32, unlocker: &T)-> Result<PrivKey, HDWError>;
 
     /**
-        Returns the extended private key at a custom path. Singlesig only
+        Returns the extended private key at a custom path
         
         The resulting Xprv key can be used to derive addresses and keys at the path using methods written in
         the Xprv and ExtendedKeys struct and trait. 
         This can be used with wallets that use custom non-standard derivation paths.
     */
-    fn custom_path_extended_private_key(&self, custom_path: &str, unlocker: &T) -> Result<Xprv, HDWError> { Err(HDWError::DefaultError) }
+    fn custom_path_extended_private_key(&self, custom_path: &str, unlocker: &T) -> Result<Xprv, HDWError>;
 }
 
 /**
