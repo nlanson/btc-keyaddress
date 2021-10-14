@@ -56,7 +56,7 @@ pub struct Xpub {
     pub index: [u8; 4]
 }
 
-pub trait ExtendedKey<T> {
+pub trait ExtendedKey<T> where T: Key {
     /**
         Constructs the Extended Key.
     */

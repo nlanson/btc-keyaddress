@@ -27,6 +27,7 @@ pub use hdwallet::Locked;
 //Multisig HDWallet
 pub use hdmultisig::MultisigHDWallet;
 pub use hdmultisig::MultisigWalletType;
+pub use hdmultisig::MultisigHDWalletBuilder;
 
 pub use ckd::derive_xprv;
 pub use ckd::derive_xpub;
@@ -50,5 +51,6 @@ pub enum HDWError {
     BadPath(String),
     WatchOnly,
     DefaultError,
-    IndexMissing
+    IndexMissing,
+    MissingFields
 }

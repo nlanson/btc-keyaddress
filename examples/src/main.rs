@@ -1,5 +1,5 @@
 use btc_keyaddress::prelude::*;
-use btc_keyaddress::hdwallet::WatchOnly;
+use btc_keyaddress::hdwallet::{MultisigHDWalletBuilder, WatchOnly};
 
 fn main() {
    multisig_hdwallet();
@@ -113,32 +113,24 @@ fn p2sh_p2wsh() {
 }
 
 fn multisig_hdwallet() -> Result<(), HDWError> {
-    //Create new mnemonic
-    let phrase: String = "solution tank now evidence resemble island goose elephant quantum play lonely summer".to_string();
-    let mnemonic1: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
+    let mut b = MultisigHDWalletBuilder::new();
     
-    //Create new mnemonic
-    let phrase: String = "prefer broom toast pond fence comfort dumb slot pupil ability meadow sick".to_string();
-    let mnemonic2: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
+    let phrase1: String = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string();
+    let mnemonic1: Mnemonic = Mnemonic::from_phrase(phrase1, Language::English, "").unwrap();
+    let phrase2: String = "pride bounce best cannon transfer prize vast nose that distance atom honey".to_string();
+    let mnemonic2: Mnemonic = Mnemonic::from_phrase(phrase2, Language::English, "").unwrap();
 
-    //Create new mnemonic
-    let phrase: String = "fit airport catalog list circle cave jar wrestle deer sibling panther order".to_string();
-    let mnemonic3: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
+    b.set_type(MultisigWalletType::P2SH_P2WSH);
+    b.add_signer_from_mnemonic(&mnemonic1);
+    b.add_signer_from_mnemonic(&mnemonic2);
+    b.set_quorum(2);
 
+    let wallet = b.build()?;
     
-    let mnemonics = vec![mnemonic1, mnemonic2, mnemonic3];
-    let wallet_type = MultisigWalletType::P2SH;
-    let quorum: u8 = 2;
-    let network = Network::Bitcoin;
-    let account_index = Some(0 as u32);
-    let mhdw = MultisigHDWallet::from_mnemonics(&mnemonics, quorum, wallet_type, network, account_index)?;
-
-    for i in 0..=9 {
-        println!("{}", mhdw.address_at(false, i, Some(0))?);
+    //Print 10 receiving addresses for the wallet
+    for i in 0..10 {
+        println!("{}", wallet.address_at(false, i, None)?)
     }
-    
-    
 
     Ok(())
-     
 }
