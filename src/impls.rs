@@ -122,7 +122,9 @@ impl fmt::Display for hdwallet::HDWError {
             Self::WatchOnly => format!("Cannot get the master public key as this wallet is watch only."),
             Self::DefaultError => format!("Method is unsupported for the wallet type."),
             Self::IndexMissing => format!("Index needs to be Some(u32)"),
-            Self::MissingFields => format!("One or more missing fields")
+            Self::MissingFields => format!("One or more missing fields"),
+            Self::BadQuorum(q) => format!("Quorum {} is not valid", q),
+            Self::TypeDiscrepancy => format!("Wallet type or network does not match")
         };
         
         write!(f, "{}", val)

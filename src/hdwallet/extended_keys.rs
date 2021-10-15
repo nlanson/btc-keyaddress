@@ -163,9 +163,21 @@ impl ExtendedKey<PrivKey> for Xprv {
             if !x { return Err(HDWError::BadChecksum()) } 
         }
         
-        //Check if the verion of the key is for "xprv" keys
+        //Check if the verion of the key is for xprv keys
         let version = bytes[0..4].to_vec();
-        if version != vec![0x04, 0x88, 0xAD, 0xE4] { return Err(HDWError::BadPrefix(version)) }
+        match &version[..] {
+            //Only continue if version is for ex priv
+            &[0x04, 0x35, 0x83, 0x94] | //x
+            &[0x04, 0x4a, 0x4e, 0x28] | //t
+            &[0x04, 0x5f, 0x18, 0xbc] | //y
+            &[0x04, 0x88, 0xAD, 0xE4] | //u
+            &[0x04, 0x9d, 0x78, 0x78] | //z
+            &[0x04, 0xb2, 0x43, 0x0c]   //v
+                                            => { /* Continue */ },
+            
+            //Return an error if not valid
+            _ => return Err(HDWError::BadPrefix(version))
+        }
 
         //Extract the remaining data from the payload
         let depth: u8 = bytes[4];
@@ -320,9 +332,22 @@ impl ExtendedKey<PubKey> for Xpub {
             if !x { return Err(HDWError::BadChecksum()) } 
         }
         
-        //Check if the verion of the key is for "xpub" keys
+        //Check if the verion of the key is for xpub keys
         let version = bytes[0..4].to_vec();
-        if version != vec![0x04, 0x88, 0xB2, 0x1E] { return Err(HDWError::BadPrefix(version)) }
+        match &version[..] {
+            //Only continue if version is for ex pub
+            &[0x04, 0x88, 0xB2, 0x1E] | //x
+            &[0x04, 0x35, 0x87, 0xCF] | //t
+            &[0x04, 0x9d, 0x7c, 0xb2] | //y
+            &[0x04, 0x4a, 0x52, 0x62] | //u
+            &[0x04, 0xb2, 0x47, 0x46] | //z
+            &[0x04, 0x5f, 0x1c, 0xf6]   //v
+                                            => { /* Continue */ },
+            
+            //Return an error if not valid
+            _ => return Err(HDWError::BadPrefix(version))
+        }
+
         
         //Extract the remaining data from the payload
         let depth: u8 = bytes[4];

@@ -1,12 +1,13 @@
 /*
     Module implementing Multisig HD Wallet data structures
 
-    Todo:.
-        - HD Multisig wallet builder, address generator and key extracting should be working (no unit tests)
-        - Builder to track path used to derive each shared key and return error upon build if
-          any of the paths use a different path from the others.
+    Todo:
+        - SLIP-0132 support (outlined in lib.rs notes)
         - The pathing trait could be used for Singlesig HDWallets as well.
         - The pathing trait could take in custom paths from master (with unlocker)
+        - Is there a better way to implement an Unlocker for multisig?
+          Currently, the unlocker unlocks a single key at a time.
+          If the unlocker takes in many keys at a time, how will it return the valid keys?
         
             ****************
             ** UNIT TESTS **
@@ -42,70 +43,43 @@ pub enum MultisigWalletType {
 }
 
 impl MultisigWalletType {
-    //Given a vector of extended keys, return the type of multisig wallet to use.
-    //If all of the keys are the same type, return the MultisigWalletType.
-    //If even one of the keys is a different type, return an error.
-    pub fn from_xkeys(keys: &Vec<&str>) -> Result<Self, HDWError> {
+    pub fn from_xkeys(key: &str) -> Result<Self, HDWError> {
         //Get the wallet type for each individual key as if it was a PKH wallet
-        let key_type = keys.iter().map(|x| {
-            WalletType::from_xkey(x).unwrap()
-        }).collect::<Vec<WalletType>>();
+        let key_type = WalletType::from_xkey(key)?;
 
-        //If all the wallet types are equal to the first wallet type,
-        //then return the multisig wallet type of the first key
-        if key_type.iter().all(|t| *t == key_type[0]) {
-            return Ok(match key_type[0] {
-                WalletType::P2PKH => MultisigWalletType::P2SH,
-                WalletType::P2SH_P2WPKH => MultisigWalletType::P2SH_P2WSH,
-                WalletType::P2WPKH => MultisigWalletType::P2WSH
-            })
-        }
-
-        //Else return an error
-        Err(HDWError::BadKey())
+        Ok(match key_type {
+            WalletType::P2PKH => MultisigWalletType::P2SH,
+            WalletType::P2SH_P2WPKH => MultisigWalletType::P2SH_P2WSH,
+            WalletType::P2WPKH => MultisigWalletType::P2WSH
+        })
     }
 
     /**
         Given a vec of extended keys, this function will return the Network
         that the extended key is used for only if all the extended keys use the same network.
     */
-    pub fn network_from_xkeys(keys: &Vec<&str>) -> Result<Network, HDWError> {
+    pub fn network_from_xkey(key: &str) -> Result<Network, HDWError> {
         //Collect the network of each key
-        let networks = keys.iter().map(|x| {
-            WalletType::network_from_xkey(x).unwrap()
-        }).collect::<Vec<Network>>();
+        let network = WalletType::network_from_xkey(key)?;
 
-        //Check if they are all the same
-        if networks.iter().all(|n| *n == networks[0]) {
-            return Ok(networks[0])
-        }
-
-        //Return error if not
-        Err(HDWError::BadKey())
+        Ok(network)
     }
 }
 
 /**
     Builder struct to make creating HD Multisig Wallets easier.
     Can only create standard BIP-45 or BIP-48 wallets for the time being.
-
-    When using this struct, it is recommended that if any values are going
-    to be changed from the default recommended values, that it is done before
-    adding signers. 
-
-    Issues can arise if signers are added and then default values are changed,
-    since the signers shared key is stored using the default value before values
-    change and the new shared keys cannot be reevaluated upon value change.
-    
-    This issue can be averted by tracking the path used to derive the shard keys
-    and making sure they are all the same.
 */
+const MAX_KEYS_FOR_SETUP: u8 = 15;
 pub struct MultisigHDWalletBuilder {
-    pub wallet_type: Option<MultisigWalletType>, //Defaults to P2WSH
-    pub quorum: Option<u8>,                      //Required
-    pub network: Option<Network>,                //Defaults to Bitcoin
-    pub account_index: Option<u32>,              //Defaults to 0
-    pub signers: Vec<Xpub> //Track path here     //At least 1 signer required
+    wallet_type: Option<MultisigWalletType>, //Defaults to P2WSH
+    quorum: Option<u8>,                      //Required
+    network: Option<Network>,                //Defaults to Bitcoin
+    account_index: Option<u32>,              //Defaults to 0
+
+    master_signer_keys: Vec<Xprv>,
+    shared_signer_keys:  Vec<Xpub>,
+    //inferred_wallet_data: Vec<(MultisigWalletType, Network)> //0: Wallet Type, 1: Network
 }
 
 /**
@@ -194,7 +168,11 @@ impl MultisigHDWalletBuilder {
             quorum: None,
             network: None,
             account_index: None,
-            signers: vec![]
+            //signers: vec![],
+
+            master_signer_keys: vec![],
+            shared_signer_keys: vec![],
+            //inferred_wallet_data: vec![]
         }
     }
 
@@ -218,11 +196,73 @@ impl MultisigHDWalletBuilder {
         self.account_index = Some(account_index)
     }
 
+    //Add a new signer from Mnemonic
+    pub fn add_signer_from_mnemonic(&mut self, mnemonic: &Mnemonic) -> Result<(), HDWError> {    
+        let signer_master_key = Xprv::from_mnemonic(mnemonic)?;
+
+        //No data to extract from mnemonic. Only store master key
+        self.master_signer_keys.push(signer_master_key);
+
+        Ok(())
+    }
+
+    //Add a new signer from root Xprv key
+    //Should this take in SLIP keys or regular BIP keys (tending towards bip)
+    pub fn add_signer_from_xprv(&mut self, signer_master_key: &str) -> Result<(), HDWError> {
+        //Store the inferred wallet type and network if they are the same as the others.
+        self.add_inferred_type(signer_master_key)?;
+        
+        //Store the key
+        let key: Xprv = Xprv::from_str(signer_master_key)?;
+        self.master_signer_keys.push(key);
+
+        Ok(())
+    }
+
+    //Add a new signer from xpub shared key
+    //Should this take in SLIP keys or regular BIP keys (tending towards slip)
+    //NEEDS TO ACCEPT SLIP-0132 Multisig public keys
+    pub fn add_signer_from_xpub(&mut self, shared_key: &str)-> Result<(), HDWError> {
+        //Store the inferred wallet type and network if they are the same as the others.
+        self.add_inferred_type(shared_key)?;
+        
+        //Store the key
+        let key: Xpub = Xpub::from_str(shared_key)?;
+        self.shared_signer_keys.push(key);
+
+        Ok(())
+    }
+
+    //This method runs everytime a signer is added via xprv or xpub key.
+    //It takes in the key and extracts wallet type and network info from it and adds it to the list of
+    //inferred wallet data if it matches with the previous element in the list.
+    fn add_inferred_type(&mut self, key: &str) -> Result<(), HDWError> {
+        //Extract the wallet meta data from the key
+        let wallet_type: MultisigWalletType = MultisigWalletType::from_xkeys(key)?;
+        let network: Network = MultisigWalletType::network_from_xkey(key)?;
+        
+        //If there is a mismatch between inferred and specified wallet type or network, 
+        //return an error.
+        if self.wallet_type.is_some() && self.wallet_type.unwrap() != wallet_type ||
+           self.network.is_some() && self.network.unwrap() != network 
+        {
+            return Err(HDWError::TypeDiscrepancy)
+        }
+        
+        
+        //If there is no mismatches or no values are set
+        self.wallet_type = Some(wallet_type);
+        self.network = Some(network);
+        Ok(())
+    }
+
     /**
         Extracts values in the builder for wallet type, network and account index and if 
         none are set uses default values. 
     */
     fn extract_or_default(&self) -> (MultisigWalletType, Network, u32) {
+        //Needs to take into account inferred data as well.
+        
         let wallet_type = self.wallet_type.unwrap_or(MultisigWalletType::P2WSH);
         let network = self.network.unwrap_or(Network::Bitcoin);
         let account_index = self.account_index.unwrap_or(0);
@@ -230,52 +270,45 @@ impl MultisigHDWalletBuilder {
         (wallet_type, network, account_index)
     }
 
-    //Add a new signer from Mnemonic
-    pub fn add_signer_from_mnemonic(&mut self, mnemonic: &Mnemonic) {    
-        //If values are unset, use default values
-        let (wallet_type, network, account_index) = self.extract_or_default();
-
-        //Derive the share level key from the given mnemonic
-        let share_path: Path = Self::to_shared_from_master(wallet_type, network, account_index);
-        let signer_master_key = Xprv::from_mnemonic(mnemonic).unwrap();
-        let signer_shared_key = signer_master_key.derive_from_path(&share_path).unwrap().get_xpub();
-        
-        self.signers.push(signer_shared_key);
-    }
-
-    //Add a new signer from Xprv key
-    pub fn add_signer_from_xprv(&mut self, signer_master_key: &Xprv) {
-        //If values are unset, use default values
-        let (wallet_type, network, account_index) = self.extract_or_default();
-
-        //Derive the share level key from the provided Xprv key
-        let share_path: Path = Self::to_shared_from_master(wallet_type, network, account_index);
-        let signer_shared_key = signer_master_key.derive_from_path(&share_path).unwrap().get_xpub();
-        
-        self.signers.push(signer_shared_key);
-    }
-
-    //Add a new signer from xpub shared key
-    pub fn add_signer_from_xpub(&mut self, shared_key: &Xpub) {
-        self.signers.push(shared_key.clone())
-    }
-
     //Build the wallet
     //In here, when path tracking is implemented, the paths will need to be checked if they are all the same.
     pub fn build(&self) -> Result<MultisigHDWallet, HDWError> {
-        //Fields that are required to be set manually
-        if self.signers.len() == 0 { return Err(HDWError::MissingFields) }
+        //Get the amount of keys from the sum of master keys and shared keys provided
+        let signer_count: u8 = self.shared_signer_keys.len() as u8 + self.master_signer_keys.len() as u8;
+        if signer_count > MAX_KEYS_FOR_SETUP { return Err(HDWError::IndexTooLarge(signer_count as u32)) }
+        
+        //If the amount of keys is 0, fail
+        if signer_count == 0 { return Err(HDWError::MissingFields) }
+        
+        //Extract the quorum, if nothing is provided or the quorum is zero, fail.
         let quorum = match self.quorum {
-            Some(x) => x,
+            Some(x) => {
+                if x == 0 { return Err(HDWError::BadQuorum(x)) }
+                if x > signer_count as u8 { return Err(HDWError::BadQuorum(x)) }
+
+                x
+            },
             None => return Err(HDWError::MissingFields)
         };
 
-        //Fields that dont need to be set manually and have a default value
-        let (wallet_type, network, account_index) = self.extract_or_default();
+
+        //Use the data stored in the builder or result to defaults if nothing is set
+        let (wallet_type, network, account_index) = self.extract_or_default(); 
         
 
-        //Sort the keys in lexicographical order of PubKey
-        let mut shared_public_keys = self.signers.clone();
+        //Merge all the master signer keys and shared signer keys into a single vector of shared ex-pub keys.
+        //Do this by deriving master keys into share level keys according to wallet type, network and account index.
+        let path_to_shared = Self::to_shared_from_master(wallet_type, network, account_index);
+        let mut shared_public_keys = self.shared_signer_keys.clone();
+        shared_public_keys.append(
+            &mut self.master_signer_keys.iter().map(|x| {
+                x.derive_from_path(&path_to_shared)
+                .unwrap()
+                .get_xpub()
+            }).collect::<Vec<Xpub>>()
+        );
+        
+        //Sort the shared keys in lexicographical order of PubKey
         shared_public_keys.sort_by(|a, b| {
             a.get_pub().hex().cmp(&b.get_pub().hex())
         });
@@ -332,101 +365,6 @@ impl MultisigHDWallet {
             a.get_pub().hex().cmp(&b.get_pub().hex())
         });
     }
-    
-    /**
-        Create multisig wallet from a list of mnemonics
-    */
-    pub fn from_mnemonics(
-        mnemonics: &Vec<Mnemonic>,
-        quorum: u8,
-        wallet_type: MultisigWalletType,
-        network: Network,
-        account_index: Option<u32>
-    ) -> Result<Self, HDWError> {
-        let path: Path = Self::to_shared_from_master(wallet_type, network, account_index.unwrap());//Self::path_to_shared_keys(wallet_type, network, account_index)?;
-        let mut shared_public_keys = mnemonics.iter().map(|x| {
-            Xprv::from_mnemonic(x).unwrap()
-                .derive_from_path(&path).unwrap()
-                .get_xpub()
-        }).collect::<Vec<Xpub>>();
-        
-        //If BIP-45 is used, sort the shared keys in lexicographical order.
-        if wallet_type == MultisigWalletType::P2SH { Self::sort_keys(&mut shared_public_keys) }
-
-        Ok(
-            Self {
-                shared_public_keys,
-                quorum,
-                wallet_type,
-                network,
-                account_index
-            }
-        )
-    }
-
-    /**
-        Create multisig wallet from a list of master private keys
-    */
-    pub fn from_master_privates(
-        keys: &Vec<&str>,
-        quorum: u8,
-        account_index: Option<u32>
-    ) -> Result<Self, HDWError> {
-        //Derive the wallet type and network from given keys
-        let wallet_type = MultisigWalletType::from_xkeys(keys)?;
-        let network = MultisigWalletType::network_from_xkeys(keys)?;
-
-        //Get the path to shared keys from wallet type, network and account index if given one.
-        //Then for each key derive child keys to the shared path.
-        let path: Path = Self::to_shared_from_master(wallet_type, network, account_index.unwrap());//Self::path_to_shared_keys(wallet_type, network, account_index)?;
-        let mut shared_public_keys: Vec<Xpub> = keys.iter().map(|x| {
-            Xprv::from_str(x).unwrap()
-                .derive_from_path(&path).unwrap()
-                .get_xpub()
-        }).collect::<Vec<Xpub>>();
-
-        //If BIP-45 is used, sort the shared keys in lexicographical order.
-        if wallet_type == MultisigWalletType::P2SH { Self::sort_keys(&mut shared_public_keys) }
-
-        //Return self
-        Ok(
-            Self {
-                shared_public_keys,
-                quorum,
-                wallet_type,
-                network,
-                account_index
-            }
-        )
-    }
-
-    /**
-        Create multisig wallet from a list of share level public keys
-    */
-    pub fn from_account_publics(keys: &Vec<&str>, quorum: u8, account_index: Option<u32>) -> Result<Self, HDWError> {
-        //Derive the wallet type and network from given keys
-        let wallet_type = MultisigWalletType::from_xkeys(keys)?;
-        let network = MultisigWalletType::network_from_xkeys(keys)?;
-        
-        //Convert each key string to a Xpub struct
-        let mut shared_public_keys = keys.iter().map(|x| {
-            Xpub::from_str(x).unwrap()
-        }).collect::<Vec<Xpub>>();
-
-        //If BIP-45 is used, sort the shared keys in lexicographical order.
-        if wallet_type == MultisigWalletType::P2SH { Self::sort_keys(&mut shared_public_keys) }
-
-        //Return self
-        Ok(
-            Self {
-                shared_public_keys,
-                quorum,
-                wallet_type,
-                network,
-                account_index
-            }
-        )
-    }
 
     /**
         Returns the total number of keys in the multisig setup
@@ -455,6 +393,7 @@ impl MultisigHDWallet {
         Err(HDWError::BadKey())
     }
 
+    //Creates the redeem script at a given standard path
     pub fn redeem_script_at(
         &self,
         cosigner_index: Option<u8>,
@@ -470,11 +409,12 @@ impl MultisigHDWallet {
         }
     }
     
+    //Generates an address at a given standard path
     pub fn address_at(
         &self,
+        cosigner_index: Option<u8>,
         change: bool,
-        address_index: u32,
-        cosigner_index: Option<u8>
+        address_index: u32
     ) -> Result<String, HDWError>
     where Self: Sized {
         //Get the addresses at the given path and up count times.
@@ -562,5 +502,124 @@ impl MultisigHDWallet {
         
 
         keys
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prelude::*;
+
+    #[test]
+    fn successful_multisig_hdwallet_building() -> Result<(), HDWError> {
+        let mut wallets = vec![];
+        wallets.push( create_from_mnemonics()? );
+        wallets.push( create_from_master_keys()? );
+        wallets.push( create_from_shared_keys()? );
+        wallets.push( from_a_bit_of_everything()? );
+
+
+        //Check addresses
+        for wallet in wallets {
+            assert_eq!(wallet.address_at(None, false, 0)?, "bc1q2amk0dcqqs2gqfa6ju2td2xx42zz93n80paztjueltjefjugyv0qh6dtdx");
+            assert_eq!(wallet.address_at(None, true, 0)?, "bc1qcgsxne2nppzu38yshxmls4ayzje8k3xk48r592wvpuyzgfayayasweyn85");
+        }
+        
+
+        Ok(())
+    }
+
+    //Test builder using mnemonics and setting data
+    fn create_from_mnemonics() -> Result<MultisigHDWallet, HDWError> {
+        //Create new builder instance
+        let mut b = MultisigHDWalletBuilder::new();
+        
+        //Set wallet meta data
+        //Not setting account index, network and wallet type here means it will resort to default values of
+        // Account #0, P2WPSH, Bitcoin Mainnet
+        b.set_quorum(2);
+
+        //Set mnemonics
+        let mnemonic_1 = Mnemonic::from_phrase("valid wife trash caution slide coach lift visual goose buzz off silly".to_string(), Language::English, "").unwrap();
+        let mnemonic_2 = Mnemonic::from_phrase("salon cloth blossom below emotion buffalo bone dilemma dinosaur morning interest gentle".to_string(), Language::English, "").unwrap();
+        let mnemonic_3 = Mnemonic::from_phrase("desert shock swift grant chronic invite gasp jelly round design sand liquid".to_string(), Language::English, "").unwrap();
+
+        //Add signer mnemonics
+        b.add_signer_from_mnemonic(&mnemonic_1)?;
+        b.add_signer_from_mnemonic(&mnemonic_2)?;
+        b.add_signer_from_mnemonic(&mnemonic_3)?;
+
+        //Build and return
+        Ok(b.build()?)
+    }
+
+    fn create_from_master_keys() -> Result<MultisigHDWallet, HDWError> {
+        //Create new builder instance
+        let mut b = MultisigHDWalletBuilder::new();
+                
+        //Set wallet meta data
+        //Builder will infer wallet data from keys in this case
+        b.set_quorum(2);
+
+        //Set keys
+        let key_1 = "zprvAWgYBBk7JR8Gk4wY9P7HRhWuGrexyfJtFavR1bQq3nSzQ1PV88MrKBprf4YyHjuFvrRXWA17oWnsAjGTVsAoDeuwYrjHJyrzrHbq8Psiwc8";
+        let key_2 = "zprvAWgYBBk7JR8GjujFvUS7zsufLSWC97bCHNoNc6yRWTz58wK4qYTxt9ikudjKi4gp2te2dD7TMq5urUYwD2MUsyjf2CGKoK1y2QdXsndoR9i";
+        let key_3 = "zprvAWgYBBk7JR8Gj3FRCtDjzdBp5AuDvj9zLH68u9ELqeFHfMtdou591BUFXCByUKk9nEgQcA6SwLG1qP4KrT5FvkY8xGj3RBB88sSECQrMdbP";
+        
+        //Add signer master keys
+        b.add_signer_from_xprv(key_1)?;
+        b.add_signer_from_xprv(key_2)?;
+        b.add_signer_from_xprv(key_3)?;
+
+        //Build and return
+        Ok(b.build()?)
+    }
+
+    fn create_from_shared_keys() -> Result<MultisigHDWallet, HDWError> {
+        //Create new builder instance
+        let mut b = MultisigHDWalletBuilder::new();
+                        
+        //Set wallet meta data
+        //Builder will infer wallet data from keys in this case
+        b.set_quorum(2);
+
+        //Set keys
+        let key_1 = "zpub6tpyN1ajpGN1uxLzcS3rWrAHnWXm3Bdu83yAjfmUSGFHRhDbjotAfHMqcShTAwPTqta2ARaYTAe7mHRHLo94nSknf5WqfwCvysNSHaYvGue";
+        let key_2 = "zpub6t1RkHBkCun8z95fNv9DN7rGQAb4ekB8khC1god4cPdwYjdbXK5XhgyRNk5q861jm8xHn9GjJ6YBLNVJeVhfbM91JBPVegn2PNM7q9U3B33";
+        let key_3 = "zpub6tdvmYgvW25G9mvtGAqgTRszha5Jaz24is8ZVg3CfBFsaeDNZfcoQJuZKgDERxQ1r2RDMwmxwXJJzVXtHYBWwLe16MEDNp4FRwXCYYoMd4c";
+        
+        //SLIP-0132 keys. These will fail because not yet implemented
+        // let key_1 = "Zpub75j4VFKBPDvPLXWNZ6WqLvW6WJa2FYKVSKcqew31p35h3snWWDGSkQDmR9evjNcN5Me131afLP2ctT33e2J1vvsTVYdF5LfvsbeJsTwf1c4";
+        // let key_2 = "Zpub74uWsWvBmsLWQiF3KacCCCC57xdKs6rj4xqgc4tbzAUMAvCWHiTonoqMBT3JgXEdzc2GejGrBJvgTY74wircjqFg8eVu46F2H6czR5XcxCe";
+        // let key_3 = "Zpub75Y1tnRN4yddaM6GCqJfHWDoRN7ZoLhf38nEQwJk2x6HCpnHL515VRmV8PAhzPcv5VVCEXn5pjgp7f9eamLU5pkfvpLcnDXFKfo58PxmU9n";
+
+        //Add signer master keys
+        b.add_signer_from_xpub(key_1)?;
+        b.add_signer_from_xpub(key_2)?;
+        b.add_signer_from_xpub(key_3)?;
+
+        //Build and return
+        Ok(b.build()?)
+    }
+
+    fn from_a_bit_of_everything() -> Result<MultisigHDWallet, HDWError> {
+        let mut b = MultisigHDWalletBuilder::new();
+                        
+        //Set wallet meta data
+        //Builder will infer wallet data from keys in this case
+        b.set_quorum(2);
+
+        //Set keys
+        let mnemonic_1 = Mnemonic::from_phrase("valid wife trash caution slide coach lift visual goose buzz off silly".to_string(), Language::English, "").unwrap();
+        let key_2 = "zprvAWgYBBk7JR8GjujFvUS7zsufLSWC97bCHNoNc6yRWTz58wK4qYTxt9ikudjKi4gp2te2dD7TMq5urUYwD2MUsyjf2CGKoK1y2QdXsndoR9i";
+        let key_3 = "zpub6tdvmYgvW25G9mvtGAqgTRszha5Jaz24is8ZVg3CfBFsaeDNZfcoQJuZKgDERxQ1r2RDMwmxwXJJzVXtHYBWwLe16MEDNp4FRwXCYYoMd4c";
+    
+        //Add signers
+        b.add_signer_from_mnemonic(&mnemonic_1)?;
+        b.add_signer_from_xprv(key_2)?;
+        b.add_signer_from_xpub(key_3)?;
+
+        //Build and return
+        Ok(b.build()?)
     }
 }

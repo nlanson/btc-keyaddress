@@ -52,5 +52,7 @@ pub enum HDWError {
     WatchOnly,
     DefaultError,
     IndexMissing,
-    MissingFields
+    MissingFields,
+    BadQuorum(u8),
+    TypeDiscrepancy
 }

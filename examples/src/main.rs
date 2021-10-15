@@ -129,7 +129,7 @@ fn multisig_hdwallet() -> Result<(), HDWError> {
     
     //Print 10 receiving addresses for the wallet
     for i in 0..10 {
-        println!("{}", wallet.address_at(false, i, None)?)
+        println!("{}", wallet.address_at(None, false, i)?)
     }
 
     Ok(())
