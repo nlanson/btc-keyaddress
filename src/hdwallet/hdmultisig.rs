@@ -22,10 +22,15 @@ use crate::{
         PrivKey, PubKey
     },
     script::Script,
-    util::Network
+    util::{
+        Network,
+        try_into, as_u32_be
+    },
+    encoding::bs58check::{
+        VersionPrefix, decode
+    }
 };
 use super::{
-    WalletType,
     HDWError,
     ExtendedKey,
     Xprv, Xpub,
@@ -44,25 +49,41 @@ pub enum MultisigWalletType {
 
 impl MultisigWalletType {
     pub fn from_xkeys(key: &str) -> Result<Self, HDWError> {
-        //Get the wallet type for each individual key as if it was a PKH wallet
-        let key_type = WalletType::from_xkey(key)?;
+        let bytes = match decode(&key.to_string()) {
+            Ok(x) => x,
+            Err(_) => return Err(HDWError::BadKey())
+        };
 
-        Ok(match key_type {
-            WalletType::P2PKH => MultisigWalletType::P2SH,
-            WalletType::P2SH_P2WPKH => MultisigWalletType::P2SH_P2WSH,
-            WalletType::P2WPKH => MultisigWalletType::P2WSH
-        })
-    }
-
-    /**
-        Given a vec of extended keys, this function will return the Network
-        that the extended key is used for only if all the extended keys use the same network.
-    */
-    pub fn network_from_xkey(key: &str) -> Result<Network, HDWError> {
-        //Collect the network of each key
-        let network = WalletType::network_from_xkey(key)?;
-
-        Ok(network)
+        let version: u32 = as_u32_be(&try_into(bytes[0..4].to_vec()));
+        match VersionPrefix::from_int(version) {
+            Ok(x) => match x {
+                //P2PKH
+                VersionPrefix::Xprv |
+                VersionPrefix::Xpub |
+                VersionPrefix::Tprv |
+                VersionPrefix::Tpub => Ok(MultisigWalletType::P2SH),
+                //Nested Segwit
+                VersionPrefix::Yprv |
+                VersionPrefix::Ypub |
+                VersionPrefix::Uprv |
+                VersionPrefix::Upub |
+                VersionPrefix::SLIP132Ypub |
+                VersionPrefix::SLIP132Upub => Ok(MultisigWalletType::P2SH_P2WSH),
+                
+                //Native Segwit
+                VersionPrefix::Zprv |
+                VersionPrefix::Zpub |
+                VersionPrefix::Vprv |
+                VersionPrefix::Vpub |
+                VersionPrefix::SLIP132Zpub |
+                VersionPrefix::SLIP132Vpub => Ok(MultisigWalletType::P2WSH),
+                
+                _ => return Err(HDWError::BadKey())
+            },
+            
+            //Return an error if not valid
+            _ => return Err(HDWError::BadKey())
+        }
     }
 }
 
@@ -79,7 +100,6 @@ pub struct MultisigHDWalletBuilder {
 
     master_signer_keys: Vec<Xprv>,
     shared_signer_keys:  Vec<Xpub>,
-    //inferred_wallet_data: Vec<(MultisigWalletType, Network)> //0: Wallet Type, 1: Network
 }
 
 /**
@@ -209,6 +229,8 @@ impl MultisigHDWalletBuilder {
     //Add a new signer from root Xprv key
     //If a SLIP-0132 key is given, reject or add to shared_signers list?
     pub fn add_signer_from_xprv(&mut self, signer_master_key: &str) -> Result<(), HDWError> {
+        //If the key is a SLIP-0132 Multisig private key, get the xpub of the key and add to share level
+        
         //Store the inferred wallet type and network if they are the same as the others.
         self.add_inferred_type(signer_master_key)?;
         
@@ -238,7 +260,10 @@ impl MultisigHDWalletBuilder {
     fn add_inferred_type(&mut self, key: &str) -> Result<(), HDWError> {
         //Extract the wallet meta data from the key
         let wallet_type: MultisigWalletType = MultisigWalletType::from_xkeys(key)?;
-        let network: Network = MultisigWalletType::network_from_xkey(key)?;
+        let network: Network = match Network::from_xkey(key) {
+            Ok(x) => x,
+            Err(_) => return Err(HDWError::BadKey())
+        };
         
         //If there is a mismatch between inferred and specified wallet type or network, 
         //return an error.
@@ -514,7 +539,8 @@ mod tests {
         let mut wallets = vec![];
         wallets.push( create_from_mnemonics()? );
         wallets.push( create_from_master_keys()? );
-        wallets.push( create_from_shared_keys()? );
+        wallets.push( create_from_shared_keys_slip()? );
+        wallets.push( create_from_shared_keys_nonslip()? );
         wallets.push( from_a_bit_of_everything()? );
 
 
@@ -574,7 +600,29 @@ mod tests {
         Ok(b.build()?)
     }
 
-    fn create_from_shared_keys() -> Result<MultisigHDWallet, HDWError> {
+    fn create_from_shared_keys_slip() -> Result<MultisigHDWallet, HDWError> {
+        //Create new builder instance
+        let mut b = MultisigHDWalletBuilder::new();
+                        
+        //Set wallet meta data
+        //Builder will infer wallet data from keys in this case
+        b.set_quorum(2);
+
+        //Set keys
+        let key_1 = "Zpub75j4VFKBPDvPLXWNZ6WqLvW6WJa2FYKVSKcqew31p35h3snWWDGSkQDmR9evjNcN5Me131afLP2ctT33e2J1vvsTVYdF5LfvsbeJsTwf1c4";
+        let key_2 = "Zpub74uWsWvBmsLWQiF3KacCCCC57xdKs6rj4xqgc4tbzAUMAvCWHiTonoqMBT3JgXEdzc2GejGrBJvgTY74wircjqFg8eVu46F2H6czR5XcxCe";
+        let key_3 = "Zpub75Y1tnRN4yddaM6GCqJfHWDoRN7ZoLhf38nEQwJk2x6HCpnHL515VRmV8PAhzPcv5VVCEXn5pjgp7f9eamLU5pkfvpLcnDXFKfo58PxmU9n";
+
+        //Add signer master keys
+        b.add_signer_from_xpub(key_1)?;
+        b.add_signer_from_xpub(key_2)?;
+        b.add_signer_from_xpub(key_3)?;
+
+        //Build and return
+        Ok(b.build()?)
+    }
+
+    fn create_from_shared_keys_nonslip() -> Result<MultisigHDWallet, HDWError> {
         //Create new builder instance
         let mut b = MultisigHDWalletBuilder::new();
                         
@@ -587,10 +635,7 @@ mod tests {
         let key_2 = "zpub6t1RkHBkCun8z95fNv9DN7rGQAb4ekB8khC1god4cPdwYjdbXK5XhgyRNk5q861jm8xHn9GjJ6YBLNVJeVhfbM91JBPVegn2PNM7q9U3B33";
         let key_3 = "zpub6tdvmYgvW25G9mvtGAqgTRszha5Jaz24is8ZVg3CfBFsaeDNZfcoQJuZKgDERxQ1r2RDMwmxwXJJzVXtHYBWwLe16MEDNp4FRwXCYYoMd4c";
         
-        //SLIP-0132 keys. These will fail because not yet implemented
-        // let key_1 = "Zpub75j4VFKBPDvPLXWNZ6WqLvW6WJa2FYKVSKcqew31p35h3snWWDGSkQDmR9evjNcN5Me131afLP2ctT33e2J1vvsTVYdF5LfvsbeJsTwf1c4";
-        // let key_2 = "Zpub74uWsWvBmsLWQiF3KacCCCC57xdKs6rj4xqgc4tbzAUMAvCWHiTonoqMBT3JgXEdzc2GejGrBJvgTY74wircjqFg8eVu46F2H6czR5XcxCe";
-        // let key_3 = "Zpub75Y1tnRN4yddaM6GCqJfHWDoRN7ZoLhf38nEQwJk2x6HCpnHL515VRmV8PAhzPcv5VVCEXn5pjgp7f9eamLU5pkfvpLcnDXFKfo58PxmU9n";
+        
 
         //Add signer master keys
         b.add_signer_from_xpub(key_1)?;

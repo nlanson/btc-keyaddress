@@ -85,6 +85,7 @@ impl VersionPrefix {
             0x02aa7ed3 => Self::SLIP132Zpub,
             0x024289ef => Self::SLIP132Upub,
             0x02575483 => Self::SLIP132Vpub,
+            
             _ => return Err(())
         })
     }

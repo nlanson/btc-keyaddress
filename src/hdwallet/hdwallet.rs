@@ -20,8 +20,15 @@ use crate::{
     script::{
         Script, ScriptErr
     },
-    encoding::bs58check::decode,
-    util::Network
+    encoding::{
+        bs58check::decode,
+        bs58check::VersionPrefix
+    },
+    util::{
+        Network,
+        as_u32_be,
+        try_into
+    }
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -38,55 +45,57 @@ impl WalletType {
         Does it by viewing the prefix  
     */
     pub fn from_xkey(key: &str) -> Result<Self, HDWError> {
+        // let bytes = match decode(&key.to_string()) {
+        //     Ok(x) => x,
+        //     Err(_) => return Err(HDWError::BadKey())
+        // };
+
+        // let prefix = &bytes[0..4];
+
+        // match prefix {
+        //     &[0x04, 0x88, 0xAD, 0xE4] |
+        //     &[0x04, 0x88, 0xB2, 0x1E] |
+        //     &[0x04, 0x35, 0x83, 0x94] |
+        //     &[0x04, 0x35, 0x87, 0xCF] => Ok(WalletType::P2PKH),
+        //     &[0x04, 0xb2, 0x43, 0x0c] |
+        //     &[0x04, 0xb2, 0x47, 0x46] |
+        //     &[0x04, 0x5f, 0x18, 0xbc] |
+        //     &[0x04, 0x5f, 0x1c, 0xf6] => Ok(WalletType::P2WPKH),
+        //     &[0x04, 0x9d, 0x78, 0x78] |
+        //     &[0x04, 0x9d, 0x7c, 0xb2] |
+        //     &[0x04, 0x4a, 0x4e, 0x28] |
+        //     &[0x04, 0x4a, 0x52, 0x62] => Ok(WalletType::P2SH_P2WPKH),
+        //     _ => return Err(HDWError::BadKey())
+        // }
+
         let bytes = match decode(&key.to_string()) {
             Ok(x) => x,
             Err(_) => return Err(HDWError::BadKey())
         };
 
-        let prefix = &bytes[0..4];
-
-        match prefix {
-            &[0x04, 0x88, 0xAD, 0xE4] |
-            &[0x04, 0x88, 0xB2, 0x1E] |
-            &[0x04, 0x35, 0x83, 0x94] |
-            &[0x04, 0x35, 0x87, 0xCF] => Ok(WalletType::P2PKH),
-            &[0x04, 0xb2, 0x43, 0x0c] |
-            &[0x04, 0xb2, 0x47, 0x46] |
-            &[0x04, 0x5f, 0x18, 0xbc] |
-            &[0x04, 0x5f, 0x1c, 0xf6] => Ok(WalletType::P2WPKH),
-            &[0x04, 0x9d, 0x78, 0x78] |
-            &[0x04, 0x9d, 0x7c, 0xb2] |
-            &[0x04, 0x4a, 0x4e, 0x28] |
-            &[0x04, 0x4a, 0x52, 0x62] => Ok(WalletType::P2SH_P2WPKH),
-            _ => return Err(HDWError::BadKey())
-        }
-    }
-
-    /**
-        Returns the wallet network from the extended key string.
-        Does it by viewing the prefix  
-    */
-    pub fn network_from_xkey(key: &str) -> Result<Network, HDWError> {
-        let bytes = match decode(&key.to_string()) {
-            Ok(x) => x,
-            Err(_) => return Err(HDWError::BadKey())
-        };
-
-        let prefix = &bytes[0..4];
-
-        match prefix {
-            &[0x04, 0x35, 0x83, 0x94] |
-            &[0x04, 0x35, 0x87, 0xCF] |
-            &[0x04, 0x4a, 0x4e, 0x28] |
-            &[0x04, 0x4a, 0x52, 0x62] |
-            &[0x04, 0x5f, 0x18, 0xbc] |
-            &[0x04, 0x5f, 0x1c, 0xf6] => Ok(Network::Testnet),
-            &[0x04, 0x88, 0xAD, 0xE4] |
-            &[0x04, 0x88, 0xB2, 0x1E] |
-            &[0x04, 0x9d, 0x78, 0x78] |
-            &[0x04, 0x9d, 0x7c, 0xb2] |
-            &[0x04, 0xb2, 0x43, 0x0c] |
-            &[0x04, 0xb2, 0x47, 0x46] => Ok(Network::Bitcoin),
+        let version: u32 = as_u32_be(&try_into(bytes[0..4].to_vec()));
+        match VersionPrefix::from_int(version) {
+            Ok(x) => match x {
+                //P2PKH
+                VersionPrefix::Xprv |
+                VersionPrefix::Xpub |
+                VersionPrefix::Tprv |
+                VersionPrefix::Tpub => Ok(WalletType::P2PKH),
+                //Nested Segwit
+                VersionPrefix::Yprv |
+                VersionPrefix::Ypub |
+                VersionPrefix::Uprv |
+                VersionPrefix::Upub => Ok(WalletType::P2SH_P2WPKH),
+                //Native Segwit
+                VersionPrefix::Zprv |
+                VersionPrefix::Zpub |
+                VersionPrefix::Vprv |
+                VersionPrefix::Vpub => Ok(WalletType::P2WPKH),
+                
+                _ => return Err(HDWError::BadKey())
+            },
+            
+            //Return an error if not valid
             _ => return Err(HDWError::BadKey())
         }
     }
@@ -217,7 +226,10 @@ impl HDWallet {
     */
     pub fn from_master_private(key: &str, account_index: u32) -> Result<Self, HDWError> {
         let wallet_type = WalletType::from_xkey(key)?;
-        let network = WalletType::network_from_xkey(key)?;
+        let network = match Network::from_xkey(key) {
+            Ok(x) => x,
+            Err(_) => return Err(HDWError::BadKey())
+        };
 
         let account_public_key = Xprv::from_str(key)?
                                 .derive_from_path(&Self::account_path(&wallet_type, account_index, network))?
@@ -239,7 +251,10 @@ impl HDWallet {
     */
     pub fn from_account_public(key: &str, account_index: u32) -> Result<Self, HDWError> {
         let wallet_type = WalletType::from_xkey(key)?;
-        let network = WalletType::network_from_xkey(key)?;
+        let network = match Network::from_xkey(key) {
+            Ok(x) => x,
+            Err(_) => return Err(HDWError::BadKey())
+        };
         
         let account_public_key = Xpub::from_str(key)?;
 

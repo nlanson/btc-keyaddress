@@ -35,6 +35,9 @@
         
         - Implement sorting for Xpub keys using Ord trait
 
+        - Move HDWallet network detection to util Network enum
+        - Use independent methods for Wallet type detection in HDMultisig
+
 
 */
 

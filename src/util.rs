@@ -1,4 +1,8 @@
 use std::convert::TryInto;
+use crate::{
+    encoding::bs58check::decode,
+    encoding::bs58check::VersionPrefix
+};
 
 /*
     Decodes hex strings into a byte vector
@@ -46,4 +50,43 @@ pub fn as_u32_be(array: &[u8; 4]) -> u32 {
 pub enum Network {
     Bitcoin,
     Testnet
+}
+
+impl Network {
+    pub fn from_xkey(key: &str) -> Result<Self, ()> {
+        let bytes = match decode(&key.to_string()) {
+            Ok(x) => x,
+            Err(_) => return Err(())
+        };
+
+        let version: u32 = as_u32_be(&try_into(bytes[0..4].to_vec()));
+        match VersionPrefix::from_int(version) {
+            Ok(x) => match x {
+                //Mainnet
+                VersionPrefix::Xprv |
+                VersionPrefix::Yprv |
+                VersionPrefix::Zprv |
+                VersionPrefix::Xpub |
+                VersionPrefix::Ypub |
+                VersionPrefix::Zpub |
+                VersionPrefix::SLIP132Ypub |
+                VersionPrefix::SLIP132Zpub => return Ok(Network::Bitcoin),
+
+                //Testnet
+                VersionPrefix::Tprv |
+                VersionPrefix::Uprv |
+                VersionPrefix::Vprv |
+                VersionPrefix::Tpub |
+                VersionPrefix::Upub |
+                VersionPrefix::Vpub |
+                VersionPrefix::SLIP132Upub |
+                VersionPrefix::SLIP132Vpub => return Ok(Network::Testnet),
+                
+                _ => return Err(())
+            },
+            
+            //Return an error if not valid
+            _ => return Err(())
+        }
+    }
 }
