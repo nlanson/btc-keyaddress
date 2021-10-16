@@ -22,11 +22,6 @@
         
         - HDWallets
             > Better unlocker for multisig hd wallets
-            > Use SLIP-0132 encoding for the multisig hdwallet builder
-                SLIP-0132 public and private keys can be implemented by:
-                    - Adding the version prefixes to Base58Check module
-                    - Adding match detection to relevent methods (ExtendedKeys module, HDWallets module)
-            > Move network detection to extended_keys module
             > Singlesig HDWallet builder similar to Multisig Builder?
         
         - P2TR address generation
@@ -34,9 +29,6 @@
         - Automated github tests
         
         - Implement sorting for Xpub keys using Ord trait
-
-        - Move HDWallet network detection to util Network enum
-        - Use independent methods for Wallet type detection in HDMultisig
 
 
 */

@@ -4,3 +4,4 @@
 
 pub mod bs58check;
 pub mod bech32;
+pub use bs58check::ToVersionPrefix as ToVersionPrefix;

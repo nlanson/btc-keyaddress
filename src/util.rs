@@ -69,7 +69,9 @@ impl Network {
                 VersionPrefix::Xpub |
                 VersionPrefix::Ypub |
                 VersionPrefix::Zpub |
+                VersionPrefix::SLIP132Yprv |
                 VersionPrefix::SLIP132Ypub |
+                VersionPrefix::SLIP132Zprv |
                 VersionPrefix::SLIP132Zpub => return Ok(Network::Bitcoin),
 
                 //Testnet
@@ -79,7 +81,9 @@ impl Network {
                 VersionPrefix::Tpub |
                 VersionPrefix::Upub |
                 VersionPrefix::Vpub |
+                VersionPrefix::SLIP132Uprv |
                 VersionPrefix::SLIP132Upub |
+                VersionPrefix::SLIP132Vprv |
                 VersionPrefix::SLIP132Vpub => return Ok(Network::Testnet),
                 
                 _ => return Err(())

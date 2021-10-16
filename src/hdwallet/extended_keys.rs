@@ -17,13 +17,14 @@ use crate::{
         decode,
         validate_checksum,
         VersionPrefix,
-        Bs58Error
+        Bs58Error,
+        ToVersionPrefix
     },
     hdwallet::{
         ckd::{
             derive_xprv,
             derive_xpub,
-            ChildOptions
+            ChildOptions,
         },
         HDWError,
         Path,
@@ -89,7 +90,7 @@ pub trait ExtendedKey<T> where T: Key {
     /**
         Serialize the extended key with the selected prefix
     */
-    fn serialize(&self, r#type: &WalletType, network: Network) -> String;
+    fn serialize(&self, v_prefix: &VersionPrefix) -> String;
 
     /**
         Derives the child key of self
@@ -176,7 +177,11 @@ impl ExtendedKey<PrivKey> for Xprv {
                 VersionPrefix::Zprv |
                 VersionPrefix::Tprv |
                 VersionPrefix::Uprv |
-                VersionPrefix::Vprv => { /* Continue */ },
+                VersionPrefix::Vprv |
+                VersionPrefix::SLIP132Yprv |
+                VersionPrefix::SLIP132Zprv |
+                VersionPrefix::SLIP132Uprv |
+                VersionPrefix::SLIP132Vprv => { /* Continue */ },
                 _ => return Err(HDWError::BadKey())
             },
             
@@ -234,7 +239,7 @@ impl ExtendedKey<PrivKey> for Xprv {
         self.chaincode
     }
 
-    fn serialize(&self, r#type: &WalletType, network: Network) -> String {
+    fn serialize(&self, v_prefix: &VersionPrefix) -> String {
         let mut payload: Vec<u8> = vec![];
         payload.push(self.depth); //depth
         self.parent_fingerprint.iter().for_each(|x| payload.push(*x)); //fingerprint
@@ -243,28 +248,8 @@ impl ExtendedKey<PrivKey> for Xprv {
         payload.push(0x00); //private key append 0x00
         self.key::<32>().iter().for_each(|x| payload.push(*x)); //private key
 
-        let prefix = match r#type {
-            WalletType::P2PKH => {
-                match network {
-                    Network::Bitcoin => VersionPrefix::Xprv,
-                    Network::Testnet => VersionPrefix::Tprv
-                }
-            },
-            WalletType::P2WPKH => {
-                match network {
-                    Network::Bitcoin => VersionPrefix::Zprv,
-                    Network::Testnet => VersionPrefix::Vprv
-                }
-            },
-            WalletType::P2SH_P2WPKH => {
-                match network {
-                    Network::Bitcoin => VersionPrefix::Yprv,
-                    Network::Testnet => VersionPrefix::Uprv
-                }
-            }
-        };
         
-        check_encode(prefix,&payload)
+        check_encode(v_prefix.clone(), &payload)
     }
 
     fn get_xchild(&self, options: ChildOptions) -> Result<Xprv, HDWError> {
@@ -410,7 +395,8 @@ impl ExtendedKey<PubKey> for Xpub {
         self.chaincode
     }
 
-    fn serialize(&self, r#type: &WalletType, network: Network) -> String {
+    //Need to extend to add SLIP-0132 multisig keys
+    fn serialize(&self, v_prefix: &VersionPrefix) -> String {
         let mut payload: Vec<u8> = vec![];
         payload.push(self.depth); //depth
         self.parent_fingerprint.iter().for_each(|x| payload.push(*x)); //parent fingerprint
@@ -418,28 +404,8 @@ impl ExtendedKey<PubKey> for Xpub {
         self.chaincode().iter().for_each(|x| payload.push(*x)); //chaincode
         self.key::<33>().iter().for_each(|x| payload.push(*x)); //public key
 
-        let prefix = match r#type {
-            WalletType::P2PKH => {
-                match network {
-                    Network::Bitcoin => VersionPrefix::Xpub,
-                    Network::Testnet => VersionPrefix::Tpub
-                }
-            },
-            WalletType::P2WPKH => {
-                match network {
-                    Network::Bitcoin => VersionPrefix::Zpub,
-                    Network::Testnet => VersionPrefix::Vpub
-                }
-            },
-            WalletType::P2SH_P2WPKH => {
-                match network {
-                    Network::Bitcoin => VersionPrefix::Ypub,
-                    Network::Testnet => VersionPrefix::Upub
-                }
-            }
-        };
         
-        check_encode(prefix,&payload)
+        check_encode(v_prefix.clone(),&payload)
     }
 
     fn get_xchild(&self, options: ChildOptions) -> Result<Xpub, HDWError> {
@@ -519,12 +485,12 @@ mod tests {
         let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
 
         //master xprv serialization test
-        assert_eq!(hdw.master_private_key(&unlocker)?.serialize(&WalletType::P2PKH, Network::Bitcoin), 
+        assert_eq!(hdw.master_private_key(&unlocker)?.serialize(&WalletType::P2PKH.private_version_prefix(Network::Bitcoin)), 
         "xprv9s21ZrQH143K2MPKHPWh91wRxLKehoCNsRrwizj2xNaj9zD5SHMNiHJesDEYgJAavgNE1fDWLgYNneHeSA8oVeVXVYomhP1wxdzZtKsLJbc".to_string()
         );
 
         //master xpub serialization test
-        assert_eq!(hdw.master_public_key(&unlocker)?.serialize(&WalletType::P2PKH, Network::Bitcoin),
+        assert_eq!(hdw.master_public_key(&unlocker)?.serialize(&WalletType::P2PKH.public_version_prefix(Network::Bitcoin)),
         "xpub661MyMwAqRbcEqTnPR3hW9tAWNA97FvEEenYXP8eWi7i2nYDypfdG5d8iWfK8YgesKi2EE5mk9THcTqnveDWwZVMuctjmxeEaUKgtg7CEEc".to_string()
         );
 
@@ -573,7 +539,7 @@ mod tests {
 
         let (xprv_at_path, xpub_at_path) = match hdw.master_private_key(&unlocker)?.derive_from_path(&path) {
             Ok(x) => {
-                (x.serialize(&WalletType::P2PKH, Network::Bitcoin), x.get_xpub().serialize(&WalletType::P2PKH, Network::Bitcoin))
+                (x.serialize(&WalletType::P2PKH.private_version_prefix(Network::Bitcoin)), x.get_xpub().serialize(&WalletType::P2PKH.public_version_prefix(Network::Bitcoin)))
             },
             Err(x) => panic!("{}", x)
         };
@@ -591,8 +557,8 @@ mod tests {
         let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
         
         // Account 0, root = m/84'/0'/0'
-        assert_eq!(hdw.account_private_key(&unlocker)?.serialize(&hdw.wallet_type, hdw.network), "zprvAdG4iTXWBoARxkkzNpNh8r6Qag3irQB8PzEMkAFeTRXxHpbF9z4QgEvBRmfvqWvGp42t42nvgGpNgYSJA9iefm1yYNZKEm7z6qUWCroSQnE");
-        assert_eq!(hdw.account_public_key().serialize(&hdw.wallet_type, hdw.network), "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs");
+        assert_eq!(hdw.account_private_key(&unlocker)?.serialize(&hdw.wallet_type.private_version_prefix(hdw.network)), "zprvAdG4iTXWBoARxkkzNpNh8r6Qag3irQB8PzEMkAFeTRXxHpbF9z4QgEvBRmfvqWvGp42t42nvgGpNgYSJA9iefm1yYNZKEm7z6qUWCroSQnE");
+        assert_eq!(hdw.account_public_key().serialize(&hdw.wallet_type.public_version_prefix(hdw.network)), "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs");
 
         // Account 0, first receiving address = m/84'/0'/0'/0/0
         let address = hdw.address_at(false, 0)?;

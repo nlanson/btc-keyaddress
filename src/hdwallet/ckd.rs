@@ -22,7 +22,8 @@ use crate::{
         PubKey,
         PrivKey
     },
-    util::try_into
+    util::try_into,
+    encoding::ToVersionPrefix
 };
 
 /**
@@ -215,14 +216,14 @@ mod tests {
         //Calculate the child extended public key twice  through the master xpub and child xprv
         let derived_m0 = hdw.master_private_key(&unlocker())?
                             .get_xchild(ChildOptions::Normal(0))?
-                            .serialize(&WalletType::P2PKH, Network::Bitcoin);
+                            .serialize(&WalletType::P2PKH.private_version_prefix(Network::Bitcoin));
         let derived_M0_fromxprv = hdw.master_private_key(&unlocker())?
                                     .get_xchild(ChildOptions::Normal(0))?
                                     .get_xpub()
-                                    .serialize(&WalletType::P2PKH, Network::Bitcoin);
+                                    .serialize(&WalletType::P2PKH.public_version_prefix(Network::Bitcoin));
         let derived_M0_fromxpub = hdw.master_public_key(&unlocker())?
                                     .get_xchild(ChildOptions::Normal(0))?
-                                    .serialize(&WalletType::P2PKH, Network::Bitcoin);
+                                    .serialize(&WalletType::P2PKH.public_version_prefix(Network::Bitcoin));
 
         //Test is derived values are equal to expected values and if derived xpubs are both identical
         assert_eq!(derived_m0, EXPECTED_m0.to_string());
@@ -242,7 +243,7 @@ mod tests {
         let derived_m0h = hdw
                             .master_private_key(&unlocker())?
                             .get_xchild(ChildOptions::Hardened(0))?
-                            .serialize(&WalletType::P2PKH, Network::Bitcoin);
+                            .serialize(&WalletType::P2PKH.private_version_prefix(Network::Bitcoin));
         let derived_M0h_fromxpub = match hdw
                                     .master_public_key(&unlocker())?
                                     .get_xchild(ChildOptions::Hardened(0)) 
@@ -254,7 +255,7 @@ mod tests {
                                     .master_private_key(&unlocker())?
                                     .get_xchild(ChildOptions::Hardened(0))?
                                     .get_xpub()
-                                    .serialize(&WalletType::P2PKH, Network::Bitcoin);
+                                    .serialize(&WalletType::P2PKH.public_version_prefix(Network::Bitcoin));
 
         //Test is derived values are equal to expected values and if hardened xpub deriveration failed
         assert_eq!(derived_m0h, EXPECTED_m0h);

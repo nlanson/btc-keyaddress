@@ -3,7 +3,7 @@ use crate::{
     hash,
     util::{
         try_into,
-        as_u32_be
+        Network
     }
 };
 
@@ -36,9 +36,13 @@ pub enum VersionPrefix {
 
         //SLIP-0132
         SLIP132Ypub = 0x0295b43f, //Multi-signature P2WSH in P2SH
+        SLIP132Yprv = 0x0295b005,
         SLIP132Zpub = 0x02aa7ed3, //Multi-signature P2WSH
+        SLIP132Zprv = 0x02aa7a99,
         SLIP132Upub = 0x024289ef, //Multi-signature P2WSH in P2SH Testnet
+        SLIP132Uprv = 0x024285b5,
         SLIP132Vpub = 0x02575483, //Multi-signature P2WSH Testnet
+        SLIP132Vprv = 0x02575048,
 
     //No data
         None
@@ -82,13 +86,22 @@ impl VersionPrefix {
             0x045f18bc => Self::Vprv,
             0x045f1cf6 => Self::Vpub,
             0x0295b43f => Self::SLIP132Ypub,
+            0x0295b005 => Self::SLIP132Yprv,
             0x02aa7ed3 => Self::SLIP132Zpub,
+            0x02aa7a99 => Self::SLIP132Zprv,
             0x024289ef => Self::SLIP132Upub,
+            0x024285b5 => Self::SLIP132Uprv,
             0x02575483 => Self::SLIP132Vpub,
+            0x02575048 => Self::SLIP132Vprv,
             
             _ => return Err(())
         })
     }
+}
+
+pub trait ToVersionPrefix {
+    fn public_version_prefix(&self, network: Network) -> VersionPrefix;
+    fn private_version_prefix(&self, network: Network) -> VersionPrefix;
 }
 
 pub enum Bs58Error {
