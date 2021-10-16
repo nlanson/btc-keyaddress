@@ -207,7 +207,7 @@ impl MultisigHDWalletBuilder {
     }
 
     //Add a new signer from root Xprv key
-    //Should this take in SLIP keys or regular BIP keys (tending towards bip)
+    //If a SLIP-0132 key is given, reject or add to shared_signers list?
     pub fn add_signer_from_xprv(&mut self, signer_master_key: &str) -> Result<(), HDWError> {
         //Store the inferred wallet type and network if they are the same as the others.
         self.add_inferred_type(signer_master_key)?;
@@ -220,7 +220,6 @@ impl MultisigHDWalletBuilder {
     }
 
     //Add a new signer from xpub shared key
-    //Should this take in SLIP keys or regular BIP keys (tending towards slip)
     //NEEDS TO ACCEPT SLIP-0132 Multisig public keys
     pub fn add_signer_from_xpub(&mut self, shared_key: &str)-> Result<(), HDWError> {
         //Store the inferred wallet type and network if they are the same as the others.

@@ -212,6 +212,8 @@ impl HDWallet {
 
     /**
         Create a watch only wallet from a master private key
+
+        reject SLIP keys
     */
     pub fn from_master_private(key: &str, account_index: u32) -> Result<Self, HDWError> {
         let wallet_type = WalletType::from_xkey(key)?;
@@ -232,6 +234,8 @@ impl HDWallet {
 
     /**
         Create a watch only wallet from a master public key
+
+        can take in SLIP keys
     */
     pub fn from_account_public(key: &str, account_index: u32) -> Result<Self, HDWError> {
         let wallet_type = WalletType::from_xkey(key)?;

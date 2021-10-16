@@ -1,32 +1,93 @@
 use crate::{
     bs58, 
     hash,
-    util::try_into
+    util::{
+        try_into,
+        as_u32_be
+    }
 };
 
+#[derive(Debug, Clone)]
 pub enum VersionPrefix {
-    BTCAddress,
-    P2ScriptAddress,
-    TestnetP2SHAddress,
-    BTCTestNetAddress,
-    PrivateKeyWIF,
-    TestNetPrivateKeyWIF,
-    //BIP32
-    Xprv,
-    Xpub,
-    Tprv,
-    Tpub,
-    //BIP49
-    Yprv,
-    Ypub,
-    Uprv,
-    Upub,
-    //BIP84
-    Zprv,
-    Zpub,
-    Vprv,
-    Vpub,
-    None
+    //One byte version prefixes
+        BTCAddress = 0x00,
+        BTCTestNetAddress = 0x6F,
+        P2ScriptAddress = 0x05,
+        TestnetP2SHAddress = 0xC4,
+        PrivateKeyWIF = 0x80,
+        TestNetPrivateKeyWIF = 0xef,
+    
+    //Four byte version prefixes
+        //BIP-32
+        Xprv = 0x0488ADE4, //Legacy P2PKH
+        Xpub = 0x0488B21E,
+        Tprv = 0x04358394,
+        Tpub = 0x043587CF,
+        //BIP-49
+        Yprv = 0x049d7878, //P2SH nested P2WPKH
+        Ypub = 0x049d7cb2,
+        Uprv = 0x044a4e28,
+        Upub = 0x044a5262,
+        //BIP-84
+        Zprv = 0x04b2430c, //P2WPKH
+        Zpub = 0x04b24746,
+        Vprv = 0x045f18bc,
+        Vpub = 0x045f1cf6,
+
+        //SLIP-0132
+        SLIP132Ypub = 0x0295b43f, //Multi-signature P2WSH in P2SH
+        SLIP132Zpub = 0x02aa7ed3, //Multi-signature P2WSH
+        SLIP132Upub = 0x024289ef, //Multi-signature P2WSH in P2SH Testnet
+        SLIP132Vpub = 0x02575483, //Multi-signature P2WSH Testnet
+
+    //No data
+        None
+}
+
+impl VersionPrefix {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            //Special cases where version bytes is not 4 bytes long
+            VersionPrefix::BTCAddress => vec![0x00],
+            VersionPrefix::BTCTestNetAddress => vec![0x6F],
+            VersionPrefix::P2ScriptAddress => vec![0x05],
+            VersionPrefix::TestnetP2SHAddress => vec![0xC4],
+            VersionPrefix::PrivateKeyWIF => vec![0x80],
+            VersionPrefix::TestNetPrivateKeyWIF => vec![0xef],
+            VersionPrefix::None => vec![],
+            
+            //Cases where version bytes is 4 bytes long
+            _ => (self.clone() as u32).to_be_bytes().to_vec()
+        }
+    }
+
+    pub fn from_int(int: u32) -> Result<Self, ()> {
+        Ok(match int {
+            0x00 => Self::BTCAddress,
+            0x6F => Self::BTCTestNetAddress,
+            0x05 => Self::P2ScriptAddress,
+            0xC4 => Self::TestnetP2SHAddress,
+            0x80 => Self::PrivateKeyWIF,
+            0xEF => Self:: TestNetPrivateKeyWIF,
+            0x0488ADE4 => Self::Xprv,
+            0x0488B21E => Self::Xpub,
+            0x04358394 => Self::Tprv,
+            0x043587cf => Self::Tpub,
+            0x049d7878 => Self::Yprv,
+            0x049d7cb2 => Self::Ypub,
+            0x044a4e28 => Self::Uprv,
+            0x044a5262 => Self::Upub,
+            0x04b2430c => Self::Zprv,
+            0x04b24746 => Self::Zpub,
+            0x045f18bc => Self::Vprv,
+            0x045f1cf6 => Self::Vpub,
+            0x0295b43f => Self::SLIP132Ypub,
+            0x02aa7ed3 => Self::SLIP132Zpub,
+            0x024289ef => Self::SLIP132Upub,
+            0x02575483 => Self::SLIP132Vpub,
+            _ => return Err(())
+        })
+    }
 }
 
 pub enum Bs58Error {
@@ -43,28 +104,7 @@ pub fn check_encode(prefix: VersionPrefix, data: &[u8]) -> String {
     //Reassigning data as mutable vec
     let mut data = data.to_vec();
     
-    //Set the prefix based on use
-    let p: Vec<u8> = match prefix {
-        VersionPrefix::BTCAddress => vec![0x00],
-        VersionPrefix::BTCTestNetAddress => vec![0x6F],
-        VersionPrefix::P2ScriptAddress => vec![0x05],
-        VersionPrefix::TestnetP2SHAddress => vec![0xC4],
-        VersionPrefix::PrivateKeyWIF => vec![0x80],
-        VersionPrefix::TestNetPrivateKeyWIF => vec![0xef],
-        VersionPrefix::Xprv => vec![0x04, 0x88, 0xAD, 0xE4], //Legacy P2PKH
-        VersionPrefix::Xpub => vec![0x04, 0x88, 0xB2, 0x1E],
-        VersionPrefix::Tprv => vec![0x04, 0x35, 0x83, 0x94],
-        VersionPrefix::Tpub => vec![0x04, 0x35, 0x87, 0xCF],
-        VersionPrefix::Yprv => vec![0x04, 0x9d, 0x78, 0x78], //P2SH nested P2WPKH
-        VersionPrefix::Ypub => vec![0x04, 0x9d, 0x7c, 0xb2],
-        VersionPrefix::Uprv => vec![0x04, 0x4a, 0x4e, 0x28],
-        VersionPrefix::Upub => vec![0x04, 0x4a, 0x52, 0x62],
-        VersionPrefix::Zprv => vec![0x04, 0xb2, 0x43, 0x0c], //P2WPKH
-        VersionPrefix::Zpub => vec![0x04, 0xb2, 0x47, 0x46],
-        VersionPrefix::Vprv => vec![0x04, 0x5f, 0x18, 0xbc],
-        VersionPrefix::Vpub => vec![0x04, 0x5f, 0x1c, 0xf6],
-        VersionPrefix::None => vec![]
-    };
+    let p = prefix.to_bytes();
 
     //Prepend the prefix to data.
     data.splice(0..0, p);

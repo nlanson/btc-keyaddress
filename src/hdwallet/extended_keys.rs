@@ -33,7 +33,10 @@ use crate::{
     bip39::Mnemonic,
     hash,
     address::Address,
-    util::try_into,
+    util::{
+        try_into,
+        as_u32_be
+    },
     util::Network,
     script::Script
 };
@@ -164,19 +167,21 @@ impl ExtendedKey<PrivKey> for Xprv {
         }
         
         //Check if the verion of the key is for xprv keys
-        let version = bytes[0..4].to_vec();
-        match &version[..] {
-            //Only continue if version is for ex priv
-            &[0x04, 0x35, 0x83, 0x94] | //x
-            &[0x04, 0x4a, 0x4e, 0x28] | //t
-            &[0x04, 0x5f, 0x18, 0xbc] | //y
-            &[0x04, 0x88, 0xAD, 0xE4] | //u
-            &[0x04, 0x9d, 0x78, 0x78] | //z
-            &[0x04, 0xb2, 0x43, 0x0c]   //v
-                                            => { /* Continue */ },
+        let version: u32 = as_u32_be(&try_into(bytes[0..4].to_vec()));
+        match VersionPrefix::from_int(version) {
+            //Only continue if version is for extended private keys
+            Ok(x) => match x {
+                VersionPrefix::Xprv |
+                VersionPrefix::Yprv |
+                VersionPrefix::Zprv |
+                VersionPrefix::Tprv |
+                VersionPrefix::Uprv |
+                VersionPrefix::Vprv => { /* Continue */ },
+                _ => return Err(HDWError::BadKey())
+            },
             
             //Return an error if not valid
-            _ => return Err(HDWError::BadPrefix(version))
+            _ => return Err(HDWError::BadPrefix(version.to_be_bytes().to_vec()))
         }
 
         //Extract the remaining data from the payload
@@ -331,21 +336,27 @@ impl ExtendedKey<PubKey> for Xpub {
         if let Ok(x) = validate_checksum(key) {
             if !x { return Err(HDWError::BadChecksum()) } 
         }
-        
-        //Check if the verion of the key is for xpub keys
-        let version = bytes[0..4].to_vec();
-        match &version[..] {
-            //Only continue if version is for ex pub
-            &[0x04, 0x88, 0xB2, 0x1E] | //x
-            &[0x04, 0x35, 0x87, 0xCF] | //t
-            &[0x04, 0x9d, 0x7c, 0xb2] | //y
-            &[0x04, 0x4a, 0x52, 0x62] | //u
-            &[0x04, 0xb2, 0x47, 0x46] | //z
-            &[0x04, 0x5f, 0x1c, 0xf6]   //v
-                                            => { /* Continue */ },
+
+        //Check if the verion of the key is for xprv keys
+        let version: u32 = as_u32_be(&try_into(bytes[0..4].to_vec()));
+        match VersionPrefix::from_int(version) {
+            //Only continue if version is for extended public keys (including slip-132)
+            Ok(x) => match x {
+                VersionPrefix::Xpub |
+                VersionPrefix::Ypub |
+                VersionPrefix::Zpub |
+                VersionPrefix::Tpub |
+                VersionPrefix::Upub |
+                VersionPrefix::Vpub |
+                VersionPrefix::SLIP132Ypub |
+                VersionPrefix::SLIP132Zpub |
+                VersionPrefix::SLIP132Upub |
+                VersionPrefix::SLIP132Vpub => { /* Continue */ },
+                _ => return Err(HDWError::BadKey())
+            },
             
             //Return an error if not valid
-            _ => return Err(HDWError::BadPrefix(version))
+            _ => return Err(HDWError::BadPrefix(version.to_be_bytes().to_vec()))
         }
 
         

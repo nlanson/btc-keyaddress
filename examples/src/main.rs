@@ -2,24 +2,20 @@ use btc_keyaddress::prelude::*;
 use btc_keyaddress::hdwallet::{MultisigHDWalletBuilder, WatchOnly};
 
 fn main() {
-   multisig_hdwallet();
+    //multisig_hdwallet();
 }
 
 fn print_vals() {
     let private_key: PrivKey = PrivKey::new_rand();
-    let compressed_wif: String = private_key.export_as_wif(true, Network::Testnet);
-    let uncompressed_wif: String = private_key.export_as_wif(false, Network::Testnet);
     let public_key: PubKey = PubKey::from_priv_key(&private_key);
-    let compressed_address: String = Address::P2PKH(public_key.clone(), Network::Testnet).to_string().unwrap();
+    let address: String = Address::P2PKH(public_key.clone(), Network::Bitcoin).to_string().unwrap();
 
     println!(
         "
-        Raw private key:      {}\n
-        Compressed WIF:       {}\n
-        Uncompressed WIF:     {}\n
-        Public Key:           {}\n
-        Compressed Address:   {}
-        ", private_key, compressed_wif, uncompressed_wif, public_key, compressed_address
+        Private key:  {}\n
+        Public Key:   {}\n
+        Address:      {}
+        ", private_key.export_as_wif(true, Network::Bitcoin), public_key.hex(), address
     );
 }
 

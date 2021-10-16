@@ -20,14 +20,14 @@
             > HDWallets (Single and multi sig)
             > P2SH nested Segwit address generation (Stand alone and in HD Wallets imported from `ypub` keys)
         
-        - Multisig HDWallets
+        - HDWallets
             > Better unlocker for multisig hd wallets
-            > Use SLIP-0132 encoding for the builder
+            > Use SLIP-0132 encoding for the multisig hdwallet builder
                 SLIP-0132 public and private keys can be implemented by:
                     - Adding the version prefixes to Base58Check module
                     - Adding match detection to relevent methods (ExtendedKeys module, HDWallets module)
-            > Split BIP-45 and BIP-48 into either traits or structs.
             > Move network detection to extended_keys module
+            > Singlesig HDWallet builder similar to Multisig Builder?
         
         - P2TR address generation
 
