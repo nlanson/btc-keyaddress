@@ -4,6 +4,14 @@
 
     Custom derivation paths are also supported but require
     external path management.
+
+    Todo:
+        - StandardPathing trait (that can also take in custom paths)
+        - Builder struct (similar to multisig hd wallet builder)
+        
+            ****************
+            ** UNIT TESTS **
+            ****************
 */
 
 use crate::{
@@ -17,12 +25,10 @@ use crate::{
         ExtendedKey, Xprv, Xpub, 
         HDWError, ChildOptions, Path
     },
-    script::{
-        Script, ScriptErr
-    },
     encoding::{
         bs58check::decode,
-        bs58check::VersionPrefix
+        bs58check::VersionPrefix,
+        ToVersionPrefix
     },
     util::{
         Network,
@@ -45,29 +51,6 @@ impl WalletType {
         Does it by viewing the prefix  
     */
     pub fn from_xkey(key: &str) -> Result<Self, HDWError> {
-        // let bytes = match decode(&key.to_string()) {
-        //     Ok(x) => x,
-        //     Err(_) => return Err(HDWError::BadKey())
-        // };
-
-        // let prefix = &bytes[0..4];
-
-        // match prefix {
-        //     &[0x04, 0x88, 0xAD, 0xE4] |
-        //     &[0x04, 0x88, 0xB2, 0x1E] |
-        //     &[0x04, 0x35, 0x83, 0x94] |
-        //     &[0x04, 0x35, 0x87, 0xCF] => Ok(WalletType::P2PKH),
-        //     &[0x04, 0xb2, 0x43, 0x0c] |
-        //     &[0x04, 0xb2, 0x47, 0x46] |
-        //     &[0x04, 0x5f, 0x18, 0xbc] |
-        //     &[0x04, 0x5f, 0x1c, 0xf6] => Ok(WalletType::P2WPKH),
-        //     &[0x04, 0x9d, 0x78, 0x78] |
-        //     &[0x04, 0x9d, 0x7c, 0xb2] |
-        //     &[0x04, 0x4a, 0x4e, 0x28] |
-        //     &[0x04, 0x4a, 0x52, 0x62] => Ok(WalletType::P2SH_P2WPKH),
-        //     _ => return Err(HDWError::BadKey())
-        // }
-
         let bytes = match decode(&key.to_string()) {
             Ok(x) => x,
             Err(_) => return Err(HDWError::BadKey())
@@ -102,6 +85,41 @@ impl WalletType {
 }
 
 
+impl ToVersionPrefix for WalletType {
+    fn public_version_prefix(&self, network: Network) -> VersionPrefix {
+        match &self {
+            WalletType::P2PKH => match network {
+                Network::Bitcoin => VersionPrefix::Xpub,
+                Network::Testnet => VersionPrefix::Tpub
+            },
+            WalletType::P2SH_P2WPKH => match network {
+                Network::Bitcoin => VersionPrefix::Ypub,
+                Network::Testnet => VersionPrefix::Upub
+            },
+            WalletType::P2WPKH => match network {
+                Network::Bitcoin => VersionPrefix::Zpub,
+                Network::Testnet => VersionPrefix::Vpub
+            },
+        }
+    }
+
+    fn private_version_prefix(&self, network: Network) -> VersionPrefix {
+        match &self {
+            WalletType::P2PKH => match network {
+                Network::Bitcoin => VersionPrefix::Xprv,
+                Network::Testnet => VersionPrefix::Tprv
+            },
+            WalletType::P2SH_P2WPKH => match network {
+                Network::Bitcoin => VersionPrefix::Yprv,
+                Network::Testnet => VersionPrefix::Uprv
+            },
+            WalletType::P2WPKH => match network {
+                Network::Bitcoin => VersionPrefix::Zprv,
+                Network::Testnet => VersionPrefix::Vprv
+            },
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct HDWallet {

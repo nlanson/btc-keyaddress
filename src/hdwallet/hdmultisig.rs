@@ -2,16 +2,22 @@
     Module implementing Multisig HD Wallet data structures
 
     Todo:
-        - SLIP-0132 support (outlined in lib.rs notes)
-        - The pathing trait could be used for Singlesig HDWallets as well.
         - The pathing trait could take in custom paths from master (with unlocker)
-        - Is there a better way to implement an Unlocker for multisig?
-          Currently, the unlocker unlocks a single key at a time.
-          If the unlocker takes in many keys at a time, how will it return the valid keys?
+        - Exporing of shared keys using SLIP-0132 version prefixes.
+            - Should just be a matter of matching network and wallet type and selecting appropriate
+              SLIP version prefix to pass into extended key serialization method.
+        - Sorting keys on build
+            - Unnecessary and only used to make getting cosigner index easy.
+            - Can be removed and used only when retrieving the cosigner index of a particular key
+        - Better unlocker that can take in multiple keys at a time.
+            - Only return the requested values of correct keys
+            - How to signify that a wrong key was given? (Index of wrong key etc...)
         
-            ****************
-            ** UNIT TESTS **
-            ****************
+        - MORE UNIT TESTS
+            - Cases to test:
+               > P2SH creation and address checking
+               > Nested segwit creation and address checking
+               > Creation from SLIP keys
           
 */
 
@@ -27,7 +33,8 @@ use crate::{
         try_into, as_u32_be
     },
     encoding::bs58check::{
-        VersionPrefix, decode
+        VersionPrefix, decode,
+        ToVersionPrefix
     }
 };
 use super::{
@@ -83,6 +90,42 @@ impl MultisigWalletType {
             
             //Return an error if not valid
             _ => return Err(HDWError::BadKey())
+        }
+    }
+}
+
+impl ToVersionPrefix for MultisigWalletType {
+    fn public_version_prefix(&self, network: Network) -> VersionPrefix {
+        match &self {
+            MultisigWalletType::P2SH => match network {
+                Network::Bitcoin => VersionPrefix::Xpub,
+                Network::Testnet => VersionPrefix::Tpub
+            },
+            MultisigWalletType::P2SH_P2WSH => match network {
+                Network::Bitcoin => VersionPrefix::Ypub,
+                Network::Testnet => VersionPrefix::Upub
+            },
+            MultisigWalletType::P2WSH => match network {
+                Network::Bitcoin => VersionPrefix::Zpub,
+                Network::Testnet => VersionPrefix::Vpub
+            },
+        }
+    }
+
+    fn private_version_prefix(&self, network: Network) -> VersionPrefix {
+        match &self {
+            MultisigWalletType::P2SH => match network {
+                Network::Bitcoin => VersionPrefix::Xprv,
+                Network::Testnet => VersionPrefix::Tprv
+            },
+            MultisigWalletType::P2SH_P2WSH => match network {
+                Network::Bitcoin => VersionPrefix::Yprv,
+                Network::Testnet => VersionPrefix::Uprv
+            },
+            MultisigWalletType::P2WSH => match network {
+                Network::Bitcoin => VersionPrefix::Zprv,
+                Network::Testnet => VersionPrefix::Vprv
+            },
         }
     }
 }
@@ -227,16 +270,56 @@ impl MultisigHDWalletBuilder {
     }
 
     //Add a new signer from root Xprv key
-    //If a SLIP-0132 key is given, reject or add to shared_signers list?
     pub fn add_signer_from_xprv(&mut self, signer_master_key: &str) -> Result<(), HDWError> {
-        //If the key is a SLIP-0132 Multisig private key, get the xpub of the key and add to share level
-        
         //Store the inferred wallet type and network if they are the same as the others.
         self.add_inferred_type(signer_master_key)?;
         
-        //Store the key
-        let key: Xprv = Xprv::from_str(signer_master_key)?;
-        self.master_signer_keys.push(key);
+        
+        //DEtermine the key type and if it is a SLIP key, store in the shared list.
+        //If it is a not a slip key but also not invalid, store in master list.
+        let bytes = match decode(&signer_master_key.to_string()) {
+            Ok(x) => x,
+            Err(_) => return Err(HDWError::BadKey())
+        };
+
+        let version: u32 = as_u32_be(&try_into(bytes[0..4].to_vec()));
+        match VersionPrefix::from_int(version) {
+            Ok(x) => match x {
+                //Non SLIP key
+                VersionPrefix::Xprv |
+                VersionPrefix::Xpub |
+                VersionPrefix::Tprv |
+                VersionPrefix::Tpub |
+                VersionPrefix::Yprv |
+                VersionPrefix::Ypub |
+                VersionPrefix::Uprv |
+                VersionPrefix::Upub |
+                VersionPrefix::Zprv |
+                VersionPrefix::Zpub |
+                VersionPrefix::Vprv |
+                VersionPrefix::Vpub  => { 
+                    //Store the key as a master key
+                    let key: Xprv = Xprv::from_str(signer_master_key)?;
+                    self.master_signer_keys.push(key);
+                },
+
+                //SLIP Key
+                VersionPrefix::SLIP132Yprv |
+                VersionPrefix::SLIP132Zprv |
+                VersionPrefix::SLIP132Uprv |
+                VersionPrefix::SLIP132Vprv => {
+                    //Get the corresponding xpub and store as shared
+                    let key: Xpub = Xprv::from_str(signer_master_key)?.get_xpub();
+                    self.shared_signer_keys.push(key);
+                },
+ 
+                //Invalid version prefix
+                _ => return Err(HDWError::BadKey())
+            },
+            
+            //Cannot detect version prefix
+            _ => return Err(HDWError::BadKey())
+        }
 
         Ok(())
     }
@@ -333,6 +416,9 @@ impl MultisigHDWalletBuilder {
         );
         
         //Sort the shared keys in lexicographical order of PubKey
+        // THIS SORTING IS NOT REQUIRED. IT IS ONLY DONE TO MAKE COSIGNER INDEXES A LITTLE EASIER FOR BIP-45 WALLETS.
+        // THIS CAN BE MOVED TO A SEPERATE METHOD TO CONSERVE USE SPECIFIED KEY ORDER AND ONLY RETURN COSIGNER INDEX WHEN
+        //  RELEVANT
         shared_public_keys.sort_by(|a, b| {
             a.get_pub().hex().cmp(&b.get_pub().hex())
         });
