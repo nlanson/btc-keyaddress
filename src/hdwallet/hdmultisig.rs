@@ -152,13 +152,20 @@ trait MultisigStandardPathing {
     fn to_shared_from_master(
         wallet_type: MultisigWalletType,
         network: Network,
-        account_index: u32
+        account_index: u32 //or cosigner_index
     ) -> Path{
         //Creating the path to the shared level.
         //Purpose for BIP-45 and script-type for BIP-48
         match wallet_type {
-            //BPI-45 shared level is the purpose level
-            MultisigWalletType::P2SH => Path::from_str("m/45'").unwrap(),
+            //BPI-45 shared level is the cosigner_index level.
+            //Electrum and Bluewallet use m/45'/0 so this library will use the same share level but with a 
+            //customizable cosigned index. 
+            MultisigWalletType::P2SH =>  { 
+                let mut path = Path::from_str("m/45'").unwrap();
+                path.children.push(ChildOptions::Normal(account_index)); //Cosigner Index
+
+                path
+            },
 
             //BIP-48 shared level is the script-type level
             MultisigWalletType::P2WSH | MultisigWalletType::P2SH_P2WSH => {
@@ -188,15 +195,10 @@ trait MultisigStandardPathing {
         wallet_type: MultisigWalletType,
         network: Network,
         account_index: u32,
-        cosigner_index: Option<u8>,
         change: bool,
         address_index: u32
     ) -> Result<Path, HDWError> {
         let mut path = Self::to_shared_from_master(wallet_type, network, account_index);
-        match cosigner_index {
-            Some(x) => path.children.push(ChildOptions::Normal(x as u32)),
-            None => { /* Don't add cosigner index to path if not presented */ }
-        }
         path.children.push(ChildOptions::Normal(change as u32));
         path.children.push(ChildOptions::Normal(address_index));
 
@@ -204,17 +206,10 @@ trait MultisigStandardPathing {
     }
 
     fn to_address_from_shared(
-        cosigner_index: Option<u8>,
         change: bool,
         address_index: u32
     ) -> Path {
         let mut path = Path::empty();
-        
-        //Add the cosigner index to the path if it is given
-        match cosigner_index {
-            Some(x) => path.children.push(ChildOptions::Normal(x as u32)),
-            None => { /*Dont add cosigner index to path if not presented*/ }
-        }
         path.children.push(ChildOptions::Normal(change as u32));
         path.children.push(ChildOptions::Normal(address_index));
 
@@ -231,7 +226,6 @@ impl MultisigHDWalletBuilder {
             quorum: None,
             network: None,
             account_index: None,
-            //signers: vec![],
 
             master_signer_keys: vec![],
             shared_signer_keys: vec![],
@@ -255,6 +249,7 @@ impl MultisigHDWalletBuilder {
     }
 
     //Set the account index. Only relevant for BIP-48 wallets.
+    //This is the cosigner index for BIP-45 wallets
     pub fn set_account_index(&mut self, account_index: u32) {
         self.account_index = Some(account_index)
     }
@@ -457,7 +452,7 @@ pub struct MultisigHDWallet {
     network: Network,
 
     //The BIP-48 account number
-    //Not required for legacy P2SH wallets
+    //For BIP-45 wallets, this is the cosigner_index
     account_index: Option<u32>
 }
 
@@ -488,7 +483,7 @@ impl MultisigHDWallet {
         //Derive the share level key from the unlocker
         let shared_key = unlocker.master_private_key
                             .derive_from_path(
-                                &Self::to_shared_from_master(self.wallet_type, self.network, self.account_index.unwrap())//&Self::path_to_shared_keys(self.wallet_type, self.network, self.account_index)?
+                                &Self::to_shared_from_master(self.wallet_type, self.network, self.account_index.unwrap())
                             )?;
         
         //For each stored key, check if the derived key is equal.
@@ -506,11 +501,10 @@ impl MultisigHDWallet {
     //Creates the redeem script at a given standard path
     pub fn redeem_script_at(
         &self,
-        cosigner_index: Option<u8>,
         change: bool,
         address_index: u32
     ) -> Result<Script, HDWError> {
-        let keys = self.address_public_keys(change, address_index, cosigner_index, true);
+        let keys = self.address_public_keys(change, address_index, true);
 
         //Create a multisig script from the quorum and key vector
         match Script::multisig(self.quorum, &keys) {
@@ -522,13 +516,12 @@ impl MultisigHDWallet {
     //Generates an address at a given standard path
     pub fn address_at(
         &self,
-        cosigner_index: Option<u8>,
         change: bool,
         address_index: u32
     ) -> Result<String, HDWError>
     where Self: Sized {
         //Get the addresses at the given path and up count times.
-        let redeem_script: Script = self.redeem_script_at(cosigner_index, change, address_index)?;
+        let redeem_script: Script = self.redeem_script_at(change, address_index)?;
 
         //Get the address depending on the wallet type
         match self.wallet_type {
@@ -575,12 +568,13 @@ impl MultisigHDWallet {
 
         If match, return the corresponding address level private key
     */
-    pub fn address_private_key(&self, change: bool, address_index: u32, cosigner_index: Option<u8>, unlocker: &Unlocker) -> Result<PrivKey, HDWError> {
+    pub fn address_private_key(&self, change: bool, address_index: u32, unlocker: &Unlocker) -> Result<PrivKey, HDWError> {
         self.unlock(unlocker)?;
         
         //Create the path from master to address
-        let mut path = Self::to_shared_from_master(self.wallet_type, self.network, self.account_index.unwrap());//Self::path_to_shared_keys(self.wallet_type, self.network, self.account_index)?;
-        path.children.append(&mut Self::to_address_from_shared(cosigner_index, change, address_index).children/*&mut Self::address_path_from_shared(&self, change, address_index, cosigner_index).children*/);
+        let mut path = Self::to_shared_from_master(self.wallet_type, self.network, self.account_index.unwrap());
+        path.children.append(&mut Self::to_address_from_shared(change, address_index).children);
+        //path.children.remove(path.children.len()-2);
 
         //Return the private key at the address
         Ok(
@@ -592,14 +586,14 @@ impl MultisigHDWallet {
         Return the public keys at a given address path
     */
     pub fn address_public_keys(
-        &self, change: bool,
+        &self, 
+        change: bool,
         address_index: u32,
-        cosigner_index: Option<u8>,
-        sort: bool
+        sort: bool  //May not be required
     ) -> Vec<PubKey> {
         //Get the derivation path from the shared level to address level
-        let path_to_address = Self::to_address_from_shared(cosigner_index, change, address_index);//self.address_path_from_shared(change, address_index, cosigner_index);
-        
+        let path_to_address = Self::to_address_from_shared(change, address_index);
+
         //Create a vec of public keys by iterating over each stored key and deriving the requried child.
         let mut extended_keys = self.shared_public_keys.clone();
         if sort { Self::sort_keys(&mut extended_keys) }
@@ -621,19 +615,19 @@ mod tests {
     use crate::prelude::*;
 
     #[test]
-    fn successful_multisig_hdwallet_building() -> Result<(), HDWError> {
+    fn good_segwit_multisig_wallet() -> Result<(), HDWError> {
         let mut wallets = vec![];
-        wallets.push( create_from_mnemonics()? );
-        wallets.push( create_from_master_keys()? );
-        wallets.push( create_from_shared_keys_slip()? );
-        wallets.push( create_from_shared_keys_nonslip()? );
-        wallets.push( from_a_bit_of_everything()? );
+        wallets.push( segwit_from_mnemonics()? );
+        wallets.push( segwit_from_master_keys()? );
+        wallets.push( segwit_from_shared_keys_slip()? );
+        wallets.push( segwit_from_shared_keys_nonslip()? );
+        wallets.push( segwit_from_a_bit_of_everything()? );
 
 
         //Check addresses
         for wallet in wallets {
-            assert_eq!(wallet.address_at(None, false, 0)?, "bc1q2amk0dcqqs2gqfa6ju2td2xx42zz93n80paztjueltjefjugyv0qh6dtdx");
-            assert_eq!(wallet.address_at(None, true, 0)?, "bc1qcgsxne2nppzu38yshxmls4ayzje8k3xk48r592wvpuyzgfayayasweyn85");
+            assert_eq!(wallet.address_at(false, 0)?, "bc1q2amk0dcqqs2gqfa6ju2td2xx42zz93n80paztjueltjefjugyv0qh6dtdx");
+            assert_eq!(wallet.address_at(true, 0)?, "bc1qcgsxne2nppzu38yshxmls4ayzje8k3xk48r592wvpuyzgfayayasweyn85");
         }
         
 
@@ -641,7 +635,7 @@ mod tests {
     }
 
     //Test builder using mnemonics and setting data
-    fn create_from_mnemonics() -> Result<MultisigHDWallet, HDWError> {
+    fn segwit_from_mnemonics() -> Result<MultisigHDWallet, HDWError> {
         //Create new builder instance
         let mut b = MultisigHDWalletBuilder::new();
         
@@ -664,7 +658,7 @@ mod tests {
         Ok(b.build()?)
     }
 
-    fn create_from_master_keys() -> Result<MultisigHDWallet, HDWError> {
+    fn segwit_from_master_keys() -> Result<MultisigHDWallet, HDWError> {
         //Create new builder instance
         let mut b = MultisigHDWalletBuilder::new();
                 
@@ -686,7 +680,7 @@ mod tests {
         Ok(b.build()?)
     }
 
-    fn create_from_shared_keys_slip() -> Result<MultisigHDWallet, HDWError> {
+    fn segwit_from_shared_keys_slip() -> Result<MultisigHDWallet, HDWError> {
         //Create new builder instance
         let mut b = MultisigHDWalletBuilder::new();
                         
@@ -708,7 +702,7 @@ mod tests {
         Ok(b.build()?)
     }
 
-    fn create_from_shared_keys_nonslip() -> Result<MultisigHDWallet, HDWError> {
+    fn segwit_from_shared_keys_nonslip() -> Result<MultisigHDWallet, HDWError> {
         //Create new builder instance
         let mut b = MultisigHDWalletBuilder::new();
                         
@@ -732,7 +726,7 @@ mod tests {
         Ok(b.build()?)
     }
 
-    fn from_a_bit_of_everything() -> Result<MultisigHDWallet, HDWError> {
+    fn segwit_from_a_bit_of_everything() -> Result<MultisigHDWallet, HDWError> {
         let mut b = MultisigHDWalletBuilder::new();
                         
         //Set wallet meta data
@@ -747,6 +741,180 @@ mod tests {
         //Add signers
         b.add_signer_from_mnemonic(&mnemonic_1)?;
         b.add_signer_from_xprv(key_2)?;
+        b.add_signer_from_xpub(key_3)?;
+
+        //Build and return
+        Ok(b.build()?)
+    }
+
+    #[test]
+    fn good_nested_segwit_multisig_wallet() -> Result<(), HDWError> {
+        let mut wallets = vec![];
+        wallets.push( nested_segwit_from_mnemonics()? );
+        wallets.push( nested_segwit_from_shared_keys_slip()? );
+        wallets.push( nested_segwit_from_a_bit_of_everything()? );
+        
+        
+
+        //Check addresses
+        for wallet in wallets {
+            assert_eq!(wallet.address_at(false, 0)?, "3KcsKbj1gTwH3yUw6JN7Et9nhGci8CxXvx");
+            assert_eq!(wallet.address_at(true, 0)?, "36r5RrBPb67M7kjxMriXkskt4h9xVpTXsa");
+        }
+        
+
+        Ok(())
+    }
+
+    //Test builder using mnemonics and setting data
+    fn nested_segwit_from_mnemonics() -> Result<MultisigHDWallet, HDWError> {
+        //Create new builder instance
+        let mut b = MultisigHDWalletBuilder::new();
+        
+        //Set wallet meta data
+        //Account #0, Nested segwit, Bitcoin Mainnet
+        b.set_quorum(2);
+        b.set_type(MultisigWalletType::P2SH_P2WSH);
+
+        //Set mnemonics
+        let mnemonic_1 = Mnemonic::from_phrase("valid wife trash caution slide coach lift visual goose buzz off silly".to_string(), Language::English, "").unwrap();
+        let mnemonic_2 = Mnemonic::from_phrase("salon cloth blossom below emotion buffalo bone dilemma dinosaur morning interest gentle".to_string(), Language::English, "").unwrap();
+        let mnemonic_3 = Mnemonic::from_phrase("desert shock swift grant chronic invite gasp jelly round design sand liquid".to_string(), Language::English, "").unwrap();
+
+        //Add signer mnemonics
+        b.add_signer_from_mnemonic(&mnemonic_1)?;
+        b.add_signer_from_mnemonic(&mnemonic_2)?;
+        b.add_signer_from_mnemonic(&mnemonic_3)?;
+
+        //Build and return
+        Ok(b.build()?)
+    }
+
+    fn nested_segwit_from_shared_keys_slip() -> Result<MultisigHDWallet, HDWError> {
+        //Create new builder instance
+        let mut b = MultisigHDWalletBuilder::new();
+                        
+        //Set wallet meta data
+        //Builder will infer wallet data from keys in this case
+        b.set_quorum(2);
+
+        //Set keys
+        let key_1 = "Ypub6ktoBaeGEYNuTuEY2xQiPuKnSUB1zTHg52YTovScv21GMBLzGUMnMbhhW5VeRm3xQ89UyFxzjQATL2d9AQfk3vNvwhAqSzDYdhhUvXYRhcG";
+        let key_2 = "Ypub6k5FZrFGdBo2X1SqSR5fGiv731Nv6XcneHC6aQCxScjuuNZ2x9A2G7iKDVzzo4ciszdEaB21m6De4ZRMrZ6YS1fB7pLzawhoxkGWX8Le9zw";
+        let key_3 = "Ypub6khkb7kSvJ69iEWRY3TyZEDHJcRUtp2re3fjD8QTQpQPUR9UXwGRhxXkQhKocD4fJXmUzNcHAE1kcD9M7SgdxRUquf2jXs1Y6w8A5CyPqKn";
+
+        //Add signer master keys
+        b.add_signer_from_xpub(key_1)?;
+        b.add_signer_from_xpub(key_2)?;
+        b.add_signer_from_xpub(key_3)?;
+
+        //Build and return
+        Ok(b.build()?)
+    }
+
+    fn nested_segwit_from_a_bit_of_everything() -> Result<MultisigHDWallet, HDWError> {
+        //Create new builder instance
+        let mut b = MultisigHDWalletBuilder::new();
+                        
+        //Set wallet meta data
+        //Builder will infer wallet data from keys in this case
+        b.set_quorum(2);
+ 
+        //Set keys
+        let mnemonic_1 = Mnemonic::from_phrase("valid wife trash caution slide coach lift visual goose buzz off silly".to_string(), Language::English, "").unwrap();
+        let key_2 = "Ypub6k5FZrFGdBo2X1SqSR5fGiv731Nv6XcneHC6aQCxScjuuNZ2x9A2G7iKDVzzo4ciszdEaB21m6De4ZRMrZ6YS1fB7pLzawhoxkGWX8Le9zw";
+        let key_3 = "Ypub6khkb7kSvJ69iEWRY3TyZEDHJcRUtp2re3fjD8QTQpQPUR9UXwGRhxXkQhKocD4fJXmUzNcHAE1kcD9M7SgdxRUquf2jXs1Y6w8A5CyPqKn";
+ 
+        //Add signer master keys
+        b.add_signer_from_mnemonic(&mnemonic_1)?;
+        b.add_signer_from_xpub(key_2)?;
+        b.add_signer_from_xpub(key_3)?;
+ 
+        //Build and return
+        Ok(b.build()?)
+    }
+
+    #[test]
+    fn good_legacy_multisig_wallet() -> Result<(), HDWError> {
+        let mut wallets = vec![];
+        wallets.push( legacy_from_mnemonics()? );            //need cosigner index
+        wallets.push( legacy_from_shared_keys_slip()? );     //no cosigner index
+        wallets.push( legacy_from_a_bit_of_everything()? );  //need cosigner index
+        
+        
+
+        //Check addresses
+        for wallet in wallets {
+            assert_eq!(wallet.wallet_type, MultisigWalletType::P2SH);
+            assert_eq!(wallet.address_at(false, 0)?, "34NZeYBNpp11XjuWc2CG59PCrwFUDteqXU");
+            assert_eq!(wallet.address_at(true, 0)?, "3MuWRVuFqyEjywRerEHacP5Y3zBnMMRJ99");
+        }
+        
+
+        Ok(())
+    }
+
+    fn legacy_from_mnemonics() -> Result<MultisigHDWallet, HDWError> {
+        //Create new builder instance
+        let mut b = MultisigHDWalletBuilder::new();
+                
+        //Set wallet meta data
+        //Account #0, Nested segwit, Bitcoin Mainnet
+        b.set_quorum(2);
+        b.set_type(MultisigWalletType::P2SH);
+
+        //Set mnemonics
+        let mnemonic_1 = Mnemonic::from_phrase("valid wife trash caution slide coach lift visual goose buzz off silly".to_string(), Language::English, "").unwrap();
+        let mnemonic_2 = Mnemonic::from_phrase("salon cloth blossom below emotion buffalo bone dilemma dinosaur morning interest gentle".to_string(), Language::English, "").unwrap();
+        let mnemonic_3 = Mnemonic::from_phrase("desert shock swift grant chronic invite gasp jelly round design sand liquid".to_string(), Language::English, "").unwrap();
+
+        //Add signer mnemonics
+        b.add_signer_from_mnemonic(&mnemonic_1)?;
+        b.add_signer_from_mnemonic(&mnemonic_2)?;
+        b.add_signer_from_mnemonic(&mnemonic_3)?;
+
+        //Build and return
+        Ok(b.build()?)
+    }
+
+    fn legacy_from_shared_keys_slip() -> Result<MultisigHDWallet, HDWError> {
+        //Create new builder instance
+        let mut b = MultisigHDWalletBuilder::new();
+                        
+        //Set wallet meta data
+        //Builder will infer wallet data from keys in this case
+        b.set_quorum(2);
+
+        //Set keys
+        let key_1 = "xpub6AUp4u2wjUAoR1QZGxgEfSnxrYdtaVcPUFWar4CTAYhvi64PYDHkx2qS58yoYVvHuYm5ErDfkUxAUDqkBwSroR2VMoQmqTT34TWD5xWz2xr";
+        let key_2 = "xpub6A73AbdSz9JHfBiBUBQdzfTLUT7RZ6EgjRckgniJdpseUA3XAZG23kLGVC3iy4K6oyToMVj5CmvyaeyWsQQMje1tFJReVjQNt6ZZKfbmoBt";
+        let key_3 = "xpub6BNSJ7M1i51wkmLn18swH14MMuiVLvvJJv66EaFDqkCpX3pv6N287iqrE1BkocAXxCi9uqfTEmvB2yZc1JQBa8Ax6Q9Fk4XGwXZwtMPSQCW";
+
+        //Add signer master keys
+        b.add_signer_from_xpub(key_1)?;
+        b.add_signer_from_xpub(key_2)?;
+        b.add_signer_from_xpub(key_3)?;
+
+        //Build and return
+        Ok(b.build()?)
+    }
+
+    fn legacy_from_a_bit_of_everything() -> Result<MultisigHDWallet, HDWError> {
+        //Create new builder instance
+        let mut b = MultisigHDWalletBuilder::new();
+                                
+        //Set wallet meta data
+        //Builder will infer wallet data from keys in this case
+        b.set_quorum(2);
+
+        //Set keys
+        let mnemonic_1 = Mnemonic::from_phrase("valid wife trash caution slide coach lift visual goose buzz off silly".to_string(), Language::English, "").unwrap();
+        let mnemonic_2 = Mnemonic::from_phrase("salon cloth blossom below emotion buffalo bone dilemma dinosaur morning interest gentle".to_string(), Language::English, "").unwrap();
+        let key_3 = "xpub6BNSJ7M1i51wkmLn18swH14MMuiVLvvJJv66EaFDqkCpX3pv6N287iqrE1BkocAXxCi9uqfTEmvB2yZc1JQBa8Ax6Q9Fk4XGwXZwtMPSQCW";
+
+        //Add signer master keys
+        b.add_signer_from_mnemonic(&mnemonic_1)?;
+        b.add_signer_from_mnemonic(&mnemonic_2)?;
         b.add_signer_from_xpub(key_3)?;
 
         //Build and return

@@ -109,24 +109,27 @@ fn p2sh_p2wsh() {
 }
 
 fn multisig_hdwallet() -> Result<(), HDWError> {
+    //Create new builder instance
     let mut b = MultisigHDWalletBuilder::new();
-    
-    let phrase1: String = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string();
-    let mnemonic1: Mnemonic = Mnemonic::from_phrase(phrase1, Language::English, "").unwrap();
-    let phrase2: String = "pride bounce best cannon transfer prize vast nose that distance atom honey".to_string();
-    let mnemonic2: Mnemonic = Mnemonic::from_phrase(phrase2, Language::English, "").unwrap();
-
-    b.set_type(MultisigWalletType::P2SH_P2WSH);
-    b.add_signer_from_mnemonic(&mnemonic1);
-    b.add_signer_from_mnemonic(&mnemonic2);
+                
+    //Set wallet meta data
+    //Account #0, Nested segwit, Bitcoin Mainnet
     b.set_quorum(2);
+    b.set_type(MultisigWalletType::P2SH);
 
+    //Set mnemonics
+    let mnemonic_1 = Mnemonic::from_phrase("valid wife trash caution slide coach lift visual goose buzz off silly".to_string(), Language::English, "").unwrap();
+    let mnemonic_2 = Mnemonic::from_phrase("salon cloth blossom below emotion buffalo bone dilemma dinosaur morning interest gentle".to_string(), Language::English, "").unwrap();
+    let mnemonic_3 = Mnemonic::from_phrase("desert shock swift grant chronic invite gasp jelly round design sand liquid".to_string(), Language::English, "").unwrap();
+
+    //Add signer mnemonics
+    b.add_signer_from_mnemonic(&mnemonic_1)?;
+    b.add_signer_from_mnemonic(&mnemonic_2)?;
+    b.add_signer_from_mnemonic(&mnemonic_3)?;
+
+    //Build and return
     let wallet = b.build()?;
-    
-    //Print 10 receiving addresses for the wallet
-    for i in 0..10 {
-        println!("{}", wallet.address_at(None, false, i)?)
-    }
+    wallet.address_at(false, 0)?;
 
     Ok(())
 }

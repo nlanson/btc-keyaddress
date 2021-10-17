@@ -20,6 +20,10 @@ pub enum Bech32Err {
 /**
     Takes in either a compressed public key or redeem script and encodes it in
     Bech32.
+
+    The data is either a pubkey hash (p2wpkh) or script hash (p2wsh) or pubkey (taproot).
+    The WitnessProgram is created from the data using the given witness version and network.
+    Use witness version 0 for P2WPKH and P2WSH. Use verion 1 for P2TR
 */
 pub fn encode(witness_version: u8, data: &[u8], network: &Network) -> Result<String, Bech32Err> {
     let network = match network {
