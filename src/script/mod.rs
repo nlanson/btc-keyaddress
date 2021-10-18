@@ -53,9 +53,7 @@ impl Script {
 
         //Sort the private keys in lexiographical order of the public keys (BIP-67)
         let mut keys = keys.clone();
-        keys.sort_by(|a, b| {
-            a.hex().cmp(&b.hex())
-        });
+        keys.sort();
         
         let mut script: Vec<u8> = vec![m + 80]; //m value as opcode
 

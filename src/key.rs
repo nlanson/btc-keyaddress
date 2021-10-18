@@ -211,6 +211,27 @@ impl Key for PubKey {
     }
 }
 
+impl Eq for PubKey { }
+impl PartialEq for PubKey { 
+    //Check the key bytes are equal
+    fn eq(&self, other: &Self) -> bool {
+        self.as_bytes() == other.as_bytes::<33>()
+    }
+}
+
+impl PartialOrd for PubKey {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PubKey {
+    //Sort lexicographically
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.hex().cmp(&other.hex())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

@@ -2,22 +2,23 @@
     Module implementing Multisig HD Wallet data structures
 
     Todo:
+        
         - The pathing trait could take in custom paths from master (with unlocker)
-        - Exporing of shared keys using SLIP-0132 version prefixes.
+        
+        - Expoting of shared keys using SLIP-0132 version prefixes.
             - Should just be a matter of matching network and wallet type and selecting appropriate
               SLIP version prefix to pass into extended key serialization method.
+        
         - Sorting keys on build
             - Unnecessary and only used to make getting cosigner index easy.
             - Can be removed and used only when retrieving the cosigner index of a particular key
+        
         - Better unlocker that can take in multiple keys at a time.
             - Only return the requested values of correct keys
             - How to signify that a wrong key was given? (Index of wrong key etc...)
-        
+    
         - MORE UNIT TESTS
-            - Cases to test:
-               > P2SH creation and address checking
-               > Nested segwit creation and address checking
-               > Creation from SLIP keys
+            - Bad wallet build. Testing to see if it will fail
           
 */
 
@@ -460,18 +461,6 @@ impl MultisigStandardPathing for MultisigHDWallet { }
 impl MultisigHDWallet {
 
     /**
-        Sorts a given list of extended public keys.
-        
-        This is used when creating a BIP-45 hd wallet to determine the 
-        cosigner indexes
-    */
-    fn sort_keys(keys: &mut Vec<Xpub>) {
-        keys.sort_by(|a, b| {
-            a.get_pub().hex().cmp(&b.get_pub().hex())
-        });
-    }
-
-    /**
         Returns the total number of keys in the multisig setup
     */
     pub fn total(&self) -> u8 {
@@ -596,7 +585,7 @@ impl MultisigHDWallet {
 
         //Create a vec of public keys by iterating over each stored key and deriving the requried child.
         let mut extended_keys = self.shared_public_keys.clone();
-        if sort { Self::sort_keys(&mut extended_keys) }
+        if sort { extended_keys.sort() }
 
         let mut keys: Vec<PubKey> = vec![];
         extended_keys.iter().for_each(|k| {

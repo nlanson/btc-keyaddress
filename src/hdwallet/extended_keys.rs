@@ -421,6 +421,29 @@ impl ExtendedKey<PubKey> for Xpub {
 
 }
 
+//Implementing ordering and comparing for extended public keys.
+//This is used for legacy HD Multisig under BIP-45 in determining the cosigner index.
+impl Eq for Xpub { }
+impl PartialEq for Xpub { 
+    //Check the key and chaincode bytes are equal
+    fn eq(&self, other: &Self) -> bool {
+        (self.key(), &self.chaincode()) == (other.key::<33>(), &other.chaincode())
+    }
+}
+
+impl PartialOrd for Xpub {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Xpub {
+    //Sort lexicographically
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.get_pub().hex().cmp(&other.get_pub().hex())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     /*

@@ -30,6 +30,8 @@
         
         - Implement sorting for Xpub keys using Ord trait
 
+        - Custom Bech32 encoding implementation
+
 
 */
 
