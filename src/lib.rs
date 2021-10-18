@@ -27,8 +27,6 @@
         - P2TR address generation
 
         - Automated github tests
-        
-        - Implement sorting for Xpub keys using Ord trait
 
         - Custom Bech32 encoding implementation
 

@@ -38,7 +38,7 @@ pub use extended_keys::Xpub;
 pub use path::Path;
 
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum HDWError {
     IndexTooLarge(u32),
     IndexReserved(u32),

@@ -27,6 +27,7 @@ pub use crate::{
         HDWallet,
         ChildOptions,
         ExtendedKey,
+        Xprv, Xpub,
         HDWError,
         Path,
         WalletType,
@@ -34,8 +35,16 @@ pub use crate::{
         Unlocker,
         Locked,
         MultisigHDWallet,
+        MultisigHDWalletBuilder,
         MultisigWalletType
     }, 
+
+    encoding::{
+        bs58check::{
+            VersionPrefix,
+            ToVersionPrefix
+        }
+    },
 
     util::{
         encode_02x,

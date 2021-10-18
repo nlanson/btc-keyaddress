@@ -16,9 +16,6 @@
         - Better unlocker that can take in multiple keys at a time.
             - Only return the requested values of correct keys
             - How to signify that a wrong key was given? (Index of wrong key etc...)
-    
-        - MORE UNIT TESTS
-            - Bad wallet build. Testing to see if it will fail
           
 */
 
@@ -62,6 +59,7 @@ impl MultisigWalletType {
             Err(_) => return Err(HDWError::BadKey())
         };
 
+        if bytes.len() < 4 { return Err(HDWError::BadKey()) }
         let version: u32 = as_u32_be(&try_into(bytes[0..4].to_vec()));
         match VersionPrefix::from_int(version) {
             Ok(x) => match x {
@@ -415,9 +413,7 @@ impl MultisigHDWalletBuilder {
         // THIS SORTING IS NOT REQUIRED. IT IS ONLY DONE TO MAKE COSIGNER INDEXES A LITTLE EASIER FOR BIP-45 WALLETS.
         // THIS CAN BE MOVED TO A SEPERATE METHOD TO CONSERVE USE SPECIFIED KEY ORDER AND ONLY RETURN COSIGNER INDEX WHEN
         //  RELEVANT
-        shared_public_keys.sort_by(|a, b| {
-            a.get_pub().hex().cmp(&b.get_pub().hex())
-        });
+        shared_public_keys.sort();
 
         //Create and return the wallet
         let wallet = MultisigHDWallet {
@@ -908,5 +904,166 @@ mod tests {
 
         //Build and return
         Ok(b.build()?)
+    }
+
+    #[test]
+    fn bad_quorum_failures() -> Result<(), HDWError> {
+        /*
+            Testing bad quorum instances in multisig wallet builder
+        
+            Test cases:
+                Case 1: 
+                    Quorum = 0,
+                    Keys provided = 1
+                    Expected err = Bad quorum due to it being zero
+                Case 2:
+                    Quorum = 1
+                    Keys provided = 2
+                    Expected err = Bad quorum due to it being larger than keys provided
+        */
+        let quorum_cases = vec![0, 2];
+        let key_cases =    vec![1, 1];
+        let expected_err = vec![
+            HDWError::BadQuorum(0),
+            HDWError::BadQuorum(2)
+        ];
+
+        for i in 0..2 {
+            let mut b = MultisigHDWalletBuilder::new();
+
+            //Set quorum
+            b.set_quorum(quorum_cases[i]);
+
+            //Set keys
+            for _ in 0..key_cases[i] {
+                let key = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
+                b.add_signer_from_mnemonic(&key)?;
+            }
+
+            //Try to build
+            match b.build() {
+                Ok(_) => assert!(false),
+                Err(x) => assert_eq!(x, expected_err[i])
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn bad_signer_count_failure() -> Result<(), HDWError> {
+        /*
+            Testing bad signer counts in multisig wallet builders.
+        
+            Test cases:
+                Case 1:
+                    Signers: 0
+                    Expected err: Missing fields as no signers are set
+                Case 2:
+                    Signers: 16
+                    Expected err: Index too large as there are too many signers
+        */
+        let signer_count = vec![0, 16];
+        let expected_err = vec![
+            HDWError::MissingFields,
+            HDWError::IndexTooLarge(16)
+        ];
+
+        for i in 0..2 {
+            let mut b = MultisigHDWalletBuilder::new();
+
+            //Set keys
+            for _ in 0..signer_count[i] {
+                let key = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
+                b.add_signer_from_mnemonic(&key)?;
+            }
+
+            //Try to build
+            match b.build() {
+                Ok(_) => assert!(false),
+                Err(x) => assert!(x == expected_err[i])
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn type_discrepancy_failure() -> Result<(), HDWError> {
+        //Tests multisig wallet builds where signers given are of a different type or a network
+        //Adding the second key will result in an error
+        
+        //Test cases:
+        let key_1 = vec![
+            /* Mainnnet legacy xpub */             "xpub6BNSJ7M1i51wkmLn18swH14MMuiVLvvJJv66EaFDqkCpX3pv6N287iqrE1BkocAXxCi9uqfTEmvB2yZc1JQBa8Ax6Q9Fk4XGwXZwtMPSQCW",
+            /* Mainnnet legacy xpub */             "xpub6BNSJ7M1i51wkmLn18swH14MMuiVLvvJJv66EaFDqkCpX3pv6N287iqrE1BkocAXxCi9uqfTEmvB2yZc1JQBa8Ax6Q9Fk4XGwXZwtMPSQCW",
+            /* Mainnnet nested segwit SLIP Ypub */ "Ypub6ktoBaeGEYNuTuEY2xQiPuKnSUB1zTHg52YTovScv21GMBLzGUMnMbhhW5VeRm3xQ89UyFxzjQATL2d9AQfk3vNvwhAqSzDYdhhUvXYRhcG",
+            /* Testnet legacy tpub */              "tpubD6NzVbkrYhZ4WsKoTUCyQjVK66nCqT41aYQLPZ6h49G5rgLQuuG7Nh9upmijk4PuDT2DRqXiSJaUfnpR6SbXe1jBF29ebVrTxw5Xjt9R2C5",
+            /* Testnet nested segwit SLIP Upub */  "Upub5JQfBberxLXY8hFueeEALeYirjJUsn11Y78uKMaUwssL1zVtts2XYVNhKCpCgFVkFLYwU8qTtRnXY7FBWRxuAwhvYecTExNh8cndnF24cZD",
+            /* Testnet native segwit SLIP Vpub */  "Vpub5dEvVGKn7251ztuSZrtpeSfonFbDAuCfQRbDVq6emVu81vf7a4xmGzVZY3UkqhV5W4AHv4wrJ1S5AfqRioP5wEGT4uyCrFK2YysmXguKNgq"
+        ];
+        let key_2 = vec![
+            /* Mainnnet nested segwit SLIP Ypub */ "Ypub6ktoBaeGEYNuTuEY2xQiPuKnSUB1zTHg52YTovScv21GMBLzGUMnMbhhW5VeRm3xQ89UyFxzjQATL2d9AQfk3vNvwhAqSzDYdhhUvXYRhcG",
+            /* Mainnnet native segwit SLIP Zpub */ "Zpub75j4VFKBPDvPLXWNZ6WqLvW6WJa2FYKVSKcqew31p35h3snWWDGSkQDmR9evjNcN5Me131afLP2ctT33e2J1vvsTVYdF5LfvsbeJsTwf1c4",
+            /* Mainnnet native segwit SLIP Zpub */ "Zpub75j4VFKBPDvPLXWNZ6WqLvW6WJa2FYKVSKcqew31p35h3snWWDGSkQDmR9evjNcN5Me131afLP2ctT33e2J1vvsTVYdF5LfvsbeJsTwf1c4",
+            /* Mainnet legacy xpub */              "xpub6BNSJ7M1i51wkmLn18swH14MMuiVLvvJJv66EaFDqkCpX3pv6N287iqrE1BkocAXxCi9uqfTEmvB2yZc1JQBa8Ax6Q9Fk4XGwXZwtMPSQCW",
+            /* Mainnet nested segwit SLIP Ypub */  "Ypub6ktoBaeGEYNuTuEY2xQiPuKnSUB1zTHg52YTovScv21GMBLzGUMnMbhhW5VeRm3xQ89UyFxzjQATL2d9AQfk3vNvwhAqSzDYdhhUvXYRhcG",
+            /* Mainnet native segwit SLIP Zpub */  "Zpub75j4VFKBPDvPLXWNZ6WqLvW6WJa2FYKVSKcqew31p35h3snWWDGSkQDmR9evjNcN5Me131afLP2ctT33e2J1vvsTVYdF5LfvsbeJsTwf1c4"
+        ];
+        let expected_err = HDWError::TypeDiscrepancy;
+
+        for i in 0..5 {
+            let mut b = MultisigHDWalletBuilder::new();
+
+            //Set keys
+            b.add_signer_from_xpub(key_1[i])?;
+            match b.add_signer_from_xpub(key_2[i]) {
+                Ok(_) => assert!(false),
+                Err(x) => assert!(x == expected_err)
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn bad_signer_key_failure() {
+        //Test cases:
+        let bad_shared_signers = vec![
+            "obviously this is not a valid key",
+            "xpubThisIsNotAValidKey",
+            "YpubThisIsAlsoNotAValidKey",
+            "ZpubThisIsDefinatelyNotAGoodKey",
+            "tpubThisIsNotAValidTestnetKey",
+            "UpubAgainNotAValidTestnetKey",
+            "VpubAnotherBadKeyToTest",
+            "",
+        ];
+
+        let bad_root_signers = vec![
+            "obviously this is not a valid key",    
+            "xprvThisIsNotAValidKey",
+            "YprvThisIsAlsoNotAValidKey",
+            "ZprvThisIsDefinatelyNotAGoodKey",
+            "tprvThisIsNotAValidTestnetKey",
+            "UprvAgainNotAValidTestnetKey",
+            "VprvAnotherBadKeyToTest",
+            ""
+        ];
+
+        for i in 0..bad_shared_signers.len() {
+            let mut b = MultisigHDWalletBuilder::new();
+            //Add the bad shared signer
+            match b.add_signer_from_xpub(bad_shared_signers[i]) {
+                Ok(_) => assert!(false),
+                Err(x) => assert!(true)
+            }
+
+            //Add the bad root signer
+            match b.add_signer_from_xprv(bad_root_signers[i]) {
+                Ok(_) => assert!(false),
+                Err(x) => assert!(true)
+            }
+        }
     }
 }
