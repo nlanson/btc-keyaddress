@@ -9,15 +9,15 @@ use crate:: {
     hash,
     key::Key,
     key::PubKey,
-    script::Script,
+    script::RedeemScript,
     util::Network
 };
 
 pub enum Address {
     P2PKH(PubKey, Network),
-    P2SH(Script, Network),
+    P2SH(RedeemScript, Network),
     P2WPKH(PubKey, Network),
-    P2WSH(Script, Network)
+    P2WSH(RedeemScript, Network)
 }
 
 #[derive(Debug)]
@@ -52,7 +52,7 @@ impl Address {
         }
     }
 
-    fn p2sh(script: &Script, network: &Network) -> String {
+    fn p2sh(script: &RedeemScript, network: &Network) -> String {
         match network {
             Network::Bitcoin => bs58check::check_encode(bs58check::VersionPrefix::P2ScriptAddress, &script.hash()),
             Network::Testnet => bs58check::check_encode(bs58check::VersionPrefix::TestnetP2SHAddress, &script.hash())
@@ -63,7 +63,7 @@ impl Address {
         Ok(encode(0, &pk.hash160(), network)?)
     }
 
-    fn p2wsh(script: &Script, network: &Network) -> Result<String, Bech32Err> {
+    fn p2wsh(script: &RedeemScript, network: &Network) -> Result<String, Bech32Err> {
         let hash = hash::sha256(script.code.clone());
         Ok(encode(0, &hash, network)?)
     }
@@ -101,7 +101,7 @@ mod tests {
     use crate::{
         key::PrivKey,
         util::decode_02x,
-        script::Script,
+        script::RedeemScript,
         util::Network
     };
 
@@ -165,14 +165,14 @@ mod tests {
     #[test]
     fn p2sh() {
         //Test data test
-        let script: Script = Script::new(vec![0x6a, 0x29, 0x05, 0x20, 0x03]);
+        let script: RedeemScript = RedeemScript::new(vec![0x6a, 0x29, 0x05, 0x20, 0x03]);
         let derived_address = Address::P2SH(script, Network::Bitcoin).to_string().unwrap();
         let expected_address = "33SjjXog5Tqm3kCYNGCQBH46gc48a4SUXn";
         assert!(derived_address == expected_address);
 
         //Random mainnet tests
         for i in 0..5 {
-            let script: Script = Script::new(vec![i; 5]);
+            let script: RedeemScript = RedeemScript::new(vec![i; 5]);
             let address = Address::P2SH(script, Network::Bitcoin).to_string().unwrap();
             match address.chars().nth(0) {
                 Some('3') => assert!(true),
@@ -182,7 +182,7 @@ mod tests {
 
         //Random testnet tests
         for i in 0..5 {
-            let script: Script = Script::new(vec![i; 5]);
+            let script: RedeemScript = RedeemScript::new(vec![i; 5]);
             let address = Address::P2SH(script, Network::Testnet).to_string().unwrap();
             match address.chars().nth(0) {
                 Some('2') => assert!(true),
@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn p2wsh() {
-        let redeem_script: Script = Script::new(vec![0x6a, 0x29, 0x05, 0x20, 0x03]);
+        let redeem_script: RedeemScript = RedeemScript::new(vec![0x6a, 0x29, 0x05, 0x20, 0x03]);
         let derived_mainnet_address = Address::P2WSH(redeem_script.clone(), Network::Bitcoin).to_string().unwrap();
         let expected_mainnet_address = "bc1q4sr2gyed4ww8zm0t9ktn47qxlu2nhl5ejkf6fjzfttnsjvxdkqjqe7yhq9".to_string();
         let derived_testnet_address = Address::P2WSH(redeem_script.clone(), Network::Testnet).to_string().unwrap();

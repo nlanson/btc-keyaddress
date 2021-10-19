@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Script {
+pub struct RedeemScript {
     pub code: Vec<u8>
 }
 
@@ -25,7 +25,7 @@ pub enum ScriptErr {
     HashLenIncorrect(usize)
 }
 
-impl Script {
+impl RedeemScript {
     /**
         Create a new instance of self
     */
@@ -65,7 +65,7 @@ impl Script {
         script.push(n + 80); //n value as opcode
         script.push(0xAE);   //op_checkmultisig
 
-        Ok(Script::new(script))
+        Ok(RedeemScript::new(script))
     }
 
     /**
@@ -79,7 +79,7 @@ impl Script {
         let mut script = vec![0x00, 0x14]; //Witness Version, Pubkey Hash len
         script.append(&mut hash.to_vec());
         
-        Script::new(script)
+        RedeemScript::new(script)
     }
 
     /**
@@ -92,7 +92,7 @@ impl Script {
         let mut script = vec![0x00, 0x20];
         script.append(&mut hash);
 
-        Script::new(script)
+        RedeemScript::new(script)
     }
 }
 
@@ -112,7 +112,7 @@ mod tests {
             PubKey::from_str("021f2f6e1e50cb6a953935c3601284925decd3fd21bc445712576873fb8c6ebc18").unwrap(),
         ];
 
-        let script = Script::multisig(2, &keys).unwrap();
+        let script = RedeemScript::multisig(2, &keys).unwrap();
         let address = Address::P2SH(script, Network::Bitcoin).to_string().unwrap();
 
         assert_eq!(address, "3Q4sF6tv9wsdqu2NtARzNCpQgwifm2rAba");

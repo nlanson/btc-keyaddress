@@ -53,6 +53,6 @@ pub use crate::{
         Network
     },
 
-    script::Script
+    script::RedeemScript
 
 };

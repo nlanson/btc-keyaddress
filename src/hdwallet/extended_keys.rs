@@ -39,7 +39,7 @@ use crate::{
         as_u32_be
     },
     util::Network,
-    script::Script
+    script::RedeemScript
 };
 
 #[derive(Debug, Clone)]
@@ -108,7 +108,7 @@ pub trait ExtendedKey<T> where T: Key {
             WalletType::P2PKH => Address::P2PKH(self.get_pub(), network).to_string().unwrap(),
             WalletType::P2WPKH => Address::P2WPKH(self.get_pub(), network).to_string().unwrap(),
             WalletType::P2SH_P2WPKH => {
-                let script: Script = Script::p2sh_p2wpkh(&self.get_pub());
+                let script: RedeemScript = RedeemScript::p2sh_p2wpkh(&self.get_pub());
                 Address::P2SH(script, network).to_string().unwrap()
             }
         }
@@ -232,7 +232,7 @@ impl ExtendedKey<PrivKey> for Xprv {
         32 bytes (No indicator)
     */
     fn key<const N:usize>(&self) -> [u8; N] {
-        self.key.as_bytes()
+        self.key.as_bytes::<N>()
     }
 
     fn chaincode(&self) -> [u8; 32] {
