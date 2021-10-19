@@ -8,6 +8,7 @@
     Todo:
         - StandardPathing trait (that can also take in custom paths)
         - Builder struct (similar to multisig hd wallet builder)
+        - See lib.rs for more
         
             ****************
             ** UNIT TESTS **

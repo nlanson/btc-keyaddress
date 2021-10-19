@@ -2,20 +2,15 @@
     Module implementing Multisig HD Wallet data structures
 
     Todo:
-        
-        - The pathing trait could take in custom paths from master (with unlocker)
-        
         - Expoting of shared keys using SLIP-0132 version prefixes.
             - Should just be a matter of matching network and wallet type and selecting appropriate
               SLIP version prefix to pass into extended key serialization method.
         
-        - Sorting keys on build
-            - Unnecessary and only used to make getting cosigner index easy.
-            - Can be removed and used only when retrieving the cosigner index of a particular key
-        
         - Better unlocker that can take in multiple keys at a time.
             - Only return the requested values of correct keys
             - How to signify that a wrong key was given? (Index of wrong key etc...)
+        
+        - Custom path wallets unit tests
           
 */
 
@@ -25,7 +20,7 @@ use crate::{
     key::{
         PrivKey, PubKey
     },
-    script::Script,
+    script::RedeemScript,
     util::{
         Network,
         try_into, as_u32_be
@@ -134,11 +129,12 @@ impl ToVersionPrefix for MultisigWalletType {
     Can only create standard BIP-45 or BIP-48 wallets for the time being.
 */
 const MAX_KEYS_FOR_SETUP: u8 = 15;
-pub struct MultisigHDWalletBuilder {
+pub struct MultisigHDWalletBuilder<'builder> {
     wallet_type: Option<MultisigWalletType>, //Defaults to P2WSH
     quorum: Option<u8>,                      //Required
     network: Option<Network>,                //Defaults to Bitcoin
     account_index: Option<u32>,              //Defaults to 0
+    derivation: Option<&'builder str>,                //Defaults to either BIP-45 or BIP-48
 
     master_signer_keys: Vec<Xprv>,
     shared_signer_keys:  Vec<Xpub>,
@@ -204,6 +200,8 @@ trait MultisigStandardPathing {
         Ok(path)
     }
 
+    //Regardless of whether a custom path is being used, this method will add the 
+    //change index and address index to the path being used to derive the address.
     fn to_address_from_shared(
         change: bool,
         address_index: u32
@@ -216,8 +214,8 @@ trait MultisigStandardPathing {
     }
 }
 
-impl MultisigStandardPathing for MultisigHDWalletBuilder { }
-impl MultisigHDWalletBuilder {
+impl<'builder> MultisigStandardPathing for MultisigHDWalletBuilder<'builder> { }
+impl<'builder> MultisigHDWalletBuilder<'builder> {
     //Return a new instance of the builder with empty values
     pub fn new() -> Self {
         Self {
@@ -225,10 +223,10 @@ impl MultisigHDWalletBuilder {
             quorum: None,
             network: None,
             account_index: None,
+            derivation: None,
 
             master_signer_keys: vec![],
             shared_signer_keys: vec![],
-            //inferred_wallet_data: vec![]
         }
     }
 
@@ -248,9 +246,16 @@ impl MultisigHDWalletBuilder {
     }
 
     //Set the account index. Only relevant for BIP-48 wallets.
-    //This is the cosigner index for BIP-45 wallets
+    //This is the cosigner index for BIP-45 wallets.
+    //For example, if a legacy multisig wallet using cosigner_index #2 is to be created,
+    //set the cosigner index using this method.
     pub fn set_account_index(&mut self, account_index: u32) {
         self.account_index = Some(account_index)
+    }
+
+    //If a custom derivation is used, set it here
+    pub fn set_custom_derivation(&mut self, path: &'builder str) {
+        self.derivation = Some(path);
     }
 
     //Add a new signer from Mnemonic
@@ -399,7 +404,14 @@ impl MultisigHDWalletBuilder {
 
         //Merge all the master signer keys and shared signer keys into a single vector of shared ex-pub keys.
         //Do this by deriving master keys into share level keys according to wallet type, network and account index.
-        let path_to_shared = Self::to_shared_from_master(wallet_type, network, account_index);
+        let path_to_shared = match self.derivation {
+            //If a custom path if given, use it.
+            Some(x) => Path::from_str(x)?,
+
+            //Else, use a standard path for BIP-48 or BIP-45 depending on wallet type etc...
+            None => Self::to_shared_from_master(wallet_type, network, account_index)
+        };
+
         let mut shared_public_keys = self.shared_signer_keys.clone();
         shared_public_keys.append(
             &mut self.master_signer_keys.iter().map(|x| {
@@ -410,10 +422,10 @@ impl MultisigHDWalletBuilder {
         );
         
         //Sort the shared keys in lexicographical order of PubKey
-        // THIS SORTING IS NOT REQUIRED. IT IS ONLY DONE TO MAKE COSIGNER INDEXES A LITTLE EASIER FOR BIP-45 WALLETS.
-        // THIS CAN BE MOVED TO A SEPERATE METHOD TO CONSERVE USE SPECIFIED KEY ORDER AND ONLY RETURN COSIGNER INDEX WHEN
-        //  RELEVANT
-        shared_public_keys.sort();
+        //Disabled since its not required
+        //
+        //shared_public_keys.sort();
+        //
 
         //Create and return the wallet
         let wallet = MultisigHDWallet {
@@ -421,7 +433,8 @@ impl MultisigHDWalletBuilder {
             quorum,
             wallet_type,
             network,
-            account_index: Some(account_index)
+            //account_index: Some(account_index),
+            derivation: path_to_shared
         };
         Ok(wallet)
     }
@@ -448,9 +461,9 @@ pub struct MultisigHDWallet {
     //For BIP-48 this is used in the coin-type level and address creation.
     network: Network,
 
-    //The BIP-48 account number
-    //For BIP-45 wallets, this is the cosigner_index
-    account_index: Option<u32>
+    //The path from a master key to a shared key
+    //This can either be a standard path or a custom path
+    derivation: Path
 }
 
 impl MultisigStandardPathing for MultisigHDWallet { }
@@ -466,10 +479,10 @@ impl MultisigHDWallet {
     //Unlocks one of the keys in the multisig setup
     fn unlock(&self, unlocker: &Unlocker) -> Result<(), HDWError> {
         //Derive the share level key from the unlocker
-        let shared_key = unlocker.master_private_key
+        let shared_key: Xpub = unlocker.master_private_key
                             .derive_from_path(
-                                &Self::to_shared_from_master(self.wallet_type, self.network, self.account_index.unwrap())
-                            )?;
+                                &self.derivation
+                            )?.get_xpub();
         
         //For each stored key, check if the derived key is equal.
         //If it is equal, return
@@ -488,11 +501,11 @@ impl MultisigHDWallet {
         &self,
         change: bool,
         address_index: u32
-    ) -> Result<Script, HDWError> {
+    ) -> Result<RedeemScript, HDWError> {
         let keys = self.address_public_keys(change, address_index, true);
 
         //Create a multisig script from the quorum and key vector
-        match Script::multisig(self.quorum, &keys) {
+        match RedeemScript::multisig(self.quorum, &keys) {
             Ok(script) => return Ok(script),
             Err(_) => return Err(HDWError::BadKey())
         }
@@ -506,14 +519,14 @@ impl MultisigHDWallet {
     ) -> Result<String, HDWError>
     where Self: Sized {
         //Get the addresses at the given path and up count times.
-        let redeem_script: Script = self.redeem_script_at(change, address_index)?;
+        let redeem_script: RedeemScript = self.redeem_script_at(change, address_index)?;
 
         //Get the address depending on the wallet type
         match self.wallet_type {
             MultisigWalletType::P2SH => Ok(Address::P2SH(redeem_script, self.network).to_string().unwrap()),
             MultisigWalletType::P2WSH => Ok(Address::P2WSH(redeem_script, self.network).to_string().unwrap()),
             MultisigWalletType::P2SH_P2WSH => {
-                let wrapped_script = Script::p2sh_p2wsh(&redeem_script);
+                let wrapped_script = RedeemScript::p2sh_p2wsh(&redeem_script);
                 Ok(Address::P2SH(wrapped_script, self.network).to_string().unwrap())
             },
         }
@@ -541,9 +554,7 @@ impl MultisigHDWallet {
         self.unlock(unlocker)?;
 
         Ok(
-            unlocker.master_private_key.derive_from_path(
-                &Self::to_shared_from_master(self.wallet_type, self.network, self.account_index.unwrap())//&Self::path_to_shared_keys(self.wallet_type, self.network, self.account_index)?
-            )?
+            unlocker.master_private_key.derive_from_path( &self.derivation )?
         )
     }
 
@@ -557,9 +568,8 @@ impl MultisigHDWallet {
         self.unlock(unlocker)?;
         
         //Create the path from master to address
-        let mut path = Self::to_shared_from_master(self.wallet_type, self.network, self.account_index.unwrap());
+        let mut path = self.derivation.clone();
         path.children.append(&mut Self::to_address_from_shared(change, address_index).children);
-        //path.children.remove(path.children.len()-2);
 
         //Return the private key at the address
         Ok(
@@ -1056,14 +1066,48 @@ mod tests {
             //Add the bad shared signer
             match b.add_signer_from_xpub(bad_shared_signers[i]) {
                 Ok(_) => assert!(false),
-                Err(x) => assert!(true)
+                Err(_) => assert!(true)
             }
 
             //Add the bad root signer
             match b.add_signer_from_xprv(bad_root_signers[i]) {
                 Ok(_) => assert!(false),
-                Err(x) => assert!(true)
+                Err(_) => assert!(true)
             }
         }
+    }
+
+    //Tests if extracted private keys create the same address as the wallet creates.
+    #[test]
+    fn private_key_extraction()-> Result<(), HDWError> {
+        //Create new 2-of-3 multisig wallet
+        let mut b = MultisigHDWalletBuilder::new();
+        b.set_quorum(2);
+        let mnemonic_1 = Mnemonic::from_phrase("valid wife trash caution slide coach lift visual goose buzz off silly".to_string(), Language::English, "").unwrap();
+        let mnemonic_2 = Mnemonic::from_phrase("salon cloth blossom below emotion buffalo bone dilemma dinosaur morning interest gentle".to_string(), Language::English, "").unwrap();
+        let mnemonic_3 = Mnemonic::from_phrase("desert shock swift grant chronic invite gasp jelly round design sand liquid".to_string(), Language::English, "").unwrap();
+        b.add_signer_from_mnemonic(&mnemonic_1)?;
+        b.add_signer_from_mnemonic(&mnemonic_2)?;
+        b.add_signer_from_mnemonic(&mnemonic_3)?;
+        let wallet = b.build()?;
+
+        //Get the unlockers from mnemonics used
+        let unlocker_1 = Unlocker::from_mnemonic(&mnemonic_1)?;
+        let unlocker_2 = Unlocker::from_mnemonic(&mnemonic_2)?;
+        let unlocker_3 = Unlocker::from_mnemonic(&mnemonic_3)?;
+
+        //Extract private keys for the first receiving address and create an address from it.
+        //Compare the address created to the one the wallet spits out
+        let address = Address::P2WSH(
+            RedeemScript::multisig(2, &vec![
+                wallet.address_private_key(false, 0, &unlocker_1)?.get_pub(),
+                wallet.address_private_key(false, 0, &unlocker_2)?.get_pub(),
+                wallet.address_private_key(false, 0, &unlocker_3)?.get_pub()
+            ]).unwrap(),
+            Network::Bitcoin
+        ).to_string().unwrap();
+        assert_eq!(address, wallet.address_at(false, 0)?);
+
+        Ok(())
     }
 }
