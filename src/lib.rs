@@ -22,8 +22,8 @@
         
         - HDWallets
             > Better unlocker for multisig hd wallets
-            > Singlesig HDWallet builder similar to Multisig Builder?
-            > Better custom paths implementation for single sig wallets (similar to multisig where the path to share level is stored)
+            > Singlesig unit tests
+            
         
         - P2TR address generation
 

@@ -42,7 +42,7 @@ use crate::{
     script::RedeemScript
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Xprv {
     key: PrivKey,
     chaincode: [u8; 32],
@@ -51,7 +51,7 @@ pub struct Xprv {
     pub index: [u8; 4]
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Xpub {
     key: PubKey,
     chaincode: [u8; 32],

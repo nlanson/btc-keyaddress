@@ -11,7 +11,7 @@ use crate::{
 };
 
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Path {
     pub children: Vec<ChildOptions>
 }
@@ -67,6 +67,16 @@ impl Path {
     pub fn empty() -> Self {
         Self {
             children: vec![]
+        }
+    }
+
+    pub fn add_level(&mut self, level: ChildOptions) {
+        self.children.push(level);
+    }
+
+    pub fn append(&mut self, other: &Self) {
+        for i in 0..other.children.len() {
+            self.add_level(other.children[i])
         }
     }
 }

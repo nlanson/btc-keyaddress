@@ -36,7 +36,8 @@ use super::{
     Xprv, Xpub,
     Path,
     ChildOptions,
-    Unlocker
+    Unlocker,
+    HDStandardPathing
 };
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -134,7 +135,7 @@ pub struct MultisigHDWalletBuilder<'builder> {
     quorum: Option<u8>,                      //Required
     network: Option<Network>,                //Defaults to Bitcoin
     account_index: Option<u32>,              //Defaults to 0
-    derivation: Option<&'builder str>,                //Defaults to either BIP-45 or BIP-48
+    derivation: Option<&'builder str>,       //Defaults to either BIP-45 or BIP-48
 
     master_signer_keys: Vec<Xprv>,
     shared_signer_keys:  Vec<Xpub>,
@@ -157,7 +158,7 @@ trait MultisigStandardPathing {
             //customizable cosigned index. 
             MultisigWalletType::P2SH =>  { 
                 let mut path = Path::from_str("m/45'").unwrap();
-                path.children.push(ChildOptions::Normal(account_index)); //Cosigner Index
+                path.add_level(ChildOptions::Normal(account_index)); //Cosigner Index
 
                 path
             },
@@ -170,16 +171,16 @@ trait MultisigStandardPathing {
                 let mut path = Path::from_str("m/48'").unwrap(); 
                 
                 //coin-type
-                path.children.push(ChildOptions::Hardened(match network { 
+                path.add_level(ChildOptions::Hardened(match network { 
                     Network::Bitcoin => 0,
                     Network::Testnet => 1
                 }));
 
                 //account index
-                path.children.push(ChildOptions::Hardened(account_index));
+                path.add_level(ChildOptions::Hardened(account_index));
 
                 //script-type
-                path.children.push(ChildOptions::Hardened(wallet_type as u32)); 
+                path.add_level(ChildOptions::Hardened(wallet_type as u32)); 
 
                 path
             }
@@ -192,12 +193,11 @@ trait MultisigStandardPathing {
         account_index: u32,
         change: bool,
         address_index: u32
-    ) -> Result<Path, HDWError> {
+    ) -> Path {
         let mut path = Self::to_shared_from_master(wallet_type, network, account_index);
-        path.children.push(ChildOptions::Normal(change as u32));
-        path.children.push(ChildOptions::Normal(address_index));
+        path.append(&Self::to_address_from_shared(change, address_index));
 
-        Ok(path)
+        path
     }
 
     //Regardless of whether a custom path is being used, this method will add the 
@@ -207,12 +207,13 @@ trait MultisigStandardPathing {
         address_index: u32
     ) -> Path {
         let mut path = Path::empty();
-        path.children.push(ChildOptions::Normal(change as u32));
-        path.children.push(ChildOptions::Normal(address_index));
+        path.add_level(ChildOptions::Normal(change as u32));
+        path.add_level(ChildOptions::Normal(address_index));
 
         path
     }
 }
+
 
 impl<'builder> MultisigStandardPathing for MultisigHDWalletBuilder<'builder> { }
 impl<'builder> MultisigHDWalletBuilder<'builder> {
@@ -274,7 +275,7 @@ impl<'builder> MultisigHDWalletBuilder<'builder> {
         self.add_inferred_type(signer_master_key)?;
         
         
-        //DEtermine the key type and if it is a SLIP key, store in the shared list.
+        //Determine the key type and if it is a SLIP key, store in the shared list.
         //If it is a not a slip key but also not invalid, store in master list.
         let bytes = match decode(&signer_master_key.to_string()) {
             Ok(x) => x,
@@ -569,7 +570,8 @@ impl MultisigHDWallet {
         
         //Create the path from master to address
         let mut path = self.derivation.clone();
-        path.children.append(&mut Self::to_address_from_shared(change, address_index).children);
+        //path.children.append(&mut Self::to_address_from_shared(change, address_index).children);
+        path.append(&Self::to_address_from_shared(change, address_index));
 
         //Return the private key at the address
         Ok(

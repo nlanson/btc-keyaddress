@@ -49,9 +49,9 @@ pub trait Key {
     The structs are essentially a wrapper for SecretKey and PublicKey
     structs in the Secp256k1 lirabry.
 */
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct PrivKey(SecretKey);
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct PubKey(PublicKey);
 
 impl PrivKey {

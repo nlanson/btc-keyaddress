@@ -29,23 +29,31 @@ fn multisig_hdwallet() -> Result<(), HDWError> {
     //Set wallet meta data
     //Account #0, Nested segwit, Bitcoin Mainnet
     b.set_quorum(2);
-    b.set_type(MultisigWalletType::P2SH);
 
     //Set mnemonics
-    let mnemonic_1 = Mnemonic::from_phrase("valid wife trash caution slide coach lift visual goose buzz off silly".to_string(), Language::English, "").unwrap();
-    let mnemonic_2 = Mnemonic::from_phrase("salon cloth blossom below emotion buffalo bone dilemma dinosaur morning interest gentle".to_string(), Language::English, "").unwrap();
-    let mnemonic_3 = Mnemonic::from_phrase("desert shock swift grant chronic invite gasp jelly round design sand liquid".to_string(), Language::English, "").unwrap();
+    let mnemonic_1 = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
+    let mnemonic_2 = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
+    let mnemonic_3 = Mnemonic::new(PhraseLength::Twelve, Language::English, "").unwrap();
 
-    //Add signer mnemonics
+    //Add mnemonics
     b.add_signer_from_mnemonic(&mnemonic_1)?;
     b.add_signer_from_mnemonic(&mnemonic_2)?;
     b.add_signer_from_mnemonic(&mnemonic_3)?;
 
-    //Build and return
+    //Build
     let wallet = b.build()?;
 
-    //Print the first receiving address
-    wallet.address_at(false, 0)?;
+    //Print the mnemonics
+    println!(
+        "Mmemonics:\n    {}\n    {}\n    {}",
+        mnemonic_1.phrase.join(" "), mnemonic_2.phrase.join(" "), mnemonic_3.phrase.join(" "),
+    );
+
+    //Print the first 10 receiving addresses
+    println!("Addresses:");
+    for i in 0..10 {
+        println!("    {}", wallet.address_at(false, i)?);
+    }
 
     Ok(())
 }

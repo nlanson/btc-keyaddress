@@ -23,6 +23,7 @@ pub use hdwallet::Unlocker;
 pub use hdwallet::WatchOnly;
 pub use hdwallet::WalletType;
 pub use hdwallet::Locked;
+use hdwallet::HDStandardPathing;
 
 //Multisig HDWallet
 pub use hdmultisig::MultisigHDWallet;
