@@ -28,8 +28,7 @@ use crate::{
         },
         HDWError,
         Path,
-        WalletType,
-        Locked
+        WalletType
     },
     bip39::Mnemonic,
     hash,
@@ -451,11 +450,19 @@ mod tests {
     */
     
     use super::*;
-    use crate::{bip39::{
+    use crate::{
+        bip39::{
             Language,
             Mnemonic,
             PhraseLength
-        }, hdwallet::HDWallet, hdwallet::{Unlocker, WatchOnly}, hdwallet::WalletType, util::{
+        },
+        hdwallet::{
+            HDWallet,
+            HDWalletBuilder,
+            Unlocker,
+            WalletType
+        },
+        util::{
             decode_02x
         }};
 
@@ -464,11 +471,19 @@ mod tests {
     const TEST_MPRIV: &str = "081549973bafbba825b31bcc402a3c4ed8e3185c2f3a31c75e55f423e9629aa3";
     const TEST_MCC: &str = "1d7d2a4c940be028b945302ad79dd2ce2afe5ed55e1a2937a5af57f8401e73dd";
 
+    //Test wallet for P2PKH
+    fn hdwallet_set() -> (HDWallet, Unlocker) {
+        let mut b = HDWalletBuilder::new();
+        let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
+        b.set_signer_from_mnemonic(&mnemonic).unwrap();
+        b.set_type(WalletType::P2PKH);
+
+        (b.build().unwrap(), Unlocker::from_mnemonic(&mnemonic).unwrap())
+    }
+    
     #[test]
     fn extended_keys_test() -> Result<(), HDWError> {
-        let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2PKH, 0, Network::Bitcoin).unwrap();
-        let unlocker = Unlocker::from_mnemonic(&mnemonic).unwrap();
+        let (hdw, unlocker) = hdwallet_set();
 
         //Test if the calculated and expected key and chaincode are equal
         assert_eq!(decode_02x(TEST_MPRIV), hdw.master_private_key(&unlocker)?.key::<32>());
@@ -480,9 +495,7 @@ mod tests {
     #[test]
     fn random_extended_keys_test() -> Result<(), HDWError> {
         for _i in 0..5 {
-            let mnemonic: Mnemonic = Mnemonic::new(PhraseLength::TwentyFour, Language::English, "").unwrap();
-            let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2PKH, 0, Network::Bitcoin)?;
-            let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
+            let (hdw, unlocker) = hdwallet_set();
 
             //Check lengths of mpriv, mpub and cc as well as compression prefix
             // of mpub.key to check if it is 0x02 or 0x03
@@ -503,9 +516,7 @@ mod tests {
 
     #[test]
     fn serialize_extended_keys() -> Result<(), HDWError> {
-        let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2PKH, 0, Network::Bitcoin).unwrap();
-        let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
+        let (hdw, unlocker) = hdwallet_set();
 
         //master xprv serialization test
         assert_eq!(hdw.master_private_key(&unlocker)?.serialize(&WalletType::P2PKH.private_version_prefix(Network::Bitcoin)), 
@@ -555,9 +566,7 @@ mod tests {
 
     #[test]
     fn derive_from_path_tests()-> Result<(), HDWError> {
-        let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
-        let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2PKH, 0, Network::Bitcoin).unwrap();
-        let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
+        let (hdw, unlocker) = hdwallet_set();
         let path: Path = Path::from_str("m/44'/0'/0'/0").unwrap();
 
         let (xprv_at_path, xpub_at_path) = match hdw.master_private_key(&unlocker)?.derive_from_path(&path) {
@@ -573,11 +582,19 @@ mod tests {
         Ok(())
     }
 
+    //Test wallet for BIP-84
+    fn segwit_hdwallet_set() -> (HDWallet, Unlocker) {
+        let mut b = HDWalletBuilder::new();
+        let mnemonic: Mnemonic = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(), Language::English, "").unwrap();
+        b.set_signer_from_mnemonic(&mnemonic).unwrap();
+        b.set_type(WalletType::P2WPKH);
+
+        (b.build().unwrap(), Unlocker::from_mnemonic(&mnemonic).unwrap())
+    }
+
     #[test]
     fn bip84_test_vectors() -> Result<(), HDWError> {
-        let mnemonic: Mnemonic = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(), Language::English, "").unwrap();
-        let hdw = HDWallet::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0, Network::Bitcoin)?;
-        let unlocker = Unlocker::from_mnemonic(&mnemonic)?;
+        let (hdw, unlocker) = segwit_hdwallet_set();
         
         // Account 0, root = m/84'/0'/0'
         assert_eq!(hdw.account_private_key(&unlocker)?.serialize(&hdw.wallet_type.private_version_prefix(hdw.network)), "zprvAdG4iTXWBoARxkkzNpNh8r6Qag3irQB8PzEMkAFeTRXxHpbF9z4QgEvBRmfvqWvGp42t42nvgGpNgYSJA9iefm1yYNZKEm7z6qUWCroSQnE");

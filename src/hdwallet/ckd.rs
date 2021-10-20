@@ -15,7 +15,9 @@ use crate::{
     hdwallet::{
         ExtendedKey, Xprv, Xpub,
         HDWError,
-        HDWallet, Unlocker, WatchOnly, WalletType, Locked
+        HDWallet,
+        Unlocker,
+        WalletType
     },
     key::{
         Key,
@@ -175,7 +177,7 @@ mod tests {
             HDWError,
             WalletType,
             Unlocker,
-            WatchOnly
+            HDWalletBuilder
         },
         bip39::{
             Mnemonic,
@@ -199,7 +201,12 @@ mod tests {
     fn create_hdw_from_test_mnemonic() -> HDWallet {
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
 
-        HDWallet::from_mnemonic(&mnemonic, WalletType::P2PKH, 0, Network::Bitcoin).unwrap()
+        // HDWallet::from_mnemonic(&mnemonic, WalletType::P2PKH, 0, Network::Bitcoin).unwrap()
+
+        let mut b = HDWalletBuilder::new();
+        b.set_signer_from_mnemonic(&mnemonic).unwrap();
+        b.set_type(WalletType::P2PKH);
+        b.build().unwrap()
     }
 
     fn unlocker() -> Unlocker {

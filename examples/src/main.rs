@@ -1,26 +1,8 @@
 use btc_keyaddress::prelude::*;
-use btc_keyaddress::hdwallet::{ MultisigHDWalletBuilder, WatchOnly };
 
 fn main() {
     //multisig_hdwallet();
 }
-
-fn hdwallet() -> Result<(), HDWError> {
-    //Create new mnemonic
-    let phrase: String = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string();
-    let mnemonic: Mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
-
-    //Create new HDWallet from the mnemonic created above, use Segwit P2WPKH and use account index 0.
-    let hdw: HDWallet = HDWallet::from_mnemonic(&mnemonic, WalletType::P2WPKH, 0, Network::Bitcoin)?;
-    
-    //Get the first external receiving address for the bitcoin testnet
-    for i in 0..=9 {
-        println!("{}", hdw.address_at(false, i)?);
-    }
-    
-    Ok(())
-}
-
 
 fn multisig_hdwallet() -> Result<(), HDWError> {
     //Create new builder instance

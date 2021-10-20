@@ -6,15 +6,12 @@
     external path management.
 
     Todo:
-        - Remove old redundant methods that have been replaced by builder struct and pathing trait.
-        - Write unit tests for builder testing successful and failing build cases and comapring derived
-          and expected addresses
-        - Use new derivation attribute in HDWallet struct replacing removed pathing methods
-        - Unify locked and watch only trait methods into a single generic impl
-        
-            ****************
-            ** UNIT TESTS **
-            ****************
+        - Write unit tests for:
+            > Builder:
+                Successful P2SH_P2WPKH wallet builds
+                Successful P2PKH wallet builds
+                Fail cases
+            > Custom path cases
 */
 
 
@@ -325,84 +322,6 @@ impl<'builder> HDWalletBuilder<'builder> {
 
 }
 
-#[derive(Debug, Clone)]
-pub struct HDWallet {
-    //The stored account level key
-    //This is the only key required to generate addresses
-    account_public_key: Xpub,
-
-    //The type of wallet
-    //This is used in determining the purpose level path and to generate addresses
-    pub wallet_type: WalletType,
-
-    //The BIP-44/49/84 account number
-    account_index: u32,
-    
-    //The network the HD wallet is going to be used on.
-    //This is used to determine the coin-type level path and in generating addresses
-    pub network: Network,
-
-    //This path is used to get to the share level from master keys.
-    //Standard derivation paths include BIP-44, 49 and 84.
-    derivation: Path
-}
-
-/**
-    A collection of methods in the HD Wallet that can be invoked without an unlocker.
-*/
-#[allow(unused_variables)]
-pub trait WatchOnly {
-    /**
-        Return the account level wallet xpub key.
-        This key can be used to import watch only wallets
-        with other providers.
-    */
-    fn account_public_key(&self) -> Xpub;
-
-    /**
-        Return the address level public key
-        derived from the account public key. 
-    */
-    fn address_public_key(
-        &self,
-        change: bool,
-        address_index: u32
-    ) -> Result<PubKey, HDWError>;
-    
-    /**
-        Return an addresses at the given BIP-44/49/84 compliant deriveration path.
-    */
-    fn address_at(
-        &self,
-        change: bool,
-        address_index: u32
-    ) -> Result<String, HDWError>;
-}
-
-/**
-    A collection of methods in the HD Wallet that require an unlocker and could
-    spend funds locked in the HD wallet.
-*/
-#[allow(unused_variables)]
-pub trait Locked<T> {
-    //Returns the master private key
-    fn master_private_key(&self, unlocker: &T) -> Result<Xprv, HDWError>;
-
-    //Returns the account private key
-    fn account_private_key(&self, unlocker: &T)-> Result<Xprv, HDWError>;
-
-    //Returns the address level private key given a change boolean and address index
-    fn address_private_key(&self, change: bool, address_index: u32, unlocker: &T)-> Result<PrivKey, HDWError>;
-
-    /**
-        Returns the extended private key at a custom path
-        
-        The resulting Xprv key can be used to derive addresses and keys at the path using methods written in
-        the Xprv and ExtendedKeys struct and trait. 
-        This can be used with wallets that use custom non-standard derivation paths.
-    */
-    fn custom_path_extended_private_key(&self, custom_path: &str, unlocker: &T) -> Result<Xprv, HDWError>;
-}
 
 /**
     Unlocker struct that unlocks locked methods in the HDWallet struct
@@ -426,143 +345,31 @@ impl Unlocker {
     }
 }
 
+
+#[derive(Debug, Clone)]
+pub struct HDWallet {
+    //The stored account level key
+    //This is the only key required to generate addresses
+    account_public_key: Xpub,
+
+    //The type of wallet
+    //This is used in determining the purpose level path and to generate addresses
+    pub wallet_type: WalletType,
+
+    //The BIP-44/49/84 account number
+    account_index: u32,
+    
+    //The network the HD wallet is going to be used on.
+    //This is used to determine the coin-type level path and in generating addresses
+    pub network: Network,
+
+    //This path is used to get to the share level from master keys.
+    //Standard derivation paths include BIP-44, 49 and 84.
+    derivation: Path
+}
+
+impl HDStandardPathing for HDWallet { }
 impl HDWallet {
-    /**
-        Create a watch only wallet from mnemonic phrase
-
-        Will be removed
-    */
-    pub fn from_mnemonic(mnemonic: &Mnemonic, wallet_type: WalletType, account_index: u32, network: Network) -> Result<Self, HDWError> {
-        
-        let account_public_key = Xprv::from_mnemonic(mnemonic)?
-                                .derive_from_path(&Self::account_path(&wallet_type, account_index, network))?
-                                .get_xpub();
-        
-        Ok(Self {
-            account_public_key,
-            wallet_type,
-            account_index,
-            network,
-            derivation: Self::account_path(&wallet_type, account_index, network)
-        })
-    }
-
-
-    /**
-        Create a watch only wallet from a master private key
-
-        reject SLIP keys
-
-        Will be removed
-    */
-    pub fn from_master_private(key: &str, account_index: u32) -> Result<Self, HDWError> {
-        let wallet_type = WalletType::from_xkey(key)?;
-        let network = match Network::from_xkey(key) {
-            Ok(x) => x,
-            Err(_) => return Err(HDWError::BadKey())
-        };
-
-        let account_public_key = Xprv::from_str(key)?
-                                .derive_from_path(&Self::account_path(&wallet_type, account_index, network))?
-                                .get_xpub();
-
-        Ok(Self {
-            account_public_key,
-            wallet_type,
-            account_index,
-            network,
-            derivation: Self::account_path(&wallet_type, account_index, network)
-        })
-    }
-
-
-    /**
-        Create a watch only wallet from a master public key
-
-        can take in SLIP keys
-
-        Will be removed
-    */
-    pub fn from_account_public(key: &str, account_index: u32) -> Result<Self, HDWError> {
-        let wallet_type = WalletType::from_xkey(key)?;
-        let network = match Network::from_xkey(key) {
-            Ok(x) => x,
-            Err(_) => return Err(HDWError::BadKey())
-        };
-        
-        let account_public_key = Xpub::from_str(key)?;
-
-        Ok(Self {
-            account_public_key,
-            wallet_type,
-            account_index,
-            network,
-            derivation: Self::account_path(&wallet_type, account_index, network)
-        })
-    }
-
-
-    /**
-        Returns a path from the root to purpose level
-
-        Will be removed
-    */
-    fn purpose_path(wallet_type: &WalletType) -> Path {
-        let mut path = String::from("m/");
-
-        //Purpose field
-        match wallet_type {
-            WalletType::P2PKH => path.push_str("44'"),
-            WalletType::P2WPKH => path.push_str("84'"),
-            WalletType::P2SH_P2WPKH => path.push_str("49'"),
-        }
-
-        Path::from_str(&path).unwrap()
-    }
-
-    /**
-        Returns a path from the root to coin type level
-
-        Will be removed
-    */
-    fn coin_type_path(wallet_type: &WalletType, network: Network) -> Path {
-        let mut path = Self::purpose_path(wallet_type);
-        path.children.push(ChildOptions::Hardened(match network {
-            Network::Bitcoin => 0,
-            Network::Testnet => 1
-        }));
-
-        path
-    }
-
-    /**
-        Returns a path from the root to account level
-
-        Will be removed
-    */
-    fn account_path(wallet_type: &WalletType, account_index: u32, network: Network) -> Path {
-        let mut path = Self::coin_type_path(wallet_type, network);
-        //WalletType::path(wallet_type, network);
-        path.children.push(ChildOptions::Hardened(account_index));
-
-        path
-    }
-
-    /**
-        Create the path to the address level given self, change boolean and address index
-
-        Returns a path from the root to address level
-
-        Will be removed
-    */
-    fn address_path(&self, change: bool, address_index: u32) -> Path {
-        let mut path = Self::account_path(&self.wallet_type, self.account_index, self.network);
-        path.children.push(ChildOptions::Normal(change as u32));
-        path.children.push(ChildOptions::Normal(address_index));
-
-        path
-    }
-
     /**
         Takes in an instance of self and an unlocker and checks if the unlocker corresponds to self. 
 
@@ -572,7 +379,7 @@ impl HDWallet {
         //If the account key derived from the unlocker is equal to the stored account key,
         //return the master private key in the unlocker.
         let derived_account_key = unlocker.master_private_key
-                                    .derive_from_path(&Self::account_path(&self.wallet_type, self.account_index, self.network))?
+                                    .derive_from_path(&self.derivation)?
                                     .get_xpub()
                                     .key::<33>();
 
@@ -582,26 +389,52 @@ impl HDWallet {
 
         Err(HDWError::BadKey())
     }
+    
+    //Return the master private key of the wallet given a valid unlocker
+    pub fn master_private_key(&self, unlocker: &Unlocker) -> Result<Xprv, HDWError> {
+        self.unlock(unlocker)?;
+        
+        Ok(unlocker.master_private_key.clone())
+    }
 
 
-    /**
-        Return the master public key of self given a valid unlocker.
-
-        This method is not bundled with the Spendable trait as it does not allow
-        for funds to be spent.
-    */
+    //Return the master public key of the wallet given a valid unlocker
     pub fn master_public_key(&self, unlocker: &Unlocker) -> Result<Xpub, HDWError> {
         Ok(self.master_private_key(unlocker)?.get_xpub())
     }
-}
 
+    
+    //Return the share level private key given a valid unlocker
+    pub fn account_private_key(&self, unlocker: &Unlocker) -> Result<Xprv, HDWError> {
+        self.unlock(unlocker)?;
+        Ok(
+            unlocker.master_private_key
+                .derive_from_path(&self.derivation)?
+        )                          
+    }
 
-impl WatchOnly for HDWallet {
-    fn account_public_key(&self) -> Xpub {
+    //return the share level public key.
+    //This is the highest order key stored in the struct
+    pub fn account_public_key(&self) -> Xpub {
         self.account_public_key.clone()
     }
 
-    fn address_public_key(&self, change: bool, address_index: u32) -> Result<PubKey, HDWError> {
+    
+    //Return the private key at an address given a valid unlocker
+    pub fn address_private_key(&self, change: bool, address_index: u32, unlocker: &Unlocker) -> Result<PrivKey, HDWError> {
+        self.unlock(unlocker)?;
+        
+        let path = Self::to_address_from_shared(change, address_index);
+        
+        Ok(
+            PrivKey::from_slice(
+                &self.account_private_key(unlocker)?.derive_from_path(&path)?.key::<32>()
+            ).unwrap()
+        )
+    }
+
+    //Return the public key at an address
+    pub fn address_public_key(&self, change: bool, address_index: u32) -> Result<PubKey, HDWError> {
         //Deriving path working from the account level
         let mut path: Path = Path::empty();
         path.children.push(ChildOptions::Normal(change as u32));
@@ -611,14 +444,13 @@ impl WatchOnly for HDWallet {
             self.account_public_key().derive_from_path(&path)?.get_pub()
         )
     }
-    
-    fn address_at(
+
+    //Return an address
+    pub fn address_at(
         &self,
         change: bool,
         address_index: u32
-    ) -> Result<String, HDWError>
-    where Self: Sized
-    {
+    ) -> Result<String, HDWError> {
         //Deriving path working from the account level
         let mut p: Path = Path::empty();
         p.children.push(ChildOptions::Normal(change as u32));
@@ -630,38 +462,45 @@ impl WatchOnly for HDWallet {
     }
 }
 
-impl Locked<Unlocker> for HDWallet {
-    fn master_private_key(&self, unlocker: &Unlocker) -> Result<Xprv, HDWError> {
-        self.unlock(unlocker)?;
-        
-        Ok(unlocker.master_private_key.clone())
-    }
-    
-    fn account_private_key(&self, unlocker: &Unlocker) -> Result<Xprv, HDWError> {
-        self.unlock(unlocker)?;
-        Ok(
-            unlocker.master_private_key
-                .derive_from_path(&Self::account_path(&self.wallet_type, self.account_index, self.network))?
-        )                          
-    }
-    
-    fn address_private_key(&self, change: bool, address_index: u32, unlocker: &Unlocker) -> Result<PrivKey, HDWError> {
-        self.unlock(unlocker)?;
-        
-        let path = self.address_path(change, address_index);
-        
-        Ok(
-            PrivKey::from_slice(
-                &self.master_private_key(unlocker)?.derive_from_path(&path)?.key::<32>()
-            ).unwrap()
-        )
+
+#[cfg(test)]
+mod tests {
+    use crate::bip39::Language;
+
+    use super::*;
+
+    #[test]
+    fn good_segwit_hd_wallet() -> Result<(), HDWError> {
+        let mut wallets = vec![];
+        wallets.push( segwit_from_mnemonic()? );
+        wallets.push( segwit_from_master()? );
+        wallets.push( segwit_from_shared()? );
+
+        for wallet in wallets {
+            //Compare addresses
+            assert_eq!(wallet.address_at(false, 0)?, "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu");
+            assert_eq!(wallet.address_at(true, 0)?, "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el");
+        }
+
+        Ok(())
     }
 
-    fn custom_path_extended_private_key(&self, custom_path: &str, unlocker: &Unlocker) -> Result<Xprv, HDWError> {
-        self.unlock(unlocker)?;
+    fn segwit_from_mnemonic() -> Result<HDWallet, HDWError> {
+        let mut b = HDWalletBuilder::new();
+        let mnemonic = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(), Language::English, "").unwrap();
+        b.set_signer_from_mnemonic(&mnemonic)?;
+        Ok(b.build()?)
+    }
 
-        let path = Path::from_str(custom_path)?;
+    fn segwit_from_master() -> Result<HDWallet, HDWError> {
+        let mut b = HDWalletBuilder::new();
+        b.set_signer_from_xprv("zprvAWgYBBk7JR8Gjrh4UJQ2uJdG1r3WNRRfURiABBE3RvMXYSrRJL62XuezvGdPvG6GFBZduosCc1YP5wixPox7zhZLfiUm8aunE96BBa4Kei5")?;
+        Ok(b.build()?)
+    }
 
-        Ok(unlocker.master_private_key.derive_from_path(&path)?)
+    fn segwit_from_shared() -> Result<HDWallet, HDWError> {
+        let mut b = HDWalletBuilder::new();
+        b.set_signer_from_xpub("zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs")?;
+        Ok(b.build()?)
     }
 }

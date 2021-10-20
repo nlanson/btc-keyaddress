@@ -44,7 +44,8 @@ pub trait Key {
 
 
 /*
-    Define the tuple structs PrivKey and PubKey.
+    Eliptic Curve Cryptography
+        Private and Public Keys
 
     The structs are essentially a wrapper for SecretKey and PublicKey
     structs in the Secp256k1 lirabry.

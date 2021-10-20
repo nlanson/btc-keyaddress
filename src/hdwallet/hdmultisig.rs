@@ -36,8 +36,7 @@ use super::{
     Xprv, Xpub,
     Path,
     ChildOptions,
-    Unlocker,
-    HDStandardPathing
+    Unlocker
 };
 
 #[derive(Copy, Clone, Debug, PartialEq)]

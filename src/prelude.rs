@@ -24,6 +24,7 @@ pub use crate::{
     },
 
     hdwallet::{
+        HDWalletBuilder,
         HDWallet,
         ChildOptions,
         ExtendedKey,
@@ -31,9 +32,7 @@ pub use crate::{
         HDWError,
         Path,
         WalletType,
-        WatchOnly,
         Unlocker,
-        Locked,
         MultisigHDWallet,
         MultisigHDWalletBuilder,
         MultisigWalletType
