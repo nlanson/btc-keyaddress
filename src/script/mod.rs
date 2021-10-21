@@ -22,7 +22,8 @@ pub enum ScriptErr {
     BadNetwork(),
     KeyCountDoesNotMatch(),
     MaxKeyCountExceeded(),
-    HashLenIncorrect(usize)
+    HashLenIncorrect(usize),
+    BadVersion(u8)
 }
 
 impl RedeemScript {
@@ -40,6 +41,21 @@ impl RedeemScript {
     */
     pub fn hash(&self) -> [u8; 20] {
         hash::hash160(&self.code)
+    }
+
+    /**
+        Creates a new witness program given a version and data.
+
+        For P2WPKH, version is 0 and data is the Hash160 of the public key.
+        For P2WSH, version is 0 and data is the SHA256 of the redeem script.
+    */
+    pub fn witness_program(version: u8, data: Vec<u8>) -> Result<Self, ScriptErr>{
+        if version > 16 { return Err(ScriptErr::BadVersion(version)) }
+
+        let mut witprog: Vec<u8> = vec![version, data.len() as u8];
+        witprog.extend_from_slice(&data);
+
+        Ok(Self::new(witprog))
     }
 
     /**
