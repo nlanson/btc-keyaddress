@@ -52,9 +52,9 @@ mod impls;
 //Dependencies
 use secp256k1::rand::rngs::OsRng as SecpOsRng; //Seperate rand 0.6.0 OsRng used by Secp256k from rand 0.8.0 OsRng
 use rand::rngs::OsRng;
-use secp256k1::{PublicKey, Secp256k1, SecretKey};
-use hmac::{Mac, NewMac, Hmac};
+use secp256k1::{ PublicKey, Secp256k1, SecretKey };
+use hmac::{ Mac, NewMac, Hmac };
 use pbkdf2::pbkdf2;
-use sha2::{Sha256, Sha512, Digest};
+use sha2::{ Sha256, Sha512, Digest };
 use ripemd160::Ripemd160;
 use bs58;

@@ -70,6 +70,8 @@ impl RedeemScript {
 
     /**
         Creates the redeem script for a P2SH nested P2WPKH address
+
+        OP_0  PUSH_BYTES_0x14  20 BYTE PUB KEY HASH
     */
     pub fn p2sh_p2wpkh(pubkey: &PubKey) -> Self {
         let hash = hash::hash160(pubkey.as_bytes::<33>());
@@ -84,6 +86,8 @@ impl RedeemScript {
 
     /**
         Creates the redeem script for a P2SH nested P2WSH address
+
+        OP_0  PUSH_BYTES_0x20 32 BYTE SCRIPT HASH
     */
     pub fn p2sh_p2wsh(script: &Self) -> Self {
         let mut hash = hash::sha256(script.code.clone()).to_vec();
