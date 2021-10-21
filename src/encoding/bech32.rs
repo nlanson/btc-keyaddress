@@ -2,7 +2,8 @@
     Module implements bech32 encoding
 */
 use crate::{
-    util::Network
+    util::Network,
+    util::decode_binary_string
 };
 
 use bitcoin_bech32::{ 
@@ -37,7 +38,7 @@ pub fn encode(witness_version: u8, data: &[u8], network: &Network) -> Result<Str
     
     let witness_program = match WitnessProgram::new(
         u5::try_from_u8(witness_version).unwrap(), //Witness version
-        data.to_vec(),               //Witness Program  (RedeemScript or PubKey Hash)
+        data.to_vec(),               //Witness Program  (RedeemScript Hash or PubKey Hash)
                 network                     //Network
     ) {
         Ok(x) => x,
@@ -105,11 +106,31 @@ impl Bech32Encoder{
     }
 
     pub fn bech32(&self) -> Result<String, Bech32Err> {
-        //1. Squash the payload byte array to 5 bit parts. (Similar to mnemonics.rs)
-        //   Essentially convert a u8 array into a u5 array
-        //2. Map 5 bit value to characters
-        //3. Calculate checksum of hrp + payload. 
+        //See ref image
 
+        todo!();
+    }
+
+    //Given a byte array, this method will return the byte array arranged as a 5 bit integer array.
+    pub fn squash(bytes: &Vec<u8>) -> Vec<u8> {
+        //Convert bytes to a string of bits.
+        let bit_string = bytes.iter().map(|x| format!("{:08b}", x)).collect::<String>();
+
+        //Split bit string into groups of five.
+        let mut squashed_bytes = vec![];
+        for i in (0..bit_string.len()).step_by(5) {
+            let bits = &bit_string[i..i+5];
+            squashed_bytes.push( decode_binary_string(bits) as u8 );
+        }
+        if bit_string.len() % 5 != 0 {
+            let bits = &bit_string[bit_string.len()-bit_string.len()%5..bit_string.len()];
+            squashed_bytes.push( decode_binary_string(bits) as u8 )
+        }
+
+        squashed_bytes
+    }
+
+    fn bech32_create_checksum(&self, m: bool) {
         todo!();
     }
 }

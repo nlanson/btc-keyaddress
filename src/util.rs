@@ -26,7 +26,7 @@ pub fn encode_02x(bytes: &[u8]) -> String {
 /**
     Takes in a binary integer as a string and returns it integer value.
 */
-pub fn decode_binary_string(b: &String) -> usize {
+pub fn decode_binary_string(b: &str) -> usize {
     usize::from_str_radix(b, 2).unwrap()
 }
 
