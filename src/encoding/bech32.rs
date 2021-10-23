@@ -34,7 +34,7 @@ pub struct Bech32 {
     //Human readable part string
     pub hrp: String,
 
-    //Squashed data
+    //Data with parts that need to be squashed already squashed
     pub data: Vec<u8>
 }
 
