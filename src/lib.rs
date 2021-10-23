@@ -29,7 +29,11 @@
 
         - Automated github tests
 
-        - Custom Bech32 encoding implementation
+        - Decode Bech32 address into a WitnessProgram struct
+            > Remove the HRP and Seperator from address.
+            > Match characters in payload to char set.
+            > Validate checksum
+            > Revert payload back to Witness program bytes and version
 
 
 */

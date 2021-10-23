@@ -1,15 +1,15 @@
 use crate:: {
     encoding::{
-        bech32::{
-            encode,
-            Bech32Err
-        },
+        bech32::Bech32Err,
         bs58check as bs58check
     },
     hash,
     key::Key,
     key::PubKey,
-    script::RedeemScript,
+    script::{
+        RedeemScript,
+        WitnessProgram
+    },
     util::Network
 };
 
@@ -60,12 +60,22 @@ impl Address {
     }
 
     fn p2wpkh(pk: &PubKey, network: &Network) -> Result<String, Bech32Err> {
-        Ok(encode(0, &pk.hash160(), network)?)
+        //Ok(encode(0, &pk.hash160(), network)?)
+
+        // let witness_program = match RedeemScript::witness_program(0, pk.hash160()) {
+        //     Ok(x) => x,
+        //     Err(_) => panic!("could not create witness program")
+        // };
+        let witness_program = WitnessProgram::new(0, pk.hash160()).unwrap();
+        Ok(witness_program.to_address(network)?)
     }
 
     fn p2wsh(script: &RedeemScript, network: &Network) -> Result<String, Bech32Err> {
-        let hash = hash::sha256(script.code.clone());
-        Ok(encode(0, &hash, network)?)
+        let hash = hash::sha256(script.code.clone()).to_vec();
+        // Ok(encode(0, &hash, network)?)
+
+        let witness_program = WitnessProgram::new(0, hash).unwrap();
+        Ok(witness_program.to_address(network)?)
     }
 
     /**
@@ -197,13 +207,13 @@ mod tests {
         let pk1 = PubKey::from_priv_key(&key_1);
         let derived_address_1 = Address::P2WPKH(pk1, Network::Testnet).to_string().unwrap();
         let expected_address_1 = "tb1qxauw2dslmtgdyzw73gtv9mzv5erp3xf7mt83vq".to_string();
-        assert!(derived_address_1 == expected_address_1);
+        assert_eq!(derived_address_1, expected_address_1);
         
         let key_2: PrivKey = PrivKey::from_wif("cRzmfLNVsbHp5MYJhY8xz6DaYJBUgSKQL8jwU2xL3su6GScPgxsb").unwrap();
         let pk2 = PubKey::from_priv_key(&key_2);
         let derived_address_2 = Address::P2WPKH(pk2, Network::Testnet).to_string().unwrap();
         let expected_address_2 = "tb1qj8rvxxnzkdapv3rueazzyn434duv5q5ep3ze5e".to_string();
-        assert!(derived_address_2 == expected_address_2);
+        assert_eq!(derived_address_2, expected_address_2);
     }
 
     #[test]
