@@ -121,6 +121,7 @@ impl RedeemScript {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct WitnessProgram {
     pub version: u8,
     pub program: Vec<u8>
@@ -156,6 +157,10 @@ impl WitnessProgram {
             0 => encoder.bech32(),
             _ => encoder.bech32m()
         }
+    }
+
+    pub fn from_address(address: &str) -> Result<Self, Bech32Err> {
+        Ok( Bech32::to_witness_program(address)? )
     }
 
     pub fn to_scriptpubkey(&self) -> RedeemScript {

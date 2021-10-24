@@ -1,7 +1,7 @@
 /*
     Module implements Bech32 encoding.
 
-    Made to work with the WitnessProgram struct
+    Made to work best with the WitnessProgram struct
 */
 use crate::{
     util::decode_binary_string,
@@ -15,6 +15,11 @@ pub enum Bech32Err {
     InvalidInt(u8),
     InvalidLength(usize),
     InvalidData(u8),
+    SeperatorMissing,
+    BadChar(char),
+    BadChecksum,
+    InvalidHRP(String),
+    LengthRestriction(usize)
 }
 
 // Encoding character set.
@@ -54,6 +59,40 @@ impl Bech32 {
         }
     }
 
+    pub fn to_witness_program(address: &str) -> Result<WitProg, Bech32Err> {        
+        //Decode the address
+        let mut bech32 = Self::decode(address)?;
+
+        //Check the HRP is valid for Bitcoin
+        match &bech32.hrp[..] {
+            "bc" | "tb" => { },
+            x => return Err(Bech32Err::InvalidHRP(x.to_string()))
+        }
+
+        //Check that the witness version is valid and enforce known length restrictions
+        let witness_version = bech32.data[0];
+        if witness_version > 16 { return Err(Bech32Err::InvalidData(witness_version)) }
+        match witness_version {
+            //Witness Version 0
+            0 => {
+                bech32.data.remove(0); //remove the version byte as it is not packed
+                let witness_program = Self::try_from_u5_str(&bech32.data)?;
+
+                //Witness version 0 must have strict program length of 20 or 32 bytes.
+                if witness_program.len() != 20 && witness_program.len() != 32 { return Err(Bech32Err::LengthRestriction(witness_program.len())) }
+
+                //Return the witness program
+                return Ok(
+                    WitProg::new(witness_version, witness_program).unwrap()
+                )
+            },
+            
+            //Future segwit versions
+            1 => unimplemented!("Witness verion 1 is reserved for Taproot"),
+            _ => unimplemented!("Witness version reserved for future upgrade")
+        }
+    }
+
     //Encode self with Bech32
     pub fn bech32(&self) -> Result<String, Bech32Err> {
         self.encode(false)
@@ -83,6 +122,44 @@ impl Bech32 {
         
         //Return
         Ok(result)
+    }
+
+    fn decode(encoded: &str) -> Result<Self, Bech32Err> {
+        //Seperate the hrp from data at the seperator
+        let mut i = 0;
+        let sep_position = loop {
+            if i >= encoded.len() { return Err(Bech32Err::SeperatorMissing) }
+            if encoded.chars().nth(i) == Some(SEPERATOR) { break i }
+            i+=1;
+        };
+        let hrp = encoded[0..sep_position].to_string();
+        let data = encoded[sep_position+1..encoded.len()].to_string();
+
+        //Match the data bytes to a 5 bit value
+        let mut bytes: Vec<u8> = vec![];
+        for i in 0..data.len() {
+            let char = data.chars().nth(i).unwrap();
+            match CHARSET.iter().position(|&c| c == char) {
+                Some(x) => bytes.push(x as u8),
+                None => return Err(Bech32Err::BadChar(char))
+            }
+        }
+
+        //Check if there is a checksum present
+        if bytes.len() < 6 { return Err(Bech32Err::InvalidLength(bytes.len())) }
+
+        //Verify the checksum and return hrp and data is valid
+        if Self::verify_checksum(&hrp.clone().into_bytes(), &bytes) { 
+            return Ok(
+                Bech32 {
+                    hrp,
+                    data: bytes[0..bytes.len()-6].to_vec() //remove the checksum from the bytes
+                }
+            )
+        }
+
+        //Return error if not valid
+        return Err(Bech32Err::BadChecksum)
     }
 
     //BIP-0713 defined method
@@ -264,9 +341,14 @@ impl Bech32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        util::Network
+    };
 
     #[test]
     fn bit_convert_tests() -> Result<(), Bech32Err> {
+        //Bitwise conversion is around 50 microseconds faster than string converstion.
+        
         //Testing the following:
         // u8 -> u5 with bitwise operations
         // u8 -> u5 with string manipulation
@@ -293,5 +375,17 @@ mod tests {
 
 
         Ok(())
+    }
+
+    #[test]
+    fn decoding_tests() {
+        let witver = 0;
+        let data = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+
+        let witness_program = WitProg::new(witver, data).unwrap();
+        let address = witness_program.to_address(&Network::Bitcoin).unwrap();
+
+        let decoded = WitProg::from_address(&address).unwrap();
+        assert_eq!(witness_program, decoded);
     }
 }
