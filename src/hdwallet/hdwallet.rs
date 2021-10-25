@@ -7,10 +7,6 @@
 
     Todo:
         - Write unit tests for:
-            > Builder:
-                Successful P2SH_P2WPKH wallet builds
-                Successful P2PKH wallet builds
-                Fail cases
             > Custom path cases
 */
 
@@ -201,8 +197,13 @@ impl<'builder> HDWalletBuilder<'builder> {
     }
 
     //Set wallet type
-    pub fn set_type(&mut self, wallet_type: WalletType) {
+    pub fn set_type(&mut self, wallet_type: WalletType) -> Result<(), HDWError> {
+        if self.wallet_type.is_some() && self.wallet_type.unwrap() != wallet_type {
+            return Err(HDWError::TypeDiscrepancy)
+        }
+        
         self.wallet_type = Some(wallet_type);
+        Ok(())
     }
 
     //Set network
@@ -502,5 +503,123 @@ mod tests {
         let mut b = HDWalletBuilder::new();
         b.set_signer_from_xpub("zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs")?;
         Ok(b.build()?)
+    }
+
+    #[test]
+    fn good_nested_segwit_hd_wallet() -> Result<(), HDWError> {
+        let mut wallets = vec![];
+        wallets.push( nested_segwit_from_mnemonic()? );
+        wallets.push( nested_segwit_from_master()?  );
+        wallets.push( nested_segwit_from_shared()? );
+
+        for wallet in wallets {
+            //Compare addresses
+            assert_eq!(wallet.address_at(false, 0)?, "37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf");
+            assert_eq!(wallet.address_at(true, 0)?, "34K56kSjgUCUSD8GTtuF7c9Zzwokbs6uZ7");
+        }
+
+
+        Ok(())
+    }
+
+    fn nested_segwit_from_mnemonic() -> Result<HDWallet, HDWError> {
+        let mut b = HDWalletBuilder::new();
+        let mnemonic = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(), Language::English, "").unwrap();
+        b.set_signer_from_mnemonic(&mnemonic)?;
+        b.set_type(WalletType::P2SH_P2WPKH);
+        Ok(b.build()?)
+    }
+
+    fn nested_segwit_from_master() -> Result<HDWallet, HDWError> {
+        let mut b = HDWalletBuilder::new();
+        b.set_signer_from_xprv("yprvABrGsX5C9jantZVwdwcQhDXkqsu4RoSAZKBwPnLA3uyeVM3C3fvTuqzru4fovMSLqYSqALGe9MBqCf7Pg7Y7CTsjoNnLYg6HxR2Xo44NX7E")?;
+        Ok(b.build()?)
+    }
+
+    fn nested_segwit_from_shared() -> Result<HDWallet, HDWError> {
+        let mut b = HDWalletBuilder::new();
+        b.set_signer_from_xpub("ypub6Ww3ibxVfGzLrAH1PNcjyAWenMTbbAosGNB6VvmSEgytSER9azLDWCxoJwW7Ke7icmizBMXrzBx9979FfaHxHcrArf3zbeJJJUZPf663zsP")?;
+        Ok(b.build()?)
+    }
+
+    #[test]
+    fn good_legacy_hd_wallet() -> Result<(), HDWError> {
+        let mut wallets = vec![];
+        wallets.push( legacy_from_mnemonic()? );
+        wallets.push( legacy_from_master()?  );
+        wallets.push( legacy_from_shared()? );
+
+        for wallet in wallets {
+            //Compare addresses
+            assert_eq!(wallet.address_at(false, 0)?, "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA");
+            assert_eq!(wallet.address_at(true, 0)?, "1J3J6EvPrv8q6AC3VCjWV45Uf3nssNMRtH");
+        }
+
+        Ok(())
+    }
+
+    fn legacy_from_mnemonic() -> Result<HDWallet, HDWError> {
+        let mut b = HDWalletBuilder::new();
+        let mnemonic = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(), Language::English, "").unwrap();
+        b.set_signer_from_mnemonic(&mnemonic)?;
+        b.set_type(WalletType::P2PKH);
+        Ok(b.build()?)
+    }
+
+    fn legacy_from_master() -> Result<HDWallet, HDWError> {
+        let mut b = HDWalletBuilder::new();
+        b.set_signer_from_xprv("xprv9s21ZrQH143K3GJpoapnV8SFfukcVBSfeCficPSGfubmSFDxo1kuHnLisriDvSnRRuL2Qrg5ggqHKNVpxR86QEC8w35uxmGoggxtQTPvfUu")?;
+        Ok(b.build()?)
+    }
+
+    fn legacy_from_shared() -> Result<HDWallet, HDWError> {
+        let mut b = HDWalletBuilder::new();
+        b.set_signer_from_xpub("xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj")?;
+        Ok(b.build()?)
+    }
+
+    //Testing cases where the wallet builder fails
+    #[test]
+    fn builder_fail_cases() {
+        let zprv = "zprvAWgYBBk7JR8Gjrh4UJQ2uJdG1r3WNRRfURiABBE3RvMXYSrRJL62XuezvGdPvG6GFBZduosCc1YP5wixPox7zhZLfiUm8aunE96BBa4Kei5";
+        let xpub = "xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj";
+        let ypub = "ypub6Ww3ibxVfGzLrAH1PNcjyAWenMTbbAosGNB6VvmSEgytSER9azLDWCxoJwW7Ke7icmizBMXrzBx9979FfaHxHcrArf3zbeJJJUZPf663zsP";
+        let zpub = "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs";
+
+        //No keys provided
+        {
+            let b = HDWalletBuilder::new();
+            assert!( match_fail_case(b, HDWError::MissingFields) );
+        }
+
+        //Two keys provided
+        {
+            let mut b = HDWalletBuilder::new();
+            b.set_signer_from_xprv(zprv).unwrap();
+            b.set_signer_from_xpub(zpub).unwrap();
+            assert!( match_fail_case(b, HDWError::BadKey()) );
+        }
+
+        //Type discrepancy
+        {
+            let keys = vec![        xpub,                ypub,                  zpub       ];
+            let types = vec![WalletType::P2WPKH, WalletType::P2PKH, WalletType::P2SH_P2WPKH];
+
+            for i in 0..3 {
+                let mut b = HDWalletBuilder::new();
+                b.set_type( types[i] ).unwrap();
+                match b.set_signer_from_xpub(keys[i]) {
+                    Ok(_) => assert!(false),
+                    Err(x) => assert_eq!(x, HDWError::TypeDiscrepancy)
+                }
+            }
+        }
+    }
+
+    fn match_fail_case(b: HDWalletBuilder, expected_err: HDWError) -> bool {
+        match b.build() {
+            Ok(_) => false,
+            Err(x) => x==expected_err
+        }
     }
 }

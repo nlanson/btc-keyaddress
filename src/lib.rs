@@ -22,7 +22,7 @@
         
         - HDWallets
             > Better unlocker for multisig hd wallets
-            > Singlesig unit tests
+            > Custom path tests
             
         
         - P2TR address generation
