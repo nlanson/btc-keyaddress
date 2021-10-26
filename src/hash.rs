@@ -86,6 +86,22 @@ pub fn hmac_sha512(data: &[u8], key: &[u8]) -> [u8; 64] {
     try_into(hmac.finalize().into_bytes().to_vec())
 }
 
+/**
+    Tagged hash as defined by BIP-340
+
+    sha256( sha256("TagName") + sha256("TagName") + data )
+*/
+pub fn tagged_hash(tag_name: &str, data: &[u8]) -> [u8; 32] {
+    let tag_hash = sha256(tag_name);
+    let mut preimage = tag_hash.to_vec();
+    preimage.extend_from_slice(&tag_hash);
+    preimage.extend_from_slice(data);
+
+
+    
+    sha256(preimage)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
