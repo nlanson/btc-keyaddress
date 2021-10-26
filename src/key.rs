@@ -11,7 +11,9 @@ use crate::{
     util::decode_02x,
     util::try_into,
     util::Network,
-    hash
+    hash,
+    lib_SchnorrPublicKey,
+    lib_SchnorrKeyPair
 };
 
 /**
@@ -52,8 +54,13 @@ pub trait Key {
 */
 #[derive(Debug, Clone, Copy)]
 pub struct PrivKey(SecretKey);
+
 #[derive(Debug, Clone, Copy)]
 pub struct PubKey(PublicKey);
+
+#[derive(Debug, Clone, Copy)]
+pub struct SchnorrPublicKey(lib_SchnorrPublicKey);
+
 
 impl PrivKey {
     
@@ -194,6 +201,13 @@ impl PubKey {
 
         Ok( Self( pk ) )
     }
+
+    pub fn schnorr(&self) -> SchnorrPublicKey {
+        let mut data = self.as_bytes::<33>().to_vec();
+        data.remove(0); //Remove the oddity byte
+
+        SchnorrPublicKey::from_slice(&data).unwrap()
+    }
 }
 
 impl Key for PubKey {
@@ -209,6 +223,63 @@ impl Key for PubKey {
     */
     fn as_bytes<const N: usize>(&self) -> [u8; N] {
         try_into(self.0.serialize()[0..N].to_vec())
+    }
+}
+
+impl Key for SchnorrPublicKey {
+    //Schnorr public keys are serialized as 32 bytes
+    fn as_bytes<const N: usize>(&self) -> [u8; N] {
+        try_into(self.0.serialize()[0..N].to_vec())
+    }
+
+    //Create a schnoor public key from slice.
+    //Fail if slice is not 32 bytes long of lib returns a failure
+    fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError>
+    where Self: Sized {
+        if byte_array.len() != 32 { return Err(KeyError::BadSlice()) }
+
+        match lib_SchnorrPublicKey::from_slice(byte_array) {
+            Ok(x) => Ok(Self(x)),
+            _ => Err(KeyError::BadSlice())
+        }
+    }
+}
+
+impl SchnorrPublicKey {
+    //Tweak self with other.
+    //Other must be a 32 byte slice or else will panic
+    pub fn tweak(&self, other: &[u8]) -> Result<Self, KeyError> {
+        let secp = Secp256k1::new();
+        let other: [u8; 32] = try_into::<u8, 32>(other.to_vec());
+
+        //Tweak the key
+        let mut tweaked_key = self.0.clone();
+        match tweaked_key.tweak_add_assign(&secp, &other) {
+            Ok(x) => {
+                //Check if tweaked successfully
+                let success = self.0.tweak_add_check(&secp, &tweaked_key, x, other);
+                if success { return Ok(Self(tweaked_key)) }
+                else { return Err(KeyError::BadArithmatic()) }
+            }
+
+            _ => Err(KeyError::BadArithmatic())
+        }
+    }
+
+    //Get a schnoor public key from secret key
+    pub fn from_priv_key(key: &PrivKey) -> Self {
+        //Convertion method
+        key.get_pub().schnorr()
+
+        //Deriving method
+        // let secp = Secp256k1::new();
+        // let keypair = lib_SchnorrKeyPair::from_seckey_slice(&secp, &key.as_bytes::<32>()).unwrap();
+        // let pk = lib_SchnorrPublicKey::from_keypair(&secp, &keypair);
+        // Self(pk)
+    }
+
+    pub fn hex(&self) -> String {
+        self.0.to_string()
     }
 }
 
@@ -235,11 +306,7 @@ impl Ord for PubKey {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        PrivKey, PubKey, Key,
-        decode_02x,
-        Network
-    };
+    use super::*;
     use crate::{
         util::encode_02x
     };
