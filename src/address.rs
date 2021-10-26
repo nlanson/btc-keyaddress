@@ -4,8 +4,11 @@ use crate:: {
         bs58check as bs58check
     },
     hash,
-    key::Key,
-    key::PubKey,
+    key::{
+        Key,
+        PubKey,
+        SchnorrPublicKey
+    },
     script::{
         RedeemScript,
         WitnessProgram
@@ -17,7 +20,8 @@ pub enum Address {
     P2PKH(PubKey, Network),
     P2SH(RedeemScript, Network),
     P2WPKH(PubKey, Network),
-    P2WSH(RedeemScript, Network)
+    P2WSH(RedeemScript, Network),
+    P2TR(SchnorrPublicKey, Network)  //The public key here is the tweaked public key
 }
 
 #[derive(Debug)]
@@ -36,8 +40,14 @@ impl Address {
                     Err(_) => return Err(AddressErr::Bech32Err)
                 }
             ),
-            Address::P2WSH(s, n) =>Ok(
+            Address::P2WSH(s, n) => Ok(
                 match Self::p2wsh(s, n) {
+                    Ok(x) => x,
+                    Err(_) => return Err(AddressErr::Bech32Err)
+                }
+            ),
+            Address::P2TR(k, n) => Ok( 
+                match Self::p2tr(k, n) {
                     Ok(x) => x,
                     Err(_) => return Err(AddressErr::Bech32Err)
                 }
@@ -60,21 +70,20 @@ impl Address {
     }
 
     fn p2wpkh(pk: &PubKey, network: &Network) -> Result<String, Bech32Err> {
-        //Ok(encode(0, &pk.hash160(), network)?)
-
-        // let witness_program = match RedeemScript::witness_program(0, pk.hash160()) {
-        //     Ok(x) => x,
-        //     Err(_) => panic!("could not create witness program")
-        // };
         let witness_program = WitnessProgram::new(0, pk.hash160()).unwrap();
         Ok(witness_program.to_address(network)?)
     }
 
     fn p2wsh(script: &RedeemScript, network: &Network) -> Result<String, Bech32Err> {
         let hash = hash::sha256(script.code.clone()).to_vec();
-        // Ok(encode(0, &hash, network)?)
 
         let witness_program = WitnessProgram::new(0, hash).unwrap();
+        Ok(witness_program.to_address(network)?)
+    }
+
+    fn p2tr(tweaked_public_key: &SchnorrPublicKey, network: &Network) -> Result<String, Bech32Err> {
+        let bytes = tweaked_public_key.as_bytes::<32>().to_vec();
+        let witness_program = WitnessProgram::new(1, bytes).unwrap();
         Ok(witness_program.to_address(network)?)
     }
 
@@ -108,12 +117,7 @@ mod tests {
         Address, PubKey, Key,
         AddressErr
     };
-    use crate::{
-        key::PrivKey,
-        util::decode_02x,
-        script::RedeemScript,
-        util::Network
-    };
+    use crate::{encoding::bs58check::ToVersionPrefix, hash, hdwallet::*, key::PrivKey, script::RedeemScript, util::Network, util::decode_02x};
 
     const TEST_PUB_KEY_HEX: &str = "0204664c60ceabd82967055ccbd0f56a1585dfbd42032656efa501c463b16fbdfe";
 
@@ -226,5 +230,17 @@ mod tests {
 
         assert!(derived_mainnet_address == expected_mainnet_address);
         assert!(derived_testnet_address == expected_testnet_address);
+    }
+
+    #[test]
+    fn p2tr() {
+        let pk = PrivKey::new_rand().get_pub().schnorr();
+
+        //This tweaking process is not correct for some reason...
+        let hash_taptweak = hash::tagged_hash("TapTweak", &pk.as_bytes::<32>());
+        let tweak_value = PrivKey::from_slice(&hash_taptweak).unwrap().get_pub().schnorr().as_bytes::<32>();
+        let tweaked_pk = pk.tweak(&tweak_value).unwrap();
+
+        println!("{}", Address::P2TR(tweaked_pk, Network::Bitcoin).to_string().unwrap());
     }
 }
