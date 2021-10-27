@@ -117,7 +117,19 @@ mod tests {
         Address, PubKey, Key,
         AddressErr
     };
-    use crate::{encoding::bs58check::ToVersionPrefix, hash, hdwallet::*, key::PrivKey, script::RedeemScript, util::Network, util::decode_02x};
+    use crate::{
+        key::{
+            KeyError,
+            PrivKey,
+            SchnorrPublicKey
+        },
+        script::RedeemScript,
+        taproot::{
+            taproot_tweak_pubkey
+        },
+        util::Network,
+        util::decode_02x
+    };
 
     const TEST_PUB_KEY_HEX: &str = "0204664c60ceabd82967055ccbd0f56a1585dfbd42032656efa501c463b16fbdfe";
 
@@ -233,14 +245,13 @@ mod tests {
     }
 
     #[test]
-    fn p2tr() {
-        let pk = PrivKey::new_rand().get_pub().schnorr();
+    fn p2tr() -> Result<(), KeyError> {
+        let internal_key = SchnorrPublicKey::from_str("cc8a4bc64d897bddc5fbc2f670f7a8ba0b386779106cf1223c6fc5d7cd6fc115")?;
+        let tweaked_key = taproot_tweak_pubkey(internal_key, b"").unwrap();
+        let address = Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap();
 
-        //This tweaking process is not correct for some reason...
-        let hash_taptweak = hash::tagged_hash("TapTweak", &pk.as_bytes::<32>());
-        let tweak_value = PrivKey::from_slice(&hash_taptweak).unwrap().get_pub().schnorr().as_bytes::<32>();
-        let tweaked_pk = pk.tweak(&tweak_value).unwrap();
-
-        println!("{}", Address::P2TR(tweaked_pk, Network::Bitcoin).to_string().unwrap());
+        assert_eq!(tweaked_key.hex(), "a60869f0dbcf1dc659c9cecbaf8050135ea9e8cdc487053f1dc6880949dc684c");
+        assert_eq!(address, "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr");
+        Ok(())
     }
 }

@@ -23,10 +23,12 @@
         - HDWallets
             > Better unlocker for multisig hd wallets
             > Custom path tests
+            > BIP-86 P2TR HDWallets
             
         
         - P2TR address generation
-            > Taproot public key tweaking 
+            > Binary script trees
+            > Commitment data derivation from script trees (Using BIP-341 reference methods)
 
         - Automated github tests
 */
@@ -38,6 +40,7 @@ pub mod address;
 pub mod bip39;
 pub mod hdwallet;
 pub mod script;
+pub mod taproot;
 
 //Modules for internal use
 mod hash;

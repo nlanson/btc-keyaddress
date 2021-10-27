@@ -236,7 +236,7 @@ impl Key for SchnorrPublicKey {
     //Fail if slice is not 32 bytes long of lib returns a failure
     fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError>
     where Self: Sized {
-        if byte_array.len() != 32 { return Err(KeyError::BadSlice()) }
+        if byte_array.len() != 32 { println!("HERE");return Err(KeyError::BadSlice()) }
 
         match lib_SchnorrPublicKey::from_slice(byte_array) {
             Ok(x) => Ok(Self(x)),
@@ -246,8 +246,11 @@ impl Key for SchnorrPublicKey {
 }
 
 impl SchnorrPublicKey {
-    //Tweak self with other.
-    //Other must be a 32 byte slice or else will panic
+    /**
+        Tweak self by other.
+        
+        Other is multiplied by generator point G before being added to self.
+    */
     pub fn tweak(&self, other: &[u8]) -> Result<Self, KeyError> {
         let secp = Secp256k1::new();
         let other: [u8; 32] = try_into::<u8, 32>(other.to_vec());
@@ -266,18 +269,34 @@ impl SchnorrPublicKey {
         }
     }
 
-    //Get a schnoor public key from secret key
+    /**
+        Compute a schnorr public key from a private key
+    */
     pub fn from_priv_key(key: &PrivKey) -> Self {
         //Convertion method
         key.get_pub().schnorr()
-
-        //Deriving method
-        // let secp = Secp256k1::new();
-        // let keypair = lib_SchnorrKeyPair::from_seckey_slice(&secp, &key.as_bytes::<32>()).unwrap();
-        // let pk = lib_SchnorrPublicKey::from_keypair(&secp, &keypair);
-        // Self(pk)
     }
 
+    /**
+        Create a schnorr public key from a key pair
+    */
+    pub fn from_keypair(keypair: &lib_SchnorrKeyPair) -> Self {
+        Self(lib_SchnorrPublicKey::from_keypair(&Secp256k1::new(), &keypair))
+    }
+
+    /**
+        Create a schnorr public key from a hex string 
+    */
+    pub fn from_str(hex: &str) -> Result<Self, KeyError> {
+        match lib_SchnorrPublicKey::from_str(hex) {
+            Ok(x) => Ok(Self(x)),
+            Err(_) => Err(KeyError::BadString())
+        }
+    }
+
+    /**
+        Serialize schnorr public key as hex string
+    */
     pub fn hex(&self) -> String {
         self.0.to_string()
     }
