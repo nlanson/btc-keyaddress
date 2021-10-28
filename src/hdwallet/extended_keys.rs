@@ -38,7 +38,8 @@ use crate::{
         as_u32_be
     },
     util::Network,
-    script::RedeemScript
+    script::RedeemScript,
+    taproot
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -102,6 +103,9 @@ pub trait ExtendedKey<T> where T: Key {
     */
     fn get_pub(&self) -> PubKey;
 
+    /**
+        Converts an extended key to an address. 
+    */
     fn get_address(&self, r#type: &WalletType, network: Network) -> String {
         match r#type {
             WalletType::P2PKH => Address::P2PKH(self.get_pub(), network).to_string().unwrap(),
@@ -109,6 +113,14 @@ pub trait ExtendedKey<T> where T: Key {
             WalletType::P2SH_P2WPKH => {
                 let script: RedeemScript = RedeemScript::p2sh_p2wpkh(&self.get_pub());
                 Address::P2SH(script, network).to_string().unwrap()
+            },
+            WalletType::P2TR => {
+                //Tweak the internal key with no commitment data.
+                //The internal key is only tweaked with committment data if a script tree is present.
+                //There is no script tree present when converting an extended key to address.
+                let internal_key = self.get_pub().schnorr();
+                let tweaked_key = taproot::taproot_tweak_pubkey(internal_key, b"").unwrap();
+                Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap()
             }
         }
     }

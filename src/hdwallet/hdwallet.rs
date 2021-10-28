@@ -39,7 +39,8 @@ use crate::{
 pub enum WalletType {
     P2PKH,
     P2WPKH,
-    P2SH_P2WPKH
+    P2SH_P2WPKH,
+    P2TR
 }
 
 impl WalletType {
@@ -97,6 +98,10 @@ impl ToVersionPrefix for WalletType {
                 Network::Bitcoin => VersionPrefix::Zpub,
                 Network::Testnet => VersionPrefix::Vpub
             },
+            WalletType::P2TR => match network {
+                Network::Bitcoin => VersionPrefix::Xpub,
+                Network::Testnet => VersionPrefix::Tpub
+            }
         }
     }
 
@@ -114,6 +119,10 @@ impl ToVersionPrefix for WalletType {
                 Network::Bitcoin => VersionPrefix::Zprv,
                 Network::Testnet => VersionPrefix::Vprv
             },
+            WalletType::P2TR => match network {
+                Network::Bitcoin => VersionPrefix::Xprv,
+                Network::Testnet => VersionPrefix::Tprv
+            }
         }
     }
 }
@@ -140,6 +149,7 @@ pub trait HDStandardPathing {
             WalletType::P2WPKH => Path::from_str("m/84'").unwrap(),
             WalletType::P2SH_P2WPKH => Path::from_str("m/49'").unwrap(),
             WalletType::P2PKH => Path::from_str("m/44'").unwrap(),
+            WalletType::P2TR => Path::from_str("m/86'").unwrap()
         };
 
         //Coin type
@@ -621,5 +631,30 @@ mod tests {
             Ok(_) => false,
             Err(x) => x==expected_err
         }
+    }
+
+    #[test]
+    fn bip_86_test_vectors() {
+        let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string();
+        let mnemonic = Mnemonic::from_phrase(phrase, Language::English, "").unwrap();
+        
+        //Build wallet
+        let mut builder = HDWalletBuilder::new();
+        builder.set_signer_from_mnemonic(&mnemonic).unwrap();
+        builder.set_type(WalletType::P2TR).unwrap();
+        let wallet = builder.build().unwrap();
+
+        //First receiving address
+        let address = wallet.address_at(false, 0).unwrap();
+        assert_eq!(address, "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr");
+
+        //Second receiving address
+        let address = wallet.address_at(false, 1).unwrap();
+        assert_eq!(address, "bc1p4qhjn9zdvkux4e44uhx8tc55attvtyu358kutcqkudyccelu0was9fqzwh");
+
+        //First change address
+        let address = wallet.address_at(true, 0).unwrap();
+        assert_eq!(address, "bc1p3qkhfews2uk44qtvauqyr2ttdsw7svhkl9nkm9s9c3x4ax5h60wqwruhk7");
+
     }
 }
