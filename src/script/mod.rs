@@ -17,7 +17,7 @@ use crate::{
     util::Network
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RedeemScript {
     pub code: Vec<u8>
 }
