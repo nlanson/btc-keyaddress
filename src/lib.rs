@@ -28,7 +28,11 @@
         
         - P2TR address generation
             > Binary script trees
-            > Commitment data derivation from script trees (Using BIP-341 reference methods)
+                - Binary tree nodes to contain the enum TapNode which can be either a script or hash of child nodes
+                - LeafVersion data type
+                - Creation of script trees from a 'builder' which can create consistent trees given a list of scripts
+                - Huffman tree creation given a list of scripts and their frquencies.
+            > Commitment data derivation from script trees (Using BIP-341 reference methods, DFS traversal)
 
         - Automated github tests
 */

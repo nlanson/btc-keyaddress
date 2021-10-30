@@ -2,6 +2,12 @@
     This module implements methods relating to Taproot key and address computing.
 
     Most functions here are translated from the reference python code in BIP-340 and BIP-341.
+
+    Todo:
+        - Carry over tree complex multilevel tree test
+        - Huffman tree creation
+        - BIP-341 tweak value computing method
+        - Once tweak value is calculated and internal key is tweaked, find and implement test cases
 */
 
 use crate::{
@@ -21,13 +27,46 @@ pub enum TaprootErr {
     BadLeaves
 }
 
-//Node struct for constructing script trees
+/**
+    Node struct to create binary trees
+*/
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     pub left: Option<Box<Node>>,
     pub right: Option<Box<Node>>,
-    pub value: Option<(u8, RedeemScript)>
+
+    //This value here could be an enum `NodeInfo` which contains either a (leaf version, script) tuple or hash of children
+    //By doing this, each node will contain a value whether it is a leaf or branch and removes the need for an Option
+    pub value: Option<LeafInfo>   
 }
+
+pub enum NodeValue {
+    Hash([u8; 32]),
+    Leaf(LeafInfo)
+}
+
+
+/**
+    LeafInfo struct that stores the leaf version and script in a script tree leaf.
+*/
+#[derive(Debug, Clone, PartialEq)]
+pub struct LeafInfo(u8, RedeemScript);
+impl LeafInfo {
+    /**
+        Creates a new leaf given a version and script
+    */
+    pub fn new_leaf_with_version(version: u8, script: &RedeemScript) -> Self {
+        Self(version, script.clone())
+    }
+
+    /**
+        Creates a new leaf with default version 
+    */
+    pub fn new_leaf(script: &RedeemScript) -> Self {
+        Self::new_leaf_with_version(0xc0, script)
+    }
+}
+
 
 impl Node {
     /**
@@ -35,51 +74,41 @@ impl Node {
     */
     pub fn new_tree(scripts: &Vec<RedeemScript>) -> Self {
         //Create leaves from scripts
-        let mut leaves: Vec<Node> = scripts.iter().map(|x| {
+        let leaves: Vec<Node> = scripts.iter().map(|x| {
             Node { 
                 left: None,
                 right: None,
-                value: Some((0xc0, x.clone()))
+                value: Some(LeafInfo::new_leaf(x))
             }
         }).collect::<Vec<Node>>();
-        
-        //If the number of leaves is not a power of two, keep adding empty leaves until it is.
-        loop {
-            if Self::is_power_of_two( leaves.len() ){ break ;}
-            leaves.push(Node::empty())
-        }
 
-        Self::leaves_to_tree(leaves).unwrap()
-    }
-
-    //Return an empty node
-    pub fn empty() -> Self {
-        Node { left: None, right: None, value: None }
+        Self::carry_over_tree(leaves)
     }
 
     /**
-        Creates a tree given a vector of leaves.
-    
-        The way this method constructs the tree is not efficient as the amount of leaves needs to 
-        be a power of two.
-        This can be fixed by implementing an algorithm that efficiently creates parent branches and if there is
-        a left over leaf, carry the leaf over into the parent branches vec and repeat.
-
-
+        Tries to create the most balanced tree from any amount of leaves.
+        Does this by combining left over leaves with the last parent.
     */
-    fn leaves_to_tree(leaves: Vec<Node>) -> Result<Self, TaprootErr> {
-        //If there is only one leaf left, it is the root.
-        if leaves.len() == 1 {
-            return Ok(leaves[0].clone())
-        }
+    fn carry_over_tree(leaves: Vec<Node>) -> Self {
+        //If there is only one leaf left, return it
+        if leaves.len() == 1 { return leaves[0].clone() }
 
-        //If the number of leaves is not a power of two, return error
-        if !Self::is_power_of_two(leaves.len()) { return Err(TaprootErr::BadLeaves) }
-
-        //Create parents from the children remainig and then call this function again using the parents
-        let mut parent_branches: Vec<Node> = vec![];
-        for i in (0..leaves.len()).step_by(2) {
-            parent_branches.push(
+        //Create new parent nodes by grouping two leaves together
+        let mut parent_level: Vec<Node> = vec![];
+        for i in (0..leaves.len()).step_by(2) { //bug: loop fucks up with odd numbers
+            //If there is a left over node, push a parent combining the left over node and the last parent created.
+            if i+1 == leaves.len() { 
+                let last_parent = parent_level[parent_level.len() - 1].clone();
+                let left_over_child = leaves[leaves.len() - 1].clone();
+    
+                parent_level.remove(parent_level.len() - 1);
+                parent_level.push(Self::carry_over_tree(vec![last_parent, left_over_child]));    
+                
+                break;
+            }
+            
+            //Push a parent node combining two child nodes
+            parent_level.push(
                 Node {
                     left: Some(Box::new(leaves[i].clone())),
                     right: Some(Box::new(leaves[i+1].clone())),
@@ -87,17 +116,26 @@ impl Node {
                 }
             )
         }
-        
-        /*
-            After looping, if there is a leaf left over, carry it over into the parent branches vector
-        */
 
+        //If there is a leaf left over, use the left over leaf and the last parent to create a new node
+        //with the left over child and last parent, replacing the last parent with this new node.
+        // if leaves.len()%2 != 0 {
+        //     let last_parent = parent_level[parent_level.len() - 1].clone();
+        //     let left_over_child = leaves[leaves.len() - 1].clone();
 
-        Self::leaves_to_tree(parent_branches)
+        //     parent_level.remove(parent_level.len() - 1);
+        //     parent_level.push(Self::carry_over_tree(vec![last_parent, left_over_child]));
+        // }
+
+        //Call self again using parent level
+        Self::carry_over_tree(parent_level)
     }
 
-    fn is_power_of_two(x: usize) -> bool {
-        (x != 0) && ((x & (x - 1)) == 0)
+    /**
+        Creates a huffman tree given a vector of nodes and their weights
+    */
+    fn huffman_tree(leaves: Vec<(u32, Node)>) -> Self {
+        todo!();
     }
 }
 
@@ -141,116 +179,59 @@ mod tests {
 
         let tree = Node::new_tree(&scripts);
         let expected_tree = Node {
-            left: Some(Box::new(Node { left: None, right: None, value: Some((0xc0 as u8, scripts[0].clone())) })),
-            right: Some(Box::new(Node { left: None, right: None, value: Some((0xc0 as u8, scripts[1].clone())) })),
+            left: Some(Box::new(Node { left: None, right: None, value: Some(LeafInfo::new_leaf(&scripts[0])) })),
+            right: Some(Box::new(Node { left: None, right: None, value: Some(LeafInfo::new_leaf(&scripts[1])) })),
             value: None
         };
         assert_eq!(tree, expected_tree);
     }
 
     #[test]
-    fn complex_script_tree() {
+    fn single_leaf_tree() {
+        let scripts = vec![
+            RedeemScript::new(vec![1])
+        ];
+        
+        let tree = Node::new_tree(&scripts);
+        let expected_tree = Node {
+            left: None,
+            right: None,
+            value: Some(LeafInfo::new_leaf(&scripts[0]))
+        };
+        assert_eq!(tree, expected_tree)
+    }
+
+    #[test]
+    fn odd_count_script_tree() {
         let scripts = vec![
             RedeemScript::new(vec![1]),
             RedeemScript::new(vec![2]),
-            RedeemScript::new(vec![3]),
-            RedeemScript::new(vec![4]),
-            RedeemScript::new(vec![5]),
-            RedeemScript::new(vec![6])
+            RedeemScript::new(vec![3])
         ];
 
-        let tree = Node::new_tree(&scripts); //Tree created should be 3 levels deep and 2 of the leaves will have no value as only 6 scripts are provided.
+        let tree = Node::new_tree(&scripts);
         let expected_tree = 
         Node {
-            left: Some(Box::new(
-                Node {
-                    left: Some(Box::new(
-                        Node {
-                            left: Some(Box::new(
-                                Node {
-                                    left: None,
-                                    right: None,
-                                    value: Some((0xc0, scripts[0].clone()))
-                                }
-                            )),
-                            right: Some(Box::new(
-                                Node {
-                                    left: None,
-                                    right: None,
-                                    value: Some((0xc0, scripts[1].clone()))
-                                }
-                            )),
-                            value: None
-                        }
-                    )),
-                    right: Some(Box::new(
-                        Node {
-                            left: Some(Box::new(
-                                Node {
-                                    left: None,
-                                    right: None,
-                                    value: Some((0xc0, scripts[2].clone()))
-                                }
-                            )),
-                            right: Some(Box::new(
-                                Node {
-                                    left: None,
-                                    right: None,
-                                    value: Some((0xc0, scripts[3].clone()))
-                                }
-                            )),
-                            value: None
-                        }
-                    )),
+            left: 
+                Some(Box::new(Node{
+                    left:  Some(Box::new(Node {left: None, right: None, value: Some(LeafInfo::new_leaf(&scripts[0]))})),
+                    right: Some(Box::new(Node {left: None, right: None, value: Some(LeafInfo::new_leaf(&scripts[1]))})),
                     value: None
-                }
-            )),
-            right: Some(Box::new(
-                Node {
-                    left: Some(Box::new(
-                        Node {
-                            left: Some(Box::new(
-                                Node {
-                                    left: None,
-                                    right: None,
-                                    value: Some((0xc0, scripts[4].clone()))
-                                }
-                            )),
-                            right: Some(Box::new(
-                                Node {
-                                    left: None,
-                                    right: None,
-                                    value: Some((0xc0, scripts[5].clone()))
-                                }
-                            )),
-                            value: None
-                        }
-                    )),
-                    right: Some(Box::new(
-                        Node {
-                            left: Some(Box::new(
-                                Node {
-                                    left: None,
-                                    right: None,
-                                    value: None
-                                }
-                            )),
-                            right: Some(Box::new(
-                                Node {
-                                    left: None,
-                                    right: None,
-                                    value: None
-                                }
-                            )),
-                            value: None
-                        }
-                    )),
-                    value: None
-                }
-            )),
+                })),
+            right: 
+                Some(Box::new(Node {
+                    left: None,
+                    right: None,
+                    value: Some(LeafInfo::new_leaf(&scripts[2]))
+                })),
             value: None
         };
 
         assert_eq!(tree, expected_tree);
+    }
+
+    #[test]
+    fn complex_script_tree() {
+
     }
 }
