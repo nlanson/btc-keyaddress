@@ -232,6 +232,62 @@ mod tests {
 
     #[test]
     fn complex_script_tree() {
+        let scripts = vec![
+            RedeemScript::new(vec![1]),
+            RedeemScript::new(vec![2]),
+            RedeemScript::new(vec![3]),
+            RedeemScript::new(vec![4]),
+            RedeemScript::new(vec![5])
+        ];
 
+        let tree = Node::new_tree(&scripts);
+        let expected_tree = 
+        Node {
+            left: Some(Box::new(
+                Node { 
+                    left: Some(Box::new(
+                        Node {
+                            left: None,
+                            right: None,
+                            value: Some(LeafInfo::new_leaf(&scripts[0]))
+                        }
+                    )),
+                    right: Some(Box::new(
+                        Node {
+                            left: None,
+                            right: None,
+                            value: Some(LeafInfo::new_leaf(&scripts[1]))
+                        }
+                    )),
+                    value: None
+                }
+            )),
+            right: Some(Box::new(
+                Node { 
+                    left: Some(Box::new(
+                        Node {
+                            left: Some(Box::new(
+                                Node { left: None, right: None, value: Some(LeafInfo::new_leaf(&scripts[2])) }
+                            )),
+                            right: Some(Box::new(
+                                Node { left: None, right: None, value: Some(LeafInfo::new_leaf(&scripts[3])) }
+                            )),
+                            value: None
+                        }
+                    )),
+                    right: Some(Box::new(
+                        Node { 
+                            left: None, 
+                            right: None, 
+                            value: Some(LeafInfo::new_leaf(&scripts[4])) 
+                        }
+                    )),
+                    value: None
+                }
+            )),
+            value: None
+        };
+
+        assert_eq!(tree, expected_tree);
     }
 }
