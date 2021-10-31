@@ -4,9 +4,8 @@
     Most functions here are translated from the reference python code in BIP-340 and BIP-341.
 
     Todo:
-        - Carry over tree complex multilevel tree test
-        - Huffman tree testing and consistency insertion implementation
-        - BIP-341 tweak value computing method
+        - Huffman tree testing
+        - BIP-341 tweak value computing method (taproot_tree_helper)
         - Once tweak value is calculated and internal key is tweaked, find and implement test cases
 */
 
@@ -74,7 +73,9 @@ struct HuffmanCoding<T> {
 }
 
 impl HuffmanCoding<RedeemScript> {
-    //Create a new item to add to a huffman tree
+    /**
+        Create a new item to add to a huffman tree
+    */
     pub fn new_item(freq: usize, script: &RedeemScript) -> Self {
         Self {
             freq,
@@ -82,7 +83,22 @@ impl HuffmanCoding<RedeemScript> {
         }
     }
     
-    //Create a new huffman tree from a vector of items
+    /**
+        Creates a huffman tree given a vector of frequencies and items.
+        
+        Currently, the tree gets cconstructed by repeatedly combining the two least frequent items
+        into a single node. This node is placed back into list with it's frequency being the sum of
+        the combined items. 
+        When combining nodes, the least frequent (or the item at the end of the array) is placed into
+        the right hand side of the combined node.
+
+        When the nodes are combined and inserted back into the table, it is simply pushed into
+        the table vector and the table vector is sorted again. The sorting method, vec::sort_by()
+        DOES NOT reorder equal elements meaning the combined node stays at the end if there are any
+        other equally weighted elements.
+
+        Needs more test cases to check for stability and consistency.
+    */
     pub fn new_script_tree(items: &Vec<Self>) -> TreeNode {
         //Create a (frequency, leaf node) table from each item
         let mut table = items.iter().map(|x| {
@@ -101,14 +117,15 @@ impl HuffmanCoding<RedeemScript> {
         //While the table does not consist of a single root node
         while table.len() != 1 {
             //Get the last two rows of the table
-            let l2i: Vec<(usize, TreeNode)> = table[table.len()-3..table.len()-1].to_vec();
+            let l2i: Vec<(usize, TreeNode)> = table.iter().rev().take(2).map(|x|(x.0, x.1.clone())).collect();
+            //table[table.len()-2..table.len()-1].to_vec();
 
             //Sum the frequencies
             let sum: usize = l2i[0].0 + l2i[1].0;
 
             //Combine the two nodes into a single Node with each as a branch
-            let left = l2i[0].1.clone();
-            let right = l2i[1].1.clone();
+            let right = l2i[0].1.clone();  //smaller
+            let left = l2i[1].1.clone();   //larger
             let combined_node: TreeNode = TreeNode::construct_tree(vec![left, right]);
 
             //Remove the last two items
@@ -119,10 +136,12 @@ impl HuffmanCoding<RedeemScript> {
             //This method of inserting the combined node might not be consistent. Later, a custom insertion method should
             //be written for consistency. 
             //But for now, it stays.
+            println!("{:?}\n", combined_node);
             table.push((sum, combined_node));
             table.sort_by(|a, b| b.0.cmp(&a.0)); 
         }
-        todo!();
+
+        table[0].1.clone()
     }
 }
 
@@ -335,11 +354,97 @@ mod tests {
 
     #[test]
     fn huffman() {
-        let freq_script = vec![
-            (1, RedeemScript::new(vec![1])),
-            (2, RedeemScript::new(vec![2])),
-            (3, RedeemScript::new(vec![3]))
+        //Expected result is a tree in this shape: https://imgur.com/a/VIJdsPD
+        let scripts = vec![
+            (3, RedeemScript::new(vec![1])),
+            (4, RedeemScript::new(vec![2])),
+            (1, RedeemScript::new(vec![3])),
+            (6, RedeemScript::new(vec![1])),
+            (1, RedeemScript::new(vec![2])),
+            (4, RedeemScript::new(vec![3]))
         ];
-        //todo
+
+        let items: Vec<HuffmanCoding<RedeemScript>> = scripts.iter().map(|x| HuffmanCoding::new_item(x.0, &x.1)).collect();
+        let tree = HuffmanCoding::new_script_tree(&items);
+        let expected_tree = 
+        //19
+        TreeNode {
+            //11
+            left: Some(Box::new(
+                TreeNode {
+                    //6
+                    left: Some(Box::new(
+                            TreeNode {
+                                left: None,
+                                right: None,
+                                value: Some(LeafInfo::new(&scripts[3].1))
+                            }
+                    )),
+                    //5
+                    right: Some(Box::new(
+                            TreeNode {
+                                //3
+                                left: Some(Box::new(
+                                    TreeNode {
+                                        left: None,
+                                        right: None,
+                                        value: Some(LeafInfo::new(&scripts[0].1))
+                                    }
+                                )),
+                                //2
+                                right: Some(Box::new(
+                                    TreeNode {
+                                        //1
+                                        left: Some(Box::new(
+                                            TreeNode {
+                                                left: None,
+                                                right: None,
+                                                value: Some(LeafInfo::new(&scripts[2].1))
+                                            }
+                                        )),
+                                        //1
+                                        right: Some(Box::new(
+                                            TreeNode {
+                                                left: None,
+                                                right: None,
+                                                value: Some(LeafInfo::new(&scripts[4].1))
+                                            }
+                                        )),
+                                        value: None
+                                    }
+                                )),
+                                value: None
+                            }
+                    )),
+                    value: None
+                }
+            )),
+
+            //8
+            right: Some(Box::new(
+                TreeNode {
+                    //4
+                    left: Some(Box::new(
+                        TreeNode {
+                            left: None,
+                            right: None,
+                            value: Some(LeafInfo::new(&scripts[1].1))
+                        }
+                    )),
+                    //4
+                    right: Some(Box::new(
+                        TreeNode {
+                            left: None,
+                            right: None,
+                            value: Some(LeafInfo::new(&scripts[5].1))
+                        }
+                    )),
+                    value: None 
+                }
+            )),
+            value: None
+        };
+
+        assert_eq!(tree, expected_tree);
     }
 }
