@@ -23,7 +23,8 @@ use crate::{
 
 #[derive(Debug)]
 pub enum TaprootErr {
-    BadLeaves
+    BadLeaves,
+    InvalidNode
 }
 
 /**
@@ -49,13 +50,20 @@ pub enum TreeNodeValue {
     LeafInfo struct that stores the leaf version and script in a script tree leaf.
 */
 #[derive(Debug, Clone, PartialEq)]
-pub struct LeafInfo(u8, RedeemScript);
+pub struct LeafInfo {
+    version: u8,
+    script: RedeemScript
+}
+
 impl LeafInfo {
     /**
         Creates a new leaf given a version and script
     */
     pub fn new_with_version(version: u8, script: &RedeemScript) -> Self {
-        Self(version, script.clone())
+        Self {
+            version,
+            script: script.clone()
+        }
     }
 
     /**
@@ -102,11 +110,7 @@ impl HuffmanCoding<RedeemScript> {
     pub fn new_script_tree(items: &Vec<Self>) -> TreeNode {
         //Create a (frequency, leaf node) table from each item
         let mut table = items.iter().map(|x| {
-            let node  = TreeNode {
-                left: None,
-                right: None,
-                value: Some(LeafInfo::new(&x.val))
-            };
+            let node = TreeNode::new(None, None, Some(LeafInfo::new(&x.val))).unwrap();
             
             (x.freq, node)
         }).collect::<Vec<(usize, TreeNode)>>();
@@ -148,16 +152,44 @@ impl HuffmanCoding<RedeemScript> {
 
 impl TreeNode {
     /**
+        Create a new node 
+    */
+    pub fn new(left: Option<Self>, right: Option<Self>, value: Option<LeafInfo>) -> Result<Self, TaprootErr> {
+        //Branch node | Has both branches and no value
+        if left.is_some() && right.is_some() && value.is_none() {
+            Ok(
+                Self {
+                    left: Some(Box::new(left.unwrap())),
+                    right: Some(Box::new(right.unwrap())),
+                    value
+                }
+            )
+        }
+
+        //Leaf node | Has no branches but has a value
+        else if left.is_none() && right.is_none() && value.is_some() {
+            Ok(
+                Self {
+                    left: None,
+                    right: None,
+                    value
+                }
+            )
+        }
+
+        //Invalid node | Other combinations
+        else {
+            Err(TaprootErr::InvalidNode)
+        }
+    } 
+    
+    /**
         Create a new tree from a list of scripts 
     */
     pub fn new_script_tree(scripts: &Vec<RedeemScript>) -> Self {
         //Create leaves from scripts
         let leaves: Vec<TreeNode> = scripts.iter().map(|x| {
-            TreeNode { 
-                left: None,
-                right: None,
-                value: Some(LeafInfo::new(x))
-            }
+            TreeNode::new(None, None, Some(LeafInfo::new(x))).unwrap()
         }).collect::<Vec<TreeNode>>();
 
         Self::construct_tree(leaves)
@@ -186,12 +218,8 @@ impl TreeNode {
             }
             
             //Push a parent node combining two child nodes
-            parent_level.push(
-                TreeNode {
-                    left: Some(Box::new(leaves[i].clone())),
-                    right: Some(Box::new(leaves[i+1].clone())),
-                    value: None
-                }
+            parent_level.push( 
+                TreeNode::new(Some(leaves[i].clone()), Some(leaves[i+1].clone()), None).unwrap()
             )
         }
 
@@ -225,6 +253,42 @@ pub fn taproot_tweak_pubkey(pubkey: SchnorrPublicKey, h: &[u8]) -> Result<Schnor
     //Compute the tweaked key
     let tweaked_key = pubkey.tweak(&tweak)?;
     Ok(tweaked_key)
+}
+
+//Unfinished
+pub fn taproot_tree_helper(script_tree: &TreeNode) -> (Vec<(LeafInfo, Vec<u8>)>, [u8; 32]) {
+    //If the current node is a leaf
+    if script_tree.value.is_some() {
+        let leaf_info = script_tree.value.clone().unwrap();
+
+        let mut h_data = vec![leaf_info.version];
+        h_data.extend_from_slice(&ser_script(&leaf_info.script));
+        let h = tagged_hash("TapLeaf", &h_data);
+        return (vec![(leaf_info, vec![])], h)
+    }
+    let (left, left_h) = taproot_tree_helper(script_tree.left.as_ref().unwrap());
+    let (right, right_h) = taproot_tree_helper(script_tree.right.as_ref().unwrap());
+    let ret = 
+    //Remaining Python code:
+    //ret = [(l, c + right_h) for l, c in left] + [(l, c + left_h) for l, c in right]
+    // if right_h < left_h:
+    //     left_h, right_h = right_h, left_h
+    // return (ret, tagged_hash("TapBranch", left_h + right_h))
+
+    todo!();
+}
+
+/**
+    Given a script, returns the script with a compact-size prefix indicating it's length.
+
+    Currently only prefixes with the script length casted as u8 and NOT compact size.
+    Need to write compact size int method.
+*/
+fn ser_script(script: &RedeemScript) -> Vec<u8> {
+    let mut prefixed = script.code.clone();
+    prefixed.insert(0, prefixed.len() as u8); //THIS NEEDS TO BE COMPACT-SIZE INSTEAD OF A REGULAR u8.
+
+    prefixed
 }
 
 #[cfg(test)]
