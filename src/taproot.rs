@@ -5,8 +5,8 @@
 
     Todo:
         - Huffman tree testing
-        - BIP-341 tweak value computing method (taproot_tree_helper)
-        - Once tweak value is calculated and internal key is tweaked, find and implement test cases
+        - taproot_tweak_pubkey should return the tweaked key AND evenness bit.
+        - Organise information as taproot spending conditions
 */
 
 use crate::{
@@ -240,6 +240,8 @@ impl TreeNode {
     H is the hash function
     c is the commitment data
     G is the generator point
+
+    Method needs to return an evenness bit as well to be spendable.
 */
 pub fn taproot_tweak_pubkey(pubkey: SchnorrPublicKey, h: &[u8]) -> Result<SchnorrPublicKey, KeyError> {
     //Extend pubkey by commitment
@@ -255,7 +257,6 @@ pub fn taproot_tweak_pubkey(pubkey: SchnorrPublicKey, h: &[u8]) -> Result<Schnor
     Ok(tweaked_key)
 }
 
-//Unfinished
 pub fn taproot_tree_helper(script_tree: &TreeNode) -> (Vec<(LeafInfo, Vec<u8>)>, [u8; 32]) {
     //If the current node is a leaf
     if script_tree.value.is_some() {
@@ -266,16 +267,36 @@ pub fn taproot_tree_helper(script_tree: &TreeNode) -> (Vec<(LeafInfo, Vec<u8>)>,
         let h = tagged_hash("TapLeaf", &h_data);
         return (vec![(leaf_info, vec![])], h)
     }
-    let (left, left_h) = taproot_tree_helper(script_tree.left.as_ref().unwrap());
-    let (right, right_h) = taproot_tree_helper(script_tree.right.as_ref().unwrap());
-    let ret = 
-    //Remaining Python code:
-    //ret = [(l, c + right_h) for l, c in left] + [(l, c + left_h) for l, c in right]
-    // if right_h < left_h:
-    //     left_h, right_h = right_h, left_h
-    // return (ret, tagged_hash("TapBranch", left_h + right_h))
 
-    todo!();
+    //Recursion
+    let (left, mut left_h) = taproot_tree_helper(script_tree.left.as_ref().unwrap());
+    let (right, mut right_h) = taproot_tree_helper(script_tree.right.as_ref().unwrap());
+    
+    //Python reference:
+    //ret = [(l, c + right_h) for l, c in left] + [(l, c + left_h) for l, c in right]
+    let mut ret: Vec<(LeafInfo, Vec<u8>)> = vec![];
+    for (l, c) in left {
+        let mut c = c;
+        c.extend_from_slice(&right_h);
+        ret.push((l, c));
+    }
+    for (l, c) in right {
+        let mut c = c;
+        c.extend_from_slice(&left_h);
+        ret.push((l, c));
+    }
+    
+    //Swap
+    if right_h < left_h {
+        let temp = left_h;
+        left_h = right_h;
+        right_h = temp;
+    }
+    
+    //Concatenate left_h and right_h and hash
+    let mut lr = left_h.to_vec();
+    lr.extend_from_slice(&right_h);
+    return (ret, tagged_hash("TapBranch", &lr))
 }
 
 /**
@@ -285,15 +306,54 @@ pub fn taproot_tree_helper(script_tree: &TreeNode) -> (Vec<(LeafInfo, Vec<u8>)>,
     Need to write compact size int method.
 */
 fn ser_script(script: &RedeemScript) -> Vec<u8> {
-    let mut prefixed = script.code.clone();
-    prefixed.insert(0, prefixed.len() as u8); //THIS NEEDS TO BE COMPACT-SIZE INSTEAD OF A REGULAR u8.
-
+    let len = script.code.len();
+    let mut compact_size: Vec<u8> = vec![];
+    if len <= 252 {
+        compact_size = vec![len as u8];
+    } else if len <=0xffff {
+        compact_size = vec![0xfd];
+        let mut len = len.to_le_bytes().to_vec();
+        len.truncate(2);
+        compact_size.extend_from_slice(&len);
+    }
+    
+    let mut prefixed = compact_size;
+    prefixed.extend_from_slice(&script.code);
     prefixed
 }
+
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    /**
+        Implementing a two leaf script tree example from 
+        https://github.com/bitcoin-core/btcdeb/blob/master/doc/tapscript-example.md
+    */
+    fn btcdeb_twoleaf_test() {
+        //The public keys involved in the test scenario
+        let internal_pk = SchnorrPublicKey::from_str("5bf08d58a430f8c222bffaf9127249c5cdff70a2d68b2b45637eb662b6b88eb5").unwrap();
+
+        //The scripts involved.
+        let scripts = vec![
+            RedeemScript::new(crate::util::decode_02x("029000b275209997a497d964fc1a62885b05a51166a65a90df00492c8d7cf61d6accf54803beac")),
+            RedeemScript::new(crate::util::decode_02x("a8206c60f404f8167a38fc70eaf8aa17ac351023bef86bcb9d1086a19afe95bd533388204edfcf9dfe6c0b5c83d1ab3f78d1b39a46ebac6798e08e19761f5ed89ec83c10ac"))
+        ];
+
+        //Create a script tree then pass it into the tree_helper method to produce the root of the merkle tree
+        let tree = TreeNode::new_script_tree(&scripts);
+        let (_, h) = taproot_tree_helper(&tree);
+        let expected_h = "41646f8c1fe2a96ddad7f5471bc4fee7da98794ef8c45a4f4fc6a559d60c9f6b";
+        assert_eq!(crate::util::encode_02x(&h), expected_h);
+
+        //Tweak the internal key by the root of the merkle tree
+        let tweaked_key = taproot_tweak_pubkey(internal_pk, &h).unwrap();
+        let expected_tweaked_key = "f128a8a8a636e19f00a80169550fedfc26b6f5dd04d935ec452894aad938ef0c";
+        assert_eq!(tweaked_key.hex(), expected_tweaked_key);
+    }
 
     #[test]
     fn simple_script_tree() {

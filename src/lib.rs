@@ -23,16 +23,14 @@
         - HDWallets
             > Better unlocker for multisig hd wallets
             > Custom path tests
-            > BIP-86 P2TR HDWallets
+            > Taproot standard HDMultisig (?)
             
         
-        - P2TR address generation
-            > Binary script trees
-                - Binary tree nodes to contain the enum TapNode which can be either a script or hash of child nodes
-                - LeafVersion data type
-                - Creation of script trees from a 'builder' which can create consistent trees given a list of scripts
-                - Huffman tree creation given a list of scripts and their frquencies.
-            > Commitment data derivation from script trees (Using BIP-341 reference methods, DFS traversal)
+        - Taproot
+            > Implement the remaining BIP-341 reference methods
+                - taproot_output_script
+                - taproot_tweak_seckey
+            > Script tree value use Enum instead of Option
 
         - Automated github tests
 */
