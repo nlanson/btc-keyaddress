@@ -52,6 +52,8 @@ pub use crate::{
         Network
     },
 
-    script::RedeemScript
+    script::RedeemScript,
+
+    taproot::*
 
 };
