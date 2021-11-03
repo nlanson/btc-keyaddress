@@ -247,11 +247,11 @@ impl Key for SchnorrPublicKey {
 
 impl SchnorrPublicKey {
     /**
-        Tweak self by other.
+        Tweak self by other. Returns the parity bit and tweaked key
         
         Other is multiplied by generator point G before being added to self.
     */
-    pub fn tweak(&self, other: &[u8]) -> Result<Self, KeyError> {
+    pub fn tweak(&self, other: &[u8]) -> Result<(bool, Self), KeyError> {
         let secp = Secp256k1::new();
         let other: [u8; 32] = try_into::<u8, 32>(other.to_vec());
 
@@ -261,7 +261,7 @@ impl SchnorrPublicKey {
             Ok(x) => {
                 //Check if tweaked successfully
                 let success = self.0.tweak_add_check(&secp, &tweaked_key, x, other);
-                if success { return Ok(Self(tweaked_key)) }
+                if success { return Ok((x, Self(tweaked_key))) }
                 else { return Err(KeyError::BadArithmatic()) }
             }
 

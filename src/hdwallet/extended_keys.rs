@@ -115,11 +115,9 @@ pub trait ExtendedKey<T> where T: Key {
                 Address::P2SH(script, network).to_string().unwrap()
             },
             WalletType::P2TR => {
-                //Tweak the internal key with no commitment data.
-                //The internal key is only tweaked with committment data if a script tree is present.
-                //There is no script tree present when converting an extended key to address.
+                //Tweaking with no script tree
                 let internal_key = self.get_pub().schnorr();
-                let tweaked_key = taproot::taproot_tweak_pubkey(internal_key, b"").unwrap();
+                let tweaked_key = taproot::taproot_output_script(&internal_key, None).unwrap();
                 Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap()
             }
         }
