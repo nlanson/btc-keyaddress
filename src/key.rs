@@ -61,6 +61,9 @@ pub struct PubKey(PublicKey);
 #[derive(Debug, Clone, Copy)]
 pub struct SchnorrPublicKey(lib_SchnorrPublicKey);
 
+#[derive(Debug, Clone, Copy)]
+pub struct SchnorrKeyPair(lib_SchnorrKeyPair);
+
 
 impl PrivKey {
     
@@ -128,6 +131,10 @@ impl PrivKey {
 
     pub fn get_pub(&self) -> PubKey {
         PubKey::from_priv_key(self)
+    }
+
+    pub fn schnorr(&self) -> SchnorrKeyPair {
+        SchnorrKeyPair::from_priv_key(self).unwrap()
     }
 }
 
@@ -302,6 +309,48 @@ impl SchnorrPublicKey {
     }
 }
 
+impl Key for SchnorrKeyPair {
+    //Keypairs cannot be serialized
+    fn as_bytes<const N: usize>(&self) -> [u8; N] { unimplemented!("Not supported") }
+
+    //Create a schnorr key pair from a secret key slice.
+    fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError>
+    where Self: Sized {
+        if byte_array.len() != 32 { return Err(KeyError::BadSlice()) }
+
+        match lib_SchnorrKeyPair::from_seckey_slice(&Secp256k1::new(),byte_array) {
+            Ok(x) => Ok(Self(x)),
+            _ => Err(KeyError::BadSlice())
+        }
+    }
+}
+
+impl SchnorrKeyPair {
+    /**
+        Tweak a schnorr key pair to use for signing. 
+    */
+    pub fn tweak(&self, other: &[u8]) -> Result<Self, KeyError> {
+        if other.len() != 32 { return Err(KeyError::BadSlice()) }
+
+        let mut tweaked_key = self.clone();
+        match tweaked_key.0.tweak_add_assign(&Secp256k1::new(), other) {
+            Ok(_) => Ok(tweaked_key),
+            Err(_) => Err(KeyError::BadArithmatic())
+        }
+    }
+
+    /**
+        Return the public key inside the key pair 
+    */
+    pub fn get_pub(&self) -> SchnorrPublicKey {
+        SchnorrPublicKey::from_keypair(&self.0)
+    }
+
+    pub fn from_priv_key(key: &PrivKey) -> Result<Self, KeyError> {
+        Self::from_slice(&key.as_bytes::<32>())
+    }
+}
+
 impl Eq for PubKey { }
 impl PartialEq for PubKey { 
     //Check the key bytes are equal
@@ -320,6 +369,13 @@ impl Ord for PubKey {
     //Sort lexicographically
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.hex().cmp(&other.hex())
+    }
+}
+
+impl PartialEq for SchnorrPublicKey {
+    //Check the key bytes are equal
+    fn eq(&self, other: &Self) -> bool {
+        self.as_bytes::<32>() == other.as_bytes::<32>()
     }
 }
 

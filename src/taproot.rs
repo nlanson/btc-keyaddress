@@ -13,6 +13,7 @@ use crate::{
         tagged_hash
     }, 
     key::{
+        SchnorrKeyPair,
         SchnorrPublicKey,
         Key,
         KeyError
@@ -257,6 +258,18 @@ pub fn taproot_tweak_pubkey(pubkey: &SchnorrPublicKey, h: &[u8]) -> Result<(bool
 }
 
 /**
+    Tweak a private key with a hash
+*/
+pub fn taproot_tweak_seckey(kp: &SchnorrKeyPair, h: &[u8]) -> Result<SchnorrKeyPair, KeyError> {
+    let p = kp.get_pub();
+    let mut data = p.as_bytes::<32>().to_vec();
+    data.extend_from_slice(h);
+
+    let t = tagged_hash("TapTweak", &data);
+    kp.tweak(&t)
+}
+
+/**
   Script tree traversal method that obtains the merkle root of the script tree.
 
   BIP-341 method
@@ -349,6 +362,9 @@ pub fn taproot_output_script(internal_key: &SchnorrPublicKey, script_tree: Optio
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        key::*
+    };
 
     #[test]
     /**
@@ -406,96 +422,6 @@ mod tests {
             value: Some(LeafInfo::new(&scripts[0]))
         };
         assert_eq!(tree, expected_tree)
-    }
-
-    #[test]
-    fn odd_count_script_tree() {
-        let scripts = vec![
-            RedeemScript::new(vec![1]),
-            RedeemScript::new(vec![2]),
-            RedeemScript::new(vec![3])
-        ];
-
-        let tree = TreeNode::new_script_tree(&scripts);
-        let expected_tree = 
-        TreeNode {
-            left: 
-                Some(Box::new(TreeNode{
-                    left:  Some(Box::new(TreeNode {left: None, right: None, value: Some(LeafInfo::new(&scripts[0]))})),
-                    right: Some(Box::new(TreeNode {left: None, right: None, value: Some(LeafInfo::new(&scripts[1]))})),
-                    value: None
-                })),
-            right: 
-                Some(Box::new(TreeNode {
-                    left: None,
-                    right: None,
-                    value: Some(LeafInfo::new(&scripts[2]))
-                })),
-            value: None
-        };
-
-        assert_eq!(tree, expected_tree);
-    }
-
-    #[test]
-    fn complex_script_tree() {
-        let scripts = vec![
-            RedeemScript::new(vec![1]),
-            RedeemScript::new(vec![2]),
-            RedeemScript::new(vec![3]),
-            RedeemScript::new(vec![4]),
-            RedeemScript::new(vec![5])
-        ];
-
-        let tree = TreeNode::new_script_tree(&scripts);
-        let expected_tree = 
-        TreeNode {
-            left: Some(Box::new(
-                TreeNode { 
-                    left: Some(Box::new(
-                        TreeNode {
-                            left: None,
-                            right: None,
-                            value: Some(LeafInfo::new(&scripts[0]))
-                        }
-                    )),
-                    right: Some(Box::new(
-                        TreeNode {
-                            left: None,
-                            right: None,
-                            value: Some(LeafInfo::new(&scripts[1]))
-                        }
-                    )),
-                    value: None
-                }
-            )),
-            right: Some(Box::new(
-                TreeNode { 
-                    left: Some(Box::new(
-                        TreeNode {
-                            left: Some(Box::new(
-                                TreeNode { left: None, right: None, value: Some(LeafInfo::new(&scripts[2])) }
-                            )),
-                            right: Some(Box::new(
-                                TreeNode { left: None, right: None, value: Some(LeafInfo::new(&scripts[3])) }
-                            )),
-                            value: None
-                        }
-                    )),
-                    right: Some(Box::new(
-                        TreeNode { 
-                            left: None, 
-                            right: None, 
-                            value: Some(LeafInfo::new(&scripts[4])) 
-                        }
-                    )),
-                    value: None
-                }
-            )),
-            value: None
-        };
-
-        assert_eq!(tree, expected_tree);
     }
 
     #[test]
@@ -592,5 +518,22 @@ mod tests {
         };
 
         assert_eq!(tree, expected_tree);
+    }
+
+    #[test]
+    /**
+        Tests if key tweaking logic is working correctly by creating a random key pair, seperating the public key from
+        it, and tweaking the keypair as a secret key and the public key as a public key and comparing the resulting tweaked
+        public keys to each other. 
+    */
+    fn key_tweaking_test() {
+        let key_pair = SchnorrKeyPair::from_priv_key(&PrivKey::new_rand()).unwrap();
+        let pub_key = key_pair.get_pub();
+
+        let commitment_data = vec![5, 29, 03];
+        let tweaked_keypair = taproot_tweak_seckey(&key_pair, &commitment_data).unwrap();
+        let tweaked_pub_key = taproot_tweak_pubkey(&pub_key, &commitment_data).unwrap().1;
+
+        assert_eq!(tweaked_keypair.get_pub(), tweaked_pub_key);
     }
 }
