@@ -526,7 +526,7 @@ impl MultisigHDWallet {
             MultisigWalletType::P2SH => Ok(Address::P2SH(redeem_script, self.network).to_string().unwrap()),
             MultisigWalletType::P2WSH => Ok(Address::P2WSH(redeem_script, self.network).to_string().unwrap()),
             MultisigWalletType::P2SH_P2WSH => {
-                let wrapped_script = RedeemScript::p2sh_p2wsh(&redeem_script);
+                let wrapped_script = RedeemScript::p2wsh(&redeem_script);
                 Ok(Address::P2SH(wrapped_script, self.network).to_string().unwrap())
             },
         }

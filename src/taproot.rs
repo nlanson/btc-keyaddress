@@ -259,8 +259,18 @@ pub fn taproot_tweak_pubkey(pubkey: &SchnorrPublicKey, h: &[u8]) -> Result<(bool
 
 /**
     Tweak a private key with a hash
+
+    T = k + H(x(kG) | c)
+
+    where
+    T is the tweaked secret key
+    k is the original secret key
+    H is the hash function
+    G is the generator point
+    c is the commitment data
 */
 pub fn taproot_tweak_seckey(kp: &SchnorrKeyPair, h: &[u8]) -> Result<SchnorrKeyPair, KeyError> {
+    //The tweak is the HashTapTweak of the secret_key multiplied by generator point G concatenated by the commitment data
     let p = kp.get_pub();
     let mut data = p.as_bytes::<32>().to_vec();
     data.extend_from_slice(h);

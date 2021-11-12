@@ -27,10 +27,11 @@
             
         
         - Taproot
-            > Implement the remaining BIP-341 reference methods
-                - taproot_output_script
-                - taproot_tweak_seckey
             > Script tree value use Enum instead of Option
+            > Struct for spending data which consists of
+                - Internal Key
+                - Optional script tree and parity bit
+                - [...]
 
         - Automated github tests
 */
