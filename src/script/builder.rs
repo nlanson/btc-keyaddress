@@ -6,6 +6,7 @@
 
 use super::RedeemScript;
 
+#[derive(Debug, Clone)]
 pub struct Builder {
     pub code: Vec<u8>
 }
@@ -23,7 +24,7 @@ impl Builder {
     }
 
     //Push a slice into the code
-    pub fn push_slice(mut self, slice: &[u8]) -> Self{
+    pub fn push_slice(mut self, slice: &[u8]) -> Self {
         self.code.extend_from_slice(slice);
         self
     }
@@ -43,6 +44,12 @@ pub struct Opcode {
 impl Opcode {
     pub fn into_u8(self) -> u8 {
         self.code
+    }
+}
+
+impl From<u8> for Opcode {
+    fn from(code: u8) -> Self {
+        Self { code }
     }
 }
 

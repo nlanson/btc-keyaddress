@@ -57,10 +57,9 @@ impl RedeemScript {
         Ok(Self::new(witprog))
     }
 
-    /**
-        Creates the redeem script for a m-of-n multisig wallet
-        BIP-11 and BIP-67 compliant
-    */
+    
+    ///Creates the redeem script for a m-of-n multisig wallet
+    ///BIP-11 and BIP-67 compliant
     pub fn multisig(m: u8, keys: &Vec<PubKey>) -> Result<Self, ScriptErr> {
         let n = keys.len() as u8;
         if n != keys.len() as u8 { return Err(ScriptErr::KeyCountDoesNotMatch()) }
@@ -69,18 +68,42 @@ impl RedeemScript {
         //Sort the private keys in lexiographical order of the public keys (BIP-67)
         let mut keys = keys.clone();
         keys.sort();
-        
-        let mut script: Vec<u8> = vec![m + 80]; //m value as opcode
 
+        let mut builder = ScriptBuilder::new().push_opcode(Opcode::from(m+80));
+        
         for i in 0..keys.len() {
-            script.push(keys[i].as_bytes::<33>().len() as u8 /*0x21*/);
-            script.append(&mut keys[i].as_bytes::<33>().to_vec())
+            builder = builder.push_opcode(opcodes::OP_PUSHBYTES_33);
+            builder = builder.push_slice(&keys[i].as_bytes::<33>());
         }
 
-        script.push(n + 80); //n value as opcode
-        script.push(0xAE);   //op_checkmultisig
+        builder = builder.push_opcode(Opcode::from(n+80));
+        builder = builder.push_opcode(opcodes::OP_CHECKMULTISIG);
 
-        Ok(RedeemScript::new(script))
+        Ok(builder.into_script())
+    }
+
+    /// P2PKH script pub key
+    /// OP_DUP OP_HASH160 <Pubkey Hash> OP_EQUALVERIFY OP_CHECKSIG
+    pub fn p2pkh(pubkey: &PubKey) -> Self {
+        let hash = hash::hash160(pubkey.as_bytes::<33>());
+        ScriptBuilder::new()
+            .push_opcode(opcodes::OP_DUP)
+            .push_opcode(opcodes::OP_HASH160)
+            .push_slice(&hash)
+            .push_opcode(opcodes::OP_EQUALVERIFY)
+            .push_opcode(opcodes::OP_CHECKSIG)
+            .into_script()
+    }
+
+    /// P2SH script pub key
+    /// OP_HASH160 <Hash160(redeemScript)> OP_EQUAL
+    pub fn p2sh(script: &Self) -> Self {
+        let hash = hash::hash160(&script.code);
+        ScriptBuilder::new()
+            .push_opcode(opcodes::OP_HASH160)
+            .push_slice(&hash)
+            .push_opcode(opcodes::OP_EQUAL)
+            .into_script()
     }
 
     /// P2WPKH script pub key

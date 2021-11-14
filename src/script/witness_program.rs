@@ -1,7 +1,9 @@
 use crate::{
     script::{
         RedeemScript,
-        ScriptErr
+        ScriptErr,
+        ScriptBuilder,
+        Opcode
     },
     encoding::bech32::{
         Bech32,
@@ -53,8 +55,6 @@ impl WitnessProgram {
     }
 
     pub fn to_scriptpubkey(&self) -> RedeemScript {
-        let mut pubkey: Vec<u8> = Vec::new();
-        
         //Version OP code for anything above 0 needs to add 0x50.
         let mut version = self.version;
         if version > 0 {
@@ -62,10 +62,10 @@ impl WitnessProgram {
         }
 
         //Redeem script = version | program len | program
-        pubkey.push(version);
-        pubkey.push(self.program.len() as u8);
-        pubkey.extend_from_slice(&self.program);
-        
-        RedeemScript::new(pubkey)
+        ScriptBuilder::new()
+            .push_opcode(Opcode::from(version))
+            .push_opcode(Opcode::from(self.program.len() as u8))
+            .push_slice(&self.program)
+            .into_script()
     }
 }

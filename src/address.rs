@@ -55,6 +55,7 @@ impl Address {
         }
     }
 
+    ///P2PKH address given a public key
     fn p2pkh(pk: &PubKey, network: &Network) -> String {
         match network {
             Network::Bitcoin => bs58check::check_encode(bs58check::VersionPrefix::BTCAddress, &pk.hash160()),
@@ -62,6 +63,7 @@ impl Address {
         }
     }
 
+    /// P2SH address given a script
     fn p2sh(script: &RedeemScript, network: &Network) -> String {
         match network {
             Network::Bitcoin => bs58check::check_encode(bs58check::VersionPrefix::P2ScriptAddress, &script.hash()),
@@ -69,11 +71,13 @@ impl Address {
         }
     }
 
+    ///P2WPKH address given a public key
     fn p2wpkh(pk: &PubKey, network: &Network) -> Result<String, Bech32Err> {
         let witness_program = WitnessProgram::new(0, pk.hash160()).unwrap();
         Ok(witness_program.to_address(network)?)
     }
 
+    /// P2WSH address given a script
     fn p2wsh(script: &RedeemScript, network: &Network) -> Result<String, Bech32Err> {
         let hash = hash::sha256(script.code.clone()).to_vec();
 
@@ -81,6 +85,7 @@ impl Address {
         Ok(witness_program.to_address(network)?)
     }
 
+    /// P2TR addres given a tweaked public key
     fn p2tr(tweaked_public_key: &SchnorrPublicKey, network: &Network) -> Result<String, Bech32Err> {
         let bytes = tweaked_public_key.as_bytes::<32>().to_vec();
         let witness_program = WitnessProgram::new(1, bytes).unwrap();
@@ -114,8 +119,7 @@ impl Address {
 #[cfg(test)]
 mod tests {
     use super::{
-        Address, PubKey, Key,
-        AddressErr
+        Address, PubKey, Key
     };
     use crate::{
         key::{
