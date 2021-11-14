@@ -536,7 +536,7 @@ mod tests {
         let mut b = HDWalletBuilder::new();
         let mnemonic = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(), Language::English, "").unwrap();
         b.set_signer_from_mnemonic(&mnemonic)?;
-        b.set_type(WalletType::P2SH_P2WPKH);
+        b.set_type(WalletType::P2SH_P2WPKH).unwrap();
         Ok(b.build()?)
     }
 
@@ -572,7 +572,7 @@ mod tests {
         let mut b = HDWalletBuilder::new();
         let mnemonic = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(), Language::English, "").unwrap();
         b.set_signer_from_mnemonic(&mnemonic)?;
-        b.set_type(WalletType::P2PKH);
+        b.set_type(WalletType::P2PKH).unwrap();
         Ok(b.build()?)
     }
 

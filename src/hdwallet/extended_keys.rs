@@ -18,7 +18,7 @@ use crate::{
         validate_checksum,
         VersionPrefix,
         Bs58Error,
-        ToVersionPrefix
+        
     },
     hdwallet::{
         ckd::{
@@ -461,10 +461,10 @@ mod tests {
     
     use super::*;
     use crate::{
+        encoding::ToVersionPrefix,
         bip39::{
             Language,
             Mnemonic,
-            PhraseLength
         },
         hdwallet::{
             HDWallet,
@@ -486,7 +486,7 @@ mod tests {
         let mut b = HDWalletBuilder::new();
         let mnemonic: Mnemonic = Mnemonic::from_phrase(TEST_MNEMONIC.to_string(), Language::English, "").unwrap();
         b.set_signer_from_mnemonic(&mnemonic).unwrap();
-        b.set_type(WalletType::P2PKH);
+        b.set_type(WalletType::P2PKH).unwrap();
 
         (b.build().unwrap(), Unlocker::from_mnemonic(&mnemonic).unwrap())
     }
@@ -597,7 +597,7 @@ mod tests {
         let mut b = HDWalletBuilder::new();
         let mnemonic: Mnemonic = Mnemonic::from_phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(), Language::English, "").unwrap();
         b.set_signer_from_mnemonic(&mnemonic).unwrap();
-        b.set_type(WalletType::P2WPKH);
+        b.set_type(WalletType::P2WPKH).unwrap();
 
         (b.build().unwrap(), Unlocker::from_mnemonic(&mnemonic).unwrap())
     }

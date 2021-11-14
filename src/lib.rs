@@ -33,6 +33,8 @@
                 - Optional script tree and parity bit
                 - [...]
 
+        - Base58 encoding
+
         - Automated github tests
 */
 

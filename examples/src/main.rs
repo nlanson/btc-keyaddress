@@ -1,7 +1,7 @@
 use btc_keyaddress::prelude::*;
 
 fn main() {
-    //multisig_hdwallet();
+    multisig_hdwallet().unwrap();
 }
 
 fn multisig_hdwallet() -> Result<(), HDWError> {

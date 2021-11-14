@@ -8,24 +8,17 @@
 */
 
 use crate::{
-    hash::{ 
-        hmac_sha512,
-        hash160
-    },
+    hash::hmac_sha512,
     hdwallet::{
         ExtendedKey, Xprv, Xpub,
-        HDWError,
-        HDWallet,
-        Unlocker,
-        WalletType
+        HDWError
     },
     key::{
         Key,
         PubKey,
         PrivKey
     },
-    util::try_into,
-    encoding::ToVersionPrefix
+    util::try_into
 };
 
 /**
@@ -177,14 +170,15 @@ mod tests {
             HDWError,
             WalletType,
             Unlocker,
-            HDWalletBuilder
+            HDWalletBuilder,
+            HDWallet,
         },
         bip39::{
             Mnemonic,
-            MnemonicErr,
             Language
         },
-        util::Network
+        util::Network,
+        encoding::ToVersionPrefix,
     };
     use super::*;
 
@@ -205,7 +199,7 @@ mod tests {
 
         let mut b = HDWalletBuilder::new();
         b.set_signer_from_mnemonic(&mnemonic).unwrap();
-        b.set_type(WalletType::P2PKH);
+        b.set_type(WalletType::P2PKH).unwrap();
         b.build().unwrap()
     }
 

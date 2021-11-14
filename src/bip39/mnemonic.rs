@@ -1,15 +1,7 @@
 use crate::{
     hash,
     util,
-    entropy,
-    hdwallet::{
-        ExtendedKey, Xprv,
-        HDWError
-    },
-    key::{
-        PrivKey,
-        Key
-    }
+    entropy
 };
 use super::{ 
     lang,
@@ -225,8 +217,6 @@ impl Mnemonic {
 
 #[cfg(test)]
 mod tests {
-    use crate::bip39::MnemonicErr;
-
     use super::{
         Mnemonic,
         PhraseLength,
