@@ -130,7 +130,7 @@ pub fn check_encode(prefix: VersionPrefix, data: &[u8]) -> String {
     data.splice(data.len()..data.len(), checksum);
 
     //Return the Base58Check encoded value of the data
-    bs58::encode(data).into_string()
+    encode(&data)
 }
 
 /**

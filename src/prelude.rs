@@ -42,7 +42,8 @@ pub use crate::{
         bs58check::{
             VersionPrefix,
             ToVersionPrefix
-        }
+        },
+        base58
     },
 
     util::{

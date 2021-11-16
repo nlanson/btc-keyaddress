@@ -19,6 +19,7 @@
             > Path deriveration
             > HDWallets (Single and multi sig)
             > P2SH nested Segwit address generation (Stand alone and in HD Wallets imported from `ypub` keys)
+            > Version prefix conversion (Key to prefix, int to prefix, etc..)
         
         - HDWallets
             > Better unlocker for multisig hd wallets
