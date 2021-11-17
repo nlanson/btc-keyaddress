@@ -102,6 +102,7 @@ impl VersionPrefix {
 pub trait ToVersionPrefix {
     fn public_version_prefix(&self, network: Network) -> VersionPrefix;
     fn private_version_prefix(&self, network: Network) -> VersionPrefix;
+    fn get_version_prefix(&self, network: Network) -> (VersionPrefix, VersionPrefix);
 }
 
 pub enum Bs58Error {

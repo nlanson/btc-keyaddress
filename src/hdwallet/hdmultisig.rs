@@ -122,6 +122,23 @@ impl ToVersionPrefix for MultisigWalletType {
             },
         }
     }
+
+    fn get_version_prefix(&self, network: Network) -> (VersionPrefix, VersionPrefix) {
+        match &self {
+            MultisigWalletType::P2SH => match network {
+                Network::Bitcoin => (VersionPrefix::Xpub, VersionPrefix::Xprv),
+                Network::Testnet => (VersionPrefix::Tpub, VersionPrefix::Tprv)
+            },
+            MultisigWalletType::P2SH_P2WSH => match network {
+                Network::Bitcoin => (VersionPrefix::Ypub, VersionPrefix::Yprv),
+                Network::Testnet => (VersionPrefix::Upub, VersionPrefix::Uprv)
+            },
+            MultisigWalletType::P2WSH => match network {
+                Network::Bitcoin => (VersionPrefix::Zpub, VersionPrefix::Zprv),
+                Network::Testnet => (VersionPrefix::Vpub, VersionPrefix::Vprv)
+            }
+        }
+    }
 }
 
 /**

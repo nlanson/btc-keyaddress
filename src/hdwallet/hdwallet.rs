@@ -125,6 +125,27 @@ impl ToVersionPrefix for WalletType {
             }
         }
     }
+
+    fn get_version_prefix(&self, network: Network) -> (VersionPrefix, VersionPrefix) {
+        match &self {
+            WalletType::P2PKH => match network {
+                Network::Bitcoin => (VersionPrefix::Xpub, VersionPrefix::Xprv),
+                Network::Testnet => (VersionPrefix::Tpub, VersionPrefix::Tprv)
+            },
+            WalletType::P2SH_P2WPKH => match network {
+                Network::Bitcoin => (VersionPrefix::Ypub, VersionPrefix::Yprv),
+                Network::Testnet => (VersionPrefix::Upub, VersionPrefix::Uprv)
+            },
+            WalletType::P2WPKH => match network {
+                Network::Bitcoin => (VersionPrefix::Zpub, VersionPrefix::Zprv),
+                Network::Testnet => (VersionPrefix::Vpub, VersionPrefix::Vprv)
+            },
+            WalletType::P2TR => match network {
+                Network::Bitcoin => (VersionPrefix::Xpub, VersionPrefix::Xprv),
+                Network::Testnet => (VersionPrefix::Tpub, VersionPrefix::Tprv)
+            }
+        }
+    }
 }
 
 pub struct HDWalletBuilder<'builder> {
