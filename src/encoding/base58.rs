@@ -7,6 +7,25 @@ use crate::{
 
 const BASE58_ALPHABET: &'static [u8; 58] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
+const MAP_BASE58: [i8; 256] = [
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1, 0, 1, 2, 3, 4, 5, 6,  7, 8,-1,-1,-1,-1,-1,-1,
+        -1, 9,10,11,12,13,14,15, 16,-1,17,18,19,20,21,-1,
+        22,23,24,25,26,27,28,29, 30,31,32,-1,-1,-1,-1,-1,
+        -1,33,34,35,36,37,38,39, 40,41,42,43,-1,44,45,46,
+        47,48,49,50,51,52,53,54, 55,56,57,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+];
+
 
 #[derive(Debug)]
 pub struct Base58 {
@@ -17,7 +36,9 @@ pub struct Base58 {
 #[derive(Debug)]
 pub enum Base58Error {
     InvalidVersionPrefix,
-    BadChar(char)
+    BadChar(char),
+    CharAfterSpace(usize),
+    BadChecksum
 }
 
 impl Base58 {
@@ -101,14 +122,97 @@ impl Base58 {
 
     /// Decodes a base58 string into a byte vector.
     /// DOES NOT remove the checksum or version prefix if present.
+    /// 
+    /// Translated from the original C implementation of Base58 in the Bitcoin Core repository with help
+    /// from https://stackoverflow.com/questions/25855062/decoding-bitcoin-base58-address-to-byte-array
     pub fn decode(encoded: &str) -> Result<Vec<u8>, Base58Error> {
-        todo!();
+        let source: String = String::from(encoded);
+        
+        //Skip leading spaces
+        let mut i = 0;
+        while i < source.len() {
+            if !source.chars().nth(i).unwrap().is_whitespace() {
+                break;
+            }
+            i+=1;
+        }
+
+        //Skip and count leading '1's
+        let mut zeroes = 0;
+        while i < source.len() {
+            if source.chars().nth(i).unwrap() != '1' {
+                break;
+            }
+            zeroes+=1;
+            i+=1;
+        }
+
+        //Allocate enough space in big-endian base256 representation.
+        let size = source.len() * 733 / 1000 + 1; // log(58) / log(256), rounded up.
+        let mut b256: Vec<u8> = vec![0; size];
+
+        //Process the characters
+        assert!(MAP_BASE58.len() == 256); //guarantee not out of range
+        while i < source.len() && !source.chars().nth(i).unwrap().is_whitespace() {
+            //Decode the base58 character
+            let ch: i32 = MAP_BASE58[source.chars().nth(i).unwrap() as usize] as i32;
+            if ch == -1 { return Err(Base58Error::BadChar(source.chars().nth(i).unwrap())); } //Invalid base58 character
+
+
+            let mut carry = ch as u32;
+            for char in b256.iter_mut().rev() {
+                carry += 58 * (*char as u32);
+                *char = (carry % 256) as u8;
+                carry /= 256;
+            }
+            //assert!(carry == 0);
+            i += 1;
+        }
+
+
+        //Skip trailing spaces
+        while i < source.len() && source.chars().nth(i).unwrap().is_whitespace() {
+            i+=1;
+        }
+        if i != source.len() {
+            return Err(Base58Error::CharAfterSpace(i));
+        }
+
+        //Skip leading zeroes in b256
+        let mut j = 0;
+        while j < b256.len() && b256[j] == 0 {
+            j+=1;
+        }
+        //Copy result into output vector
+        let mut result: Vec<u8> = vec![0; zeroes + b256.len() - j]; //Vec::with_capacity(zeroes + b256.len() - j);
+        for k in 0..result.len() {
+            if k < zeroes {
+                result[k] = 0x00;
+            } else {
+                result[k] = b256[j];
+                j+=1;
+            }
+        }
+
+        
+        Ok(result)
     }
 
     /// Checks if a base58 check encoded string is valid
     pub fn validate_checksum(encoded: &str) -> Result<bool, Base58Error> {
         let bytes = Base58::decode(encoded)?;
-        todo!();
+
+        //Check derived_checksum == extracted_checksum
+        Ok(hash::double_sha256(&bytes[..bytes.len()-4])[0..4] == bytes[bytes.len()-4..])
+    }
+
+    /// Returns the decoded payload with the checksum removed.
+    /// Version prefix is NOT removed as it is variable length depending on context.
+    pub fn check_decode(encoded: &str) -> Result<Vec<u8>, Base58Error> {
+        if !Self::validate_checksum(encoded)? { return Err(Base58Error::BadChecksum); }
+
+        let bytes = Base58::decode(encoded)?;
+        Ok(bytes[..bytes.len()-4].to_vec())
     }
 }
 
@@ -128,6 +232,15 @@ mod tests {
         let derived_address = Base58::new(Some(VersionPrefix::BTCAddress), &key.hash160()).check_encode();
         
         assert_eq!(expected_address, derived_address);
+    }
+
+    #[test]
+    fn base58_decode() {
+        let expected_key = PubKey::from_slice(&decode_02x("0204664c60ceabd82967055ccbd0f56a1585dfbd42032656efa501c463b16fbdfe")).unwrap();
+        let address = "124ERAK4SqHMNWXycHPautn5zDYRKr3b2E";
+        let decoded = Base58::check_decode(address).expect("Decode failed");
+
+        assert_eq!(decoded[1..], expected_key.hash160());
     }
 
 }

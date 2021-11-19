@@ -1,6 +1,7 @@
 /*
-    Library to create non-deterministic and 
-    deterministic keys and addresses for Bitcoin.
+    Library to created to learn about Bitcoin keys, addresses, script and more.
+    The library is not the best Bitcoin implementation, but it is a good reference 
+    to learn about how Bitcoin keys, addresses, scripts and work.
 
     Not for use with the bitcoin main network.
 
@@ -13,6 +14,8 @@
 
         - The Rust-Bitcoin repository (https://github.com/rust-bitcoin/rust-bitcoin)
             for providing clear reference code to work against, especially with bip32.
+        
+        - The gods of the Bitcoin Stackexchange and Stackoverflow.
 
     Todo:
         - Unit tests for:
@@ -35,6 +38,7 @@
                 - [...]
 
         - Base58 encoding
+            > Use the internal implementation of the base58 in the library for addresses, keys and extended keys.
 
         - Automated github tests
 */
