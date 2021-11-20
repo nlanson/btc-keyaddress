@@ -12,12 +12,15 @@ use crate::{
         PubKey,
         Key
     },
-    encoding::bs58check::{
-        check_encode,
-        decode,
-        validate_checksum,
-        VersionPrefix,
-        Bs58Error,
+    encoding::{
+        // check_encode,
+        // decode,
+        // validate_checksum,
+        // VersionPrefix,
+        // Bs58Error,
+        base58::Base58,
+        base58::Base58Error,
+        version_prefix::VersionPrefix
         
     },
     hdwallet::{
@@ -158,12 +161,11 @@ impl ExtendedKey<PrivKey> for Xprv {
     }
 
     fn from_str(key: &str) -> Result<Self, HDWError> {
-        let bytes = match decode(&key.to_string()) {
+        let bytes = match Base58::decode(&key.to_string()) {
             Ok(x) => x,
             //If decode error, return the index of the bad character or a generic error
             Err(x) => match x {
-                Bs58Error::InvalidChar(x) => return Err(HDWError::BadChar(x.1)),
-                Bs58Error::NonAsciiChar(x) => return Err(HDWError::BadChar(x)),
+                Base58Error::BadChar(x) => return Err(HDWError::BadChar(x as usize)),
                 _ => return Err(HDWError::BadKey())
             }
         };
@@ -172,7 +174,7 @@ impl ExtendedKey<PrivKey> for Xprv {
         
         //Check if the checkum of the decoded bytes is equal to the calculated checksum.
         //validate_checksum() method will likely not return an Error as the key has already been decoded once.
-        if let Ok(x) = validate_checksum(key) {
+        if let Ok(x) = Base58::validate_checksum(key) {
             if !x { return Err(HDWError::BadChecksum()) } 
         }
         
@@ -258,7 +260,7 @@ impl ExtendedKey<PrivKey> for Xprv {
         self.key::<32>().iter().for_each(|x| payload.push(*x)); //private key
 
         
-        check_encode(v_prefix.clone(), &payload)
+        Base58::new(Some(*v_prefix), &payload).check_encode()
     }
 
     fn get_xchild(&self, options: ChildOptions) -> Result<Xprv, HDWError> {
@@ -314,12 +316,11 @@ impl ExtendedKey<PubKey> for Xpub {
     }
 
     fn from_str(key: &str) -> Result<Self, HDWError> {
-        let bytes = match decode(&key.to_string()) {
+        let bytes = match Base58::decode(key) {
             Ok(x) => x,
             //If decode error, return the index of the bad character or a generic error
             Err(x) => match x {
-                Bs58Error::InvalidChar(x) => return Err(HDWError::BadChar(x.1)),
-                Bs58Error::NonAsciiChar(x) => return Err(HDWError::BadChar(x)),
+                Base58Error::BadChar(x) => return Err(HDWError::BadChar(x as usize)),
                 _ => return Err(HDWError::BadKey())
             }
         };
@@ -327,7 +328,7 @@ impl ExtendedKey<PubKey> for Xpub {
         if bytes.len() != 82 { return Err(HDWError::BadKey()) }
 
         //Check if the checkum of the decoded bytes is equal to the calculated checksum
-        if let Ok(x) = validate_checksum(key) {
+        if let Ok(x) = Base58::validate_checksum(key) {
             if !x { return Err(HDWError::BadChecksum()) } 
         }
 
@@ -414,7 +415,7 @@ impl ExtendedKey<PubKey> for Xpub {
         self.key::<33>().iter().for_each(|x| payload.push(*x)); //public key
 
         
-        check_encode(v_prefix.clone(),&payload)
+        Base58::new(Some(*v_prefix), &payload).check_encode()
     }
 
     fn get_xchild(&self, options: ChildOptions) -> Result<Xpub, HDWError> {

@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use crate::{
-    encoding::bs58check::decode,
-    encoding::bs58check::VersionPrefix
+    encoding::base58::Base58,
+    encoding::version_prefix::VersionPrefix
 };
 
 /*
@@ -54,7 +54,7 @@ pub enum Network {
 
 impl Network {
     pub fn from_xkey(key: &str) -> Result<Self, ()> {
-        let bytes = match decode(&key.to_string()) {
+        let bytes = match Base58::decode(&key.to_string()) {
             Ok(x) => x,
             Err(_) => return Err(())
         };

@@ -23,6 +23,7 @@
             > HDWallets (Single and multi sig)
             > P2SH nested Segwit address generation (Stand alone and in HD Wallets imported from `ypub` keys)
             > Version prefix conversion (Key to prefix, int to prefix, etc..)
+            > Extensive tests for Base58 encoding and decoding
         
         - HDWallets
             > Better unlocker for multisig hd wallets
@@ -68,4 +69,3 @@ use hmac::{ Mac, NewMac, Hmac };
 use pbkdf2::pbkdf2;
 use sha2::{ Sha256, Sha512, Digest };
 use ripemd160::Ripemd160;
-use bs58;

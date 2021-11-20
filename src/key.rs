@@ -6,7 +6,8 @@ use crate::{
     SecretKey,
     SecpOsRng,
     encoding::{
-        bs58check as bs58check
+        base58::Base58,
+        version_prefix::VersionPrefix
     },
     util::decode_02x,
     util::try_into,
@@ -86,8 +87,8 @@ impl PrivKey {
         }
         
         match network {
-            Network::Bitcoin => bs58check::check_encode(bs58check::VersionPrefix::PrivateKeyWIF, &key),
-            Network::Testnet => bs58check::check_encode(bs58check::VersionPrefix::TestNetPrivateKeyWIF, &key)
+            Network::Bitcoin => Base58::new(Some(VersionPrefix::PrivateKeyWIF), &key).check_encode(),
+            Network::Testnet => Base58::new(Some(VersionPrefix::TestNetPrivateKeyWIF), &key).check_encode()
         }
         
     }
@@ -111,7 +112,7 @@ impl PrivKey {
       Create a private key from wif
     */
     pub fn from_wif(wif: &str) -> Result<Self, KeyError> {
-        let mut bytes = match bs58check::decode(&wif.to_string()) {
+        let mut bytes = match Base58::decode(wif) {
             Ok(x) => x,
             Err(_) => return Err(KeyError::BadWif())
         };

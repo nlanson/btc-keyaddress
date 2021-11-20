@@ -23,9 +23,9 @@ use crate::{
         HDWError, ChildOptions, Path
     },
     encoding::{
-        bs58check::decode,
-        bs58check::VersionPrefix,
-        ToVersionPrefix
+        version_prefix::VersionPrefix,
+        ToVersionPrefix,
+        base58::Base58
     },
     util::{
         Network,
@@ -49,7 +49,7 @@ impl WalletType {
         Does it by viewing the prefix  
     */
     pub fn from_xkey(key: &str) -> Result<Self, HDWError> {
-        let bytes = match decode(&key.to_string()) {
+        let bytes = match Base58::decode(key) {
             Ok(x) => x,
             Err(_) => return Err(HDWError::BadKey())
         };

@@ -25,9 +25,10 @@ use crate::{
         Network,
         try_into, as_u32_be
     },
-    encoding::bs58check::{
-        VersionPrefix, decode,
-        ToVersionPrefix
+    encoding::{
+        base58::Base58,
+        version_prefix::VersionPrefix,
+        version_prefix::ToVersionPrefix
     }
 };
 use super::{
@@ -49,7 +50,7 @@ pub enum MultisigWalletType {
 
 impl MultisigWalletType {
     pub fn from_xkeys(key: &str) -> Result<Self, HDWError> {
-        let bytes = match decode(&key.to_string()) {
+        let bytes = match Base58::decode(key) {
             Ok(x) => x,
             Err(_) => return Err(HDWError::BadKey())
         };
@@ -293,7 +294,7 @@ impl<'builder> MultisigHDWalletBuilder<'builder> {
         
         //Determine the key type and if it is a SLIP key, store in the shared list.
         //If it is a not a slip key but also not invalid, store in master list.
-        let bytes = match decode(&signer_master_key.to_string()) {
+        let bytes = match Base58::decode(signer_master_key) {
             Ok(x) => x,
             Err(_) => return Err(HDWError::BadKey())
         };

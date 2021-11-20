@@ -1,7 +1,8 @@
 use crate:: {
     encoding::{
         bech32::Bech32Err,
-        bs58check as bs58check
+        base58::Base58,
+        version_prefix::VersionPrefix as VersionPrefix
     },
     hash,
     key::{
@@ -58,16 +59,16 @@ impl Address {
     ///P2PKH address given a public key
     fn p2pkh(pk: &PubKey, network: &Network) -> String {
         match network {
-            Network::Bitcoin => bs58check::check_encode(bs58check::VersionPrefix::BTCAddress, &pk.hash160()),
-            Network::Testnet => bs58check::check_encode(bs58check::VersionPrefix::BTCTestNetAddress, &pk.hash160())
+            Network::Bitcoin => Base58::new(Some(VersionPrefix::BTCAddress), &pk.hash160()).check_encode(),
+            Network::Testnet => Base58::new(Some(VersionPrefix::BTCTestNetAddress), &pk.hash160()).check_encode()
         }
     }
 
     /// P2SH address given a script
     fn p2sh(script: &RedeemScript, network: &Network) -> String {
         match network {
-            Network::Bitcoin => bs58check::check_encode(bs58check::VersionPrefix::P2ScriptAddress, &script.hash()),
-            Network::Testnet => bs58check::check_encode(bs58check::VersionPrefix::TestnetP2SHAddress, &script.hash())
+            Network::Bitcoin => Base58::new(Some(VersionPrefix::P2ScriptAddress), &script.hash()).check_encode(),
+            Network::Testnet => Base58::new(Some(VersionPrefix::TestnetP2SHAddress), &script.hash()).check_encode(),
         }
     }
 
@@ -96,19 +97,17 @@ impl Address {
         Verifies that an address is valid by checking the payload and checksum.
         Only works for legacy addresses
     */
-    pub fn is_valid(address: String) -> bool {
-        let decoded: Vec<u8> = match bs58check::decode(&address) {
-            Ok(x) => x,
-            Err(_) => return false //Could return Err() here instead to provide more insight on why the address is not valid
-        };
-        if decoded.len() != 25 { return false }
+    pub fn is_valid(address: &str) -> bool {
+        match Base58::check_decode(address) {
+            Ok(x) => 
+                if x.len() != 21 {
+                    false
+                } else {
+                    true
+                },
 
-        
-        if let Ok(_) = bs58check::validate_checksum(&address) {
-            return true;
-        };
-
-        false
+            _ => false
+        }
     }
 }
 
@@ -151,7 +150,7 @@ mod tests {
 
         //Test if the expeted and derived keys are equal
         assert_eq!(expected_compressed_address, derived_compressed_address);
-        assert_eq!(Address::is_valid(derived_compressed_address.to_string()), true);
+        assert_eq!(Address::is_valid(&derived_compressed_address), true);
 
     }
 

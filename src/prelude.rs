@@ -39,11 +39,11 @@ pub use crate::{
     }, 
 
     encoding::{
-        bs58check::{
+        version_prefix::{
             VersionPrefix,
             ToVersionPrefix
         },
-        base58
+        base58::Base58
     },
 
     util::{
