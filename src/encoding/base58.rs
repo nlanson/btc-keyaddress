@@ -1,6 +1,6 @@
 use crate::{
     encoding::{
-        bs58check::VersionPrefix
+        version_prefix::VersionPrefix
     },
     hash
 };
@@ -77,7 +77,7 @@ impl Base58 {
         } else {
             self.payload
         };
-        
+
         let mut result = Vec::new();
         let mut zcount = 0;
         let mut encoding_flag = true;
@@ -224,6 +224,18 @@ mod tests {
         util::decode_02x
     };
     use super::*;
+
+
+    #[test]
+    fn base58_ietf_test_vectors() {
+        let hello_world = b"Hello World!";
+        let fox = b"The quick brown fox jumps over the lazy dog.";
+        let int = [0x00, 0x00, 0x28, 0x7f, 0xb4, 0xcd];
+
+        assert_eq!(Base58::new(None, hello_world).encode(), "2NEpo7TZRRrLZSi2U");
+        assert_eq!(Base58::new(None, fox).encode(), "USm3fpXnKG5EUBx2ndxBDMPVciP5hGey2Jh4NDv6gmeo1LkMeiKrLJUUBk6Z");
+        assert_eq!(Base58::new(None, &int).encode(), "11233QC4");
+    }
 
     #[test]
     fn base58_check_encode() {
