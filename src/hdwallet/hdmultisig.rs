@@ -559,7 +559,7 @@ impl MultisigHDWallet {
     pub fn master_private_key(&self, unlocker: &Unlocker) -> Result<Xprv, HDWError> {
         self.unlock(unlocker)?;
 
-        Ok(unlocker.master_private_key.clone())
+        Ok(unlocker.master_private_key)
     }
 
     /**

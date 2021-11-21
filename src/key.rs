@@ -264,7 +264,7 @@ impl SchnorrPublicKey {
         let other: [u8; 32] = try_into::<u8, 32>(other.to_vec());
 
         //Tweak the key
-        let mut tweaked_key = self.0.clone();
+        let mut tweaked_key = self.0; //clone removed
         match tweaked_key.tweak_add_assign(&secp, &other) {
             Ok(x) => {
                 //Check if tweaked successfully

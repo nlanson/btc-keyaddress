@@ -63,7 +63,7 @@ pub struct Xpub {
     pub index: [u8; 4]
 }
 
-pub trait ExtendedKey<T> where T: Key {
+pub trait ExtendedKey<T> where T: Key, Self: Copy {
     /**
         Constructs the Extended Key.
     */
@@ -138,11 +138,11 @@ pub trait ExtendedKey<T> where T: Key {
         let mut current_key: Self = self.clone();
         let mut childkey: Self = self.clone();
         for i in 0..path.children.len() {
-            childkey = match current_key.get_xchild(path.children[i].clone()) {
+            childkey = match current_key.get_xchild(path.children[i]) {
                 Ok(x) => x,
                 Err(x) => return Err(x)
             };
-            current_key = childkey.clone();
+            current_key = childkey;
         }
         Ok(childkey) 
     }

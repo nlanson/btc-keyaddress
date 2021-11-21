@@ -80,7 +80,7 @@ impl Address {
 
     /// P2WSH address given a script
     fn p2wsh(script: &RedeemScript, network: &Network) -> Result<String, Bech32Err> {
-        let hash = hash::sha256(script.code.clone()).to_vec();
+        let hash = hash::sha256(&script.code).to_vec();
 
         let witness_program = WitnessProgram::new(0, hash).unwrap();
         Ok(witness_program.to_address(network)?)

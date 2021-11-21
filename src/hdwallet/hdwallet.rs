@@ -426,7 +426,7 @@ impl HDWallet {
     pub fn master_private_key(&self, unlocker: &Unlocker) -> Result<Xprv, HDWError> {
         self.unlock(unlocker)?;
         
-        Ok(unlocker.master_private_key.clone())
+        Ok(unlocker.master_private_key)
     }
 
 
@@ -448,7 +448,7 @@ impl HDWallet {
     //return the share level public key.
     //This is the highest order key stored in the struct
     pub fn account_public_key(&self) -> Xpub {
-        self.account_public_key.clone()
+        self.account_public_key
     }
 
     

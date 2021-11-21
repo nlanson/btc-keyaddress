@@ -56,7 +56,7 @@ impl VersionPrefix {
             VersionPrefix::None => vec![],
             
             //Cases where version bytes is 4 bytes long
-            _ => (self.clone() as u32).to_be_bytes().to_vec()
+            _ => (*self as u32).to_be_bytes().to_vec()
         }
     }
 

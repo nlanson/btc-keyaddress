@@ -36,6 +36,13 @@
                 - Internal Key
                 - Optional script tree and parity bit
                 - [...]
+        
+        
+        - Custom SHA256 implementation using information from the learnmeabitcoin tutorial
+          and Ruby implementation:
+            > https://www.youtube.com/watch?v=f9EbD6iY9zI
+            > https://github.com/in3rsha/sha256-animation
+          This may be good to implement as a seperate repo/crate with a VERY extensive test suite.
                 
 
         - Automated github tests

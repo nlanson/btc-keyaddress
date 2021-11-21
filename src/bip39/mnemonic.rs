@@ -65,7 +65,7 @@ impl Mnemonic {
         //Get the seed and return
         Ok(
             Self {
-            phrase: phrase.clone(),
+            phrase,
             passphrase: passphrase.to_string()
             }
         )

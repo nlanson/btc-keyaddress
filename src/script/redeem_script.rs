@@ -120,7 +120,7 @@ impl RedeemScript {
     /// P2WSH script pub key
     /// 0x0020 <32-byte-script-hash>
     pub fn p2wsh(script: &Self) -> Self {
-        let hash = hash::sha256(script.code.clone()).to_vec();
+        let hash = hash::sha256(&script.code).to_vec();
         ScriptBuilder::new()
             .push_opcode(opcodes::OP_PUSHBYTES_0)
             .push_opcode(opcodes::OP_PUSHBYTES_32)
