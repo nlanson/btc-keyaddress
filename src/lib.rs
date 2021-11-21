@@ -23,7 +23,6 @@
             > HDWallets (Single and multi sig)
             > P2SH nested Segwit address generation (Stand alone and in HD Wallets imported from `ypub` keys)
             > Version prefix conversion (Key to prefix, int to prefix, etc..)
-            > Extensive tests for Base58 encoding and decoding
         
         - HDWallets
             > Better unlocker for multisig hd wallets
@@ -37,9 +36,7 @@
                 - Internal Key
                 - Optional script tree and parity bit
                 - [...]
-
-        - Base58 encoding
-            > Use the internal implementation of the base58 in the library for addresses, keys and extended keys.
+                
 
         - Automated github tests
 */
