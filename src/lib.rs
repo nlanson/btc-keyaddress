@@ -39,8 +39,8 @@
 
 
         - Clean up Bech32 encoding implementation for ease of use with Bech32m
-           > Use enum for choosing which encoding to use.
-           > Address decoding checking address requirements such as witness version, use of correct checksum and program length.
+           > Address decoding that enforces correct checksum use.
+           > Bech32 decoding taproot rules.
            > Implement BIP-0173 and BIP-350 test cases for Bech32 and Bech32m encoding.
              Test cases including:
                 > Valid strings that should pass decoding

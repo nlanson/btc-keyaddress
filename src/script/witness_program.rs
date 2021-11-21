@@ -7,6 +7,7 @@ use crate::{
     },
     encoding::bech32::{
         Bech32,
+        Format,
         Bech32Err
     },
     util::Network
@@ -45,8 +46,8 @@ impl WitnessProgram {
 
         let encoder = Bech32::from_witness_program(&hrp, self);
         match self.version {
-            0 => encoder.bech32(),
-            _ => encoder.bech32m()
+            0 => encoder.encode(Format::Bech32),
+            _ => encoder.encode(Format::Bech32m)
         }
     }
 

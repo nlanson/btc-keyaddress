@@ -32,30 +32,49 @@ const CHARSET: [char; 32] = [
 ];
 
 //Encoding values.
-const BECH32M_CONST: u32 = 0x2bc830a3;  //Bech32m xor constant
-const GEN: [u32; 5] = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]; //polymod generator coefficients
+const BECH32M_CONST: u32 = 0x2bc830a3;  //Bech32m XOR constant
+const GEN: [u32; 5] = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]; //Polymod generator coefficients
 
 pub struct Bech32 {
     //Human readable part string
     pub hrp: String,
 
-    //Data with parts that need to be squashed already squashed
+    //Data with parts that need to be squashed, already squashed
     pub data: Vec<u8>
 }
 
-pub enum Encoding {
+
+/// Enum for the different formats of Bech32 encoding
+pub enum Format {
     Bech32,
     Bech32m
 }
 
 impl Bech32 {
-    //Return a new encoder instance
+    /// Return a new encoder instance given a HRP and squashed data.
+    pub fn new(hrp: &str, squashed_data: &[u8]) -> Self {
+        Self {
+            hrp: hrp.to_string(),
+            data: squashed_data.to_vec()
+        }
+    }
+
+    /// Unsquash the data in the Bech32 encoder engine and return it
+    pub fn unwrap_data(&self) -> Result<Vec<u8>, Bech32Err> {
+        Self::try_from_u5_str(&self.data)
+    }
+    
+    
+    /// Return a new encoder instance from a witness program
+    /// Encode with rules enforced:
+    ///   - Witness version is not squashed
+    ///   - Witness v0 to use Bech32, Witness v1+ to use Bech32m [NOT YET IMPLEMENTED]
     pub fn from_witness_program (
         hrp: &str,
         wit_prog: &WitProg
     ) -> Self {
         //The data from a witness program is not the same as a script pub key
-        let mut squashed_data = vec![wit_prog.version];    //Version
+        let mut squashed_data = vec![wit_prog.version];                          //Version is not squashed
         squashed_data.extend_from_slice( &Self::to_u5(&wit_prog.program) ); //Witness program converted to 5 bits
         
         Self {
@@ -64,6 +83,13 @@ impl Bech32 {
         }
     }
 
+    /// Given an Bech32 encoded address, decode it and return the witness program.
+    /// Taproot address decoding is not yet implemented.
+    /// Enforced Rules:
+    ///   - Valid Bitcoin HRP
+    ///   - Valid witness version (0 ~ 16)
+    ///   - Witness program length restrictions
+    ///   - Use of correct checksum for witness version (Bech32 for v0, Bech32m for v1+)  [NOT YET IMPLEMENTED]
     pub fn to_witness_program(address: &str) -> Result<WitProg, Bech32Err> {        
         //Decode the address
         let mut bech32 = Self::decode(address)?;
@@ -74,14 +100,16 @@ impl Bech32 {
             x => return Err(Bech32Err::InvalidHRP(x.to_string()))
         }
 
-        //Check that the witness version is valid and enforce known length restrictions
+        //Check that the witness version is valid...
         let witness_version = bech32.data[0];
+        bech32.data.remove(0);  // then remove it from the encoder as it is not packed
         if witness_version > 16 { return Err(Bech32Err::InvalidData(witness_version)) }
+        
+        //Enforce known length restrictions
         match witness_version {
             //Witness Version 0
             0 => {
-                bech32.data.remove(0); //remove the version byte as it is not packed
-                let witness_program = Self::try_from_u5_str(&bech32.data)?;
+                let witness_program = bech32.unwrap_data()?;
 
                 //Witness version 0 must have strict program length of 20 or 32 bytes.
                 if witness_program.len() != 20 && witness_program.len() != 32 { return Err(Bech32Err::LengthRestriction(witness_program.len())) }
@@ -98,25 +126,13 @@ impl Bech32 {
         }
     }
 
-    //Encode self with Bech32
-    pub fn bech32(&self) -> Result<String, Bech32Err> {
-        self.encode(Encoding::Bech32)
-    }
-
-    //Encode self with Bech32m
-    pub fn bech32m(&self) -> Result<String, Bech32Err> {
-        self.encode(Encoding::Bech32m)
-    }
-
-    pub fn encode(&self, encoding_type: Encoding) -> Result<String, Bech32Err> {
+    /// Encodes the given HRP and data to Bech32 using the specified checksum type.
+    pub fn encode(&self, encoding_format: Format) -> Result<String, Bech32Err> {
         let mut result = format!("{}{}", self.hrp, SEPERATOR);
 
         //Create the checksum
         let hrp_bytes = self.hrp.clone().into_bytes();
-        let checksum = match encoding_type {
-            Encoding::Bech32 => Self::create_checksum(&hrp_bytes, &self.data, false),
-            Encoding::Bech32m => Self::create_checksum(&hrp_bytes, &self.data, true)
-        };
+        let checksum = Self::create_checksum(&hrp_bytes, &self.data, encoding_format);
 
         //Payload is data + checksum concatenated
         let mut payload = self.data.clone();
@@ -173,15 +189,16 @@ impl Bech32 {
     }
 
     //BIP-0713 defined method
-    fn create_checksum(hrp_bytes: &Vec<u8>, data: &Vec<u8>, bech32m: bool) -> Vec<u8> {
+    fn create_checksum(hrp_bytes: &Vec<u8>, data: &Vec<u8>, format: Format) -> Vec<u8> {
         let mut values = Self::hrp_expand(hrp_bytes);
         values.extend_from_slice(data);
         values.extend_from_slice(&[0,0,0,0,0,0]);
 
         //Bech32m uses a different constant here.
-        let polymod: u32;
-        if bech32m { polymod = Self::polymod(&values) ^ BECH32M_CONST }
-        else { polymod = Self::polymod(&values) ^ 1 }
+        let polymod: u32 = match format {
+            Format::Bech32 => Self::polymod(&values) ^ 1,
+            Format::Bech32m => Self::polymod(&values) ^ BECH32M_CONST
+        };
 
         
         let mut checksum: Vec<u8> = vec![];
@@ -406,9 +423,14 @@ mod tests {
     fn bech32m_verification() -> Result<(), Bech32Err> {
         let strings = [
             "a1lqfn3a",
-            //"an83characterlonghumanreadablepartthatcontainsthetheexcludedcharactersbioandnumber11sg7hg6", # This case not passing becase the HRP contains illegal characters
+            // Not passing becasue the HRP contains illegal characters.
+            //Simply need to disable character checks while looping the HRP.
+            //"an83characterlonghumanreadablepartthatcontainsthetheexcludedcharactersbioandnumber11sg7hg6",
             "abcdef1l7aum6echk45nj3s0wdvt2fg8x9yrzpqzd3ryx",
-            //"11llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllludsr8", # This case not passing becase there is a '1' in the HRP which the code is thinking is the seperator, and counting the actual seperator as part of the data.
+            
+            // Not passing becuase the first instance if '1' is counted as the seperator, making the second instance an illegal character in the payload.
+            // Simply need to detect that last instance of '1' and make that the seperator
+            //"11llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllludsr8", 
             "split1checkupstagehandshakeupstreamerranterredcaperredlc445v",
             "?1v759aa"
         ];

@@ -43,7 +43,11 @@ pub use crate::{
             VersionPrefix,
             ToVersionPrefix
         },
-        base58::Base58
+        base58::Base58,
+        bech32::{
+            Bech32,
+            Format
+        }
     },
 
     util::{
