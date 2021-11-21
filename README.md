@@ -12,7 +12,8 @@ This library implements:
 - Single-sig HD Wallets using BIP-44/49/84 derivation paths (or even a custom path for the crazy peeps)
 - Multi-sig HD Wallets using BIP-45 or 48 derivation paths
 - Nested and native segwit
-- Taproot address creation with or without a script tree. Script tree can be either a balanced or huffman tree.
+- Taproot address creation with or without a script tree. Script tree can be either a MAST or huffman tree
+- Base58 and Bech32 encoding and decoding
 
 ## Installation
 Add this as a dependency to your ```cargo.toml```:
