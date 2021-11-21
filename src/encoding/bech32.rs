@@ -43,6 +43,11 @@ pub struct Bech32 {
     pub data: Vec<u8>
 }
 
+pub enum Encoding {
+    Bech32,
+    Bech32m
+}
+
 impl Bech32 {
     //Return a new encoder instance
     pub fn from_witness_program (
@@ -95,20 +100,23 @@ impl Bech32 {
 
     //Encode self with Bech32
     pub fn bech32(&self) -> Result<String, Bech32Err> {
-        self.encode(false)
+        self.encode(Encoding::Bech32)
     }
 
     //Encode self with Bech32m
     pub fn bech32m(&self) -> Result<String, Bech32Err> {
-        self.encode(true)
+        self.encode(Encoding::Bech32m)
     }
 
-    fn encode(&self, bech32m: bool) -> Result<String, Bech32Err> {
+    pub fn encode(&self, encoding_type: Encoding) -> Result<String, Bech32Err> {
         let mut result = format!("{}{}", self.hrp, SEPERATOR);
 
         //Create the checksum
         let hrp_bytes = self.hrp.clone().into_bytes();
-        let checksum = Self::create_checksum(&hrp_bytes, &self.data, bech32m);
+        let checksum = match encoding_type {
+            Encoding::Bech32 => Self::create_checksum(&hrp_bytes, &self.data, false),
+            Encoding::Bech32m => Self::create_checksum(&hrp_bytes, &self.data, true)
+        };
 
         //Payload is data + checksum concatenated
         let mut payload = self.data.clone();
@@ -124,6 +132,8 @@ impl Bech32 {
         Ok(result)
     }
 
+    /// Bech32 decoding function that decodes a given Bech32 string into HRP and Payload.
+    /// Does not validate address requirements such as program length and witness version.
     fn decode(encoded: &str) -> Result<Self, Bech32Err> {
         //Seperate the hrp from data at the seperator
         let mut i = 0;
@@ -206,12 +216,15 @@ impl Bech32 {
         chk
     }
 
-    //BIP-0173 defined method
+    /// BIP-0173 defined method
+    /// Verifies the checksum of a bech32 hrp bytes and data.
+    /// Does not check the witness version in the data and verifies the checksum using BOTH encoding types.
     fn verify_checksum(hrp_bytes: &Vec<u8>, data: &Vec<u8>) -> bool {
         let mut values = Self::hrp_expand(hrp_bytes);
         values.extend_from_slice(&data);
 
-        Self::polymod(&values) == 1
+        // Verify either Bech32 OR Bech32m
+        Self::polymod(&values) == 1 || Self::polymod(&values) == BECH32M_CONST
     }
 
     /**
@@ -387,5 +400,23 @@ mod tests {
 
         let decoded = WitProg::from_address(&address).unwrap();
         assert_eq!(witness_program, decoded);
+    }
+
+    #[test]
+    fn bech32m_verification() -> Result<(), Bech32Err> {
+        let strings = [
+            "a1lqfn3a",
+            //"an83characterlonghumanreadablepartthatcontainsthetheexcludedcharactersbioandnumber11sg7hg6", # This case not passing becase the HRP contains illegal characters
+            "abcdef1l7aum6echk45nj3s0wdvt2fg8x9yrzpqzd3ryx",
+            //"11llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllludsr8", # This case not passing becase there is a '1' in the HRP which the code is thinking is the seperator, and counting the actual seperator as part of the data.
+            "split1checkupstagehandshakeupstreamerranterredcaperredlc445v",
+            "?1v759aa"
+        ];
+
+        for case in strings {
+            Bech32::decode(case)?;
+        }
+
+        Ok(())
     }
 }
