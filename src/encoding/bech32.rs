@@ -10,8 +10,8 @@ use crate::{
 
 #[derive(Debug)]
 pub enum Bech32Err {
-    BadNetwork(),
-    CannotEncode(),
+    BadNetwork,
+    CannotEncode,
     InvalidInt(u8),
     InvalidLength(usize),
     InvalidData(u8),
@@ -19,7 +19,9 @@ pub enum Bech32Err {
     BadChar(char),
     BadChecksum,
     InvalidHRP(String),
-    LengthRestriction(usize)
+    LengthRestriction(usize),
+    IncorrectChecksum(Format),
+    InvalidWitnessVersion(u8)
 }
 
 // Encoding character set.
@@ -40,22 +42,36 @@ pub struct Bech32 {
     pub hrp: String,
 
     //Data with parts that need to be squashed, already squashed
-    pub data: Vec<u8>
+    pub data: Vec<u8>,
+
+    pub format: Format
 }
 
 
 /// Enum for the different formats of Bech32 encoding
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Format {
     Bech32,
     Bech32m
 }
 
+impl Format {
+    /// Given a witness version, return the Bech32 checksum format that should be used
+    pub fn from_witness_version(version: u8) -> Format {
+        match version {
+            0 => Format::Bech32,
+            _ => Format::Bech32m, //assuming all future versions will be using Bech32m
+        }
+    }
+}
+
 impl Bech32 {
-    /// Return a new encoder instance given a HRP and squashed data.
-    pub fn new(hrp: &str, squashed_data: &[u8]) -> Self {
+    /// Return a new encoder instance given a HRP and squashed data and format
+    pub fn new(hrp: &str, squashed_data: &[u8], format: Format) -> Self {
         Self {
             hrp: hrp.to_string(),
-            data: squashed_data.to_vec()
+            data: squashed_data.to_vec(),
+            format
         }
     }
 
@@ -68,7 +84,7 @@ impl Bech32 {
     /// Return a new encoder instance from a witness program
     /// Encode with rules enforced:
     ///   - Witness version is not squashed
-    ///   - Witness v0 to use Bech32, Witness v1+ to use Bech32m [NOT YET IMPLEMENTED]
+    ///   - Witness v0 to use Bech32, Witness v1+ to use Bech32m
     pub fn from_witness_program (
         hrp: &str,
         wit_prog: &WitProg
@@ -79,7 +95,8 @@ impl Bech32 {
         
         Self {
             hrp: hrp.to_string(),
-            data: squashed_data
+            data: squashed_data,
+            format: Format::from_witness_version(wit_prog.version)
         }
     }
 
@@ -89,7 +106,7 @@ impl Bech32 {
     ///   - Valid Bitcoin HRP
     ///   - Valid witness version (0 ~ 16)
     ///   - Witness program length restrictions
-    ///   - Use of correct checksum for witness version (Bech32 for v0, Bech32m for v1+)  [NOT YET IMPLEMENTED]
+    ///   - Use of correct checksum for witness version (Bech32 for v0, Bech32m for v1+)
     pub fn to_witness_program(address: &str) -> Result<WitProg, Bech32Err> {        
         //Decode the address
         let mut bech32 = Self::decode(address)?;
@@ -102,37 +119,48 @@ impl Bech32 {
 
         //Check that the witness version is valid...
         let witness_version = bech32.data[0];
-        bech32.data.remove(0);  // then remove it from the encoder as it is not packed
-        if witness_version > 16 { return Err(Bech32Err::InvalidData(witness_version)) }
+        bech32.data.remove(0);        // remove the witness version from the encoder as it is not packed
+        let witness_program = bech32.unwrap_data()?;
+        if witness_version > 16 { return Err(Bech32Err::InvalidWitnessVersion(witness_version)) }
         
-        //Enforce known length restrictions
+        //Enforce known length restrictions and checksum requirements
         match witness_version {
-            //Witness Version 0
+            //Segwit
             0 => {
-                let witness_program = bech32.unwrap_data()?;
-
-                //Witness version 0 must have strict program length of 20 or 32 bytes.
+                // Segwit witness programs are either 20 byte key hashes or 32 byte script hashes
+                // Uses Bech32 checksum
                 if witness_program.len() != 20 && witness_program.len() != 32 { return Err(Bech32Err::LengthRestriction(witness_program.len())) }
-
-                //Return the witness program
-                return Ok(
-                    WitProg::new(witness_version, witness_program).unwrap()
-                )
             },
             
-            //Future segwit versions
-            1 => unimplemented!("Witness verion 1 is reserved for Taproot"),
+            //Taproot
+            1 => {
+                // Taproot witprogs are all 32 byte public keys
+                // Uses Bech32m checksum
+                if witness_program.len() != 32 { return Err(Bech32Err::LengthRestriction(witness_program.len())) }
+            },
+
+            //Future witness versions
             _ => unimplemented!("Witness version reserved for future upgrade")
         }
+
+        //Check if the checksum uses the correct format for the version
+        if Format::from_witness_version(witness_version) != bech32.format {
+            return Err(Bech32Err::IncorrectChecksum(bech32.format))
+        }
+
+        //If checks pass for the specific witness version, return the witness program
+        return Ok(
+            WitProg::new(witness_version, witness_program).unwrap()
+        )
     }
 
     /// Encodes the given HRP and data to Bech32 using the specified checksum type.
-    pub fn encode(&self, encoding_format: Format) -> Result<String, Bech32Err> {
+    pub fn encode(&self) -> Result<String, Bech32Err> {
         let mut result = format!("{}{}", self.hrp, SEPERATOR);
 
         //Create the checksum
         let hrp_bytes = self.hrp.clone().into_bytes();
-        let checksum = Self::create_checksum(&hrp_bytes, &self.data, encoding_format);
+        let checksum = Self::create_checksum(&hrp_bytes, &self.data, self.format);
 
         //Payload is data + checksum concatenated
         let mut payload = self.data.clone();
@@ -174,12 +202,13 @@ impl Bech32 {
         //Check if there is a checksum present
         if bytes.len() < 6 { return Err(Bech32Err::InvalidLength(bytes.len())) }
 
-        //Verify the checksum and return hrp and data is valid
-        if Self::verify_checksum(&hrp.clone().into_bytes(), &bytes) { 
+        //Verify the checksum and return hrp and data and format if valid
+        if let Some(x) = Self::verify_checksum(&hrp.clone().into_bytes(), &bytes) {
             return Ok(
                 Bech32 {
                     hrp,
-                    data: bytes[0..bytes.len()-6].to_vec() //remove the checksum from the bytes
+                    data: bytes[0..bytes.len()-6].to_vec(), //remove the checksum from the bytes
+                    format: x
                 }
             )
         }
@@ -207,7 +236,7 @@ impl Bech32 {
     }
 
     //BIP-0713 defined method
-    fn hrp_expand(hrp_bytes: &Vec<u8>) -> Vec<u8> {
+    fn hrp_expand(hrp_bytes: &[u8]) -> Vec<u8> {
         let mut values: Vec<u8> = vec![];
         for x in hrp_bytes { values.push(x >> 5) }
         values.push(0);
@@ -233,15 +262,17 @@ impl Bech32 {
         chk
     }
 
-    /// BIP-0173 defined method
-    /// Verifies the checksum of a bech32 hrp bytes and data.
-    /// Does not check the witness version in the data and verifies the checksum using BOTH encoding types.
-    fn verify_checksum(hrp_bytes: &Vec<u8>, data: &Vec<u8>) -> bool {
+    /// Verifies the checksum on the hrp bytes and payload.
+    /// 
+    /// Returns the checksum format if a match is detected, otherwise returns None.
+    fn verify_checksum(hrp_bytes: &[u8], data: &[u8]) -> Option<Format> {
         let mut values = Self::hrp_expand(hrp_bytes);
         values.extend_from_slice(&data);
 
         // Verify either Bech32 OR Bech32m
-        Self::polymod(&values) == 1 || Self::polymod(&values) == BECH32M_CONST
+        if Self::polymod(&values) == 1 { return Some(Format::Bech32) }
+        else if Self::polymod(&values) == BECH32M_CONST { return Some(Format::Bech32m) }
+        else { return None }
     }
 
     /**
@@ -350,7 +381,7 @@ impl Bech32 {
         while bit_string.len()%8 != 0 {
             match bit_string.chars().nth( bit_string.len()-1 ) {
                 Some(x) => { 
-                    if x != '0' { return Err(Bech32Err::InvalidData(0)) }
+                    if x != '0' { return Err(Bech32Err::InvalidData(1)) }
                     bit_string.remove( bit_string.len()-1 );
                 },
 

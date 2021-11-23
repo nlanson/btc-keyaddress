@@ -40,15 +40,8 @@ impl WitnessProgram {
             Network::Bitcoin => "bc".to_string(),
             Network::Testnet => "tb".to_string()
         };
-        
-        let mut data = vec![self.version];
-        data.extend_from_slice(&self.program);
 
-        let encoder = Bech32::from_witness_program(&hrp, self);
-        match self.version {
-            0 => encoder.encode(Format::Bech32),
-            _ => encoder.encode(Format::Bech32m)
-        }
+        Bech32::from_witness_program(&hrp, self).encode()
     }
 
     pub fn from_address(address: &str) -> Result<Self, Bech32Err> {
