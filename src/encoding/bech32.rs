@@ -183,11 +183,14 @@ impl Bech32 {
         let mut i = 0;
         let sep_position = loop {
             if i >= encoded.len() { return Err(Bech32Err::SeperatorMissing) }
-            if encoded.chars().nth(i) == Some(SEPERATOR) { break i }
+            if encoded.chars().rev().nth(i) == Some(SEPERATOR) { break encoded.len()-i-1 }
             i+=1;
         };
         let hrp = encoded[0..sep_position].to_string();
         let data = encoded[sep_position+1..encoded.len()].to_string();
+
+        //Enforce hrp length restrictions
+        if hrp.len() == 0 { return Err(Bech32Err::InvalidHRP("".to_string())) }
 
         //Match the data bytes to a 5 bit value
         let mut bytes: Vec<u8> = vec![];
@@ -403,7 +406,10 @@ impl Bech32 {
 mod tests {
     use super::*;
     use crate::{
-        util::Network
+        util::{
+            Network,
+            decode_02x
+        }
     };
 
     #[test]
@@ -451,25 +457,116 @@ mod tests {
     }
 
     #[test]
-    fn bech32m_verification() -> Result<(), Bech32Err> {
-        let strings = [
+    fn bip173_valid_strings() -> Result<(), Bech32Err> {
+        let valid_bech32_strings = [
+            "a12uel5l",
+            "an83characterlonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1tt5tgs",
+            "abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw",
+            "11qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqc8247j",
+            "split1checkupstagehandshakeupstreamerranterredcaperred2y9e3w",
+            "?1ezyfcl"
+        ];
+
+        for string in valid_bech32_strings {
+            Bech32::decode(string)?;
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn bip173_invalid_strings() -> Result<(), Bech32Err> {
+        let invalid_bech32_strings = [
+            "pzry9x0s0muk", //missing seperator
+            "1pzry9x0s0muk",//empty hrp
+            "x1b4n0q5v",    //invalid data char
+            "li1dgmt3",     //checksum too short
+            "de1lg7wt",     //invalid checksum char
+            "10a06t8",      //empty hrp
+            "1qzzfhee"      //empty hrp
+        ];
+
+        for string in invalid_bech32_strings {
+            assert!(Bech32::decode(string).is_err())
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn bip173_valid_addresses() -> Result<(), Bech32Err> {
+        let bech32_valid_addresses = [
+            ("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "0014751e76e8199196d454941c45d1b3a323f1433bd6"), 
+            ("tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sl5k7", "00201863143c14c5166804bd19203356da136c985678cd4d27a1b8c6329604903262"),
+            ("tb1qqqqqp399et2xygdj5xreqhjjvcmzhxw4aywxecjdzew6hylgvsesrxh6hy", "0020000000c4a5cad46221b2a187905e5266362b99d5e91c6ce24d165dab93e86433")
+        ];
+
+        for address in bech32_valid_addresses {
+            let script_pub_key = Bech32::to_witness_program(address.0)?.to_scriptpubkey();
+            assert_eq!(script_pub_key.to_vec(), decode_02x(address.1));
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    #[should_panic]
+    fn bip173_invalid_addresses() -> () {
+        let bech32_invalid_addresses = [
+            "tc1qw508d6qejxtdg4y5r3zarvary0c5xw7kg3g4ty",                                   //invalid hrp
+            "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5",                                   //invalid checksum
+            "bc1rw5uspcuh",                                                                 //invalid program length
+            "bc10w508d6qejxtdg4y5r3zarvary0c5xw7kw508d6qejxtdg4y5r3zarvary0c5xw7kw5rljs90", //invalud program length
+            "bc1qr508d6qejxtdg4y5r3zarvaryv98gj9p",                                         //invalid program length
+            "tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sL5k7",               //mixed case
+            "bc1zw508d6qejxtdg4y5r3zarvaryvqyzf3du",                                        //zero padding more than 4 bits
+            "tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3pjxtptv",               //non-zero padding in 8-to-5 conversion
+            "bc1gmk9yu"                                                                     //empty data section
+        ];
+
+        for address in bech32_invalid_addresses {
+            println!("{}", address);
+            let a = Bech32::to_witness_program(address);
+            assert!(a.is_err());
+        }
+    
+        ()
+    }
+
+    #[test]
+    fn bip350_valid_strings() -> Result<(), Bech32Err> {
+        let valid_bech32m_strings = [
             "a1lqfn3a",
-            // Not passing becasue the HRP contains illegal characters.
-            //Simply need to disable character checks while looping the HRP.
-            //"an83characterlonghumanreadablepartthatcontainsthetheexcludedcharactersbioandnumber11sg7hg6",
+            "an83characterlonghumanreadablepartthatcontainsthetheexcludedcharactersbioandnumber11sg7hg6",
             "abcdef1l7aum6echk45nj3s0wdvt2fg8x9yrzpqzd3ryx",
-            
-            // Not passing becuase the first instance if '1' is counted as the seperator, making the second instance an illegal character in the payload.
-            // Simply need to detect that last instance of '1' and make that the seperator
-            //"11llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllludsr8", 
+            "11llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllludsr8", 
             "split1checkupstagehandshakeupstreamerranterredcaperredlc445v",
             "?1v759aa"
         ];
 
-        for case in strings {
-            Bech32::decode(case)?;
+        for string in valid_bech32m_strings {
+            Bech32::decode(string)?;
         }
 
+        Ok(())
+    }
+
+    #[test]
+    fn bip350_invalid_strings() ->  Result<(), Bech32Err> {
+        let invalid_bech32m_strings = [
+            "qyrz8wqd2c9m", //missing seperator
+            "1qyrz8wqd2c9m",//empty hrp
+            "y1b0jsk6g",    //invalid data char
+            "in1muywd",     //checksum too short
+            "mm1crxm3i",     //invalid checksum char
+            "16plkw9",      //empty hrp
+            "1p2gdwpf"      //empty hrp
+        ];
+
+        for string in invalid_bech32m_strings {
+            assert!(Bech32::decode(string).is_err())
+        }
+        
         Ok(())
     }
 }

@@ -39,12 +39,9 @@
 
 
         - Clean up Bech32 encoding implementation for ease of use with Bech32m
-           > Implement BIP-0173 and BIP-350 test cases for Bech32 and Bech32m encoding.
-             Test cases including:
-                > Valid strings that should pass decoding
-                > Invalud strings that should not pass decoding
-                > Valid addresses that should pass decoding and equal a certain scriptPubKey
-                > Invalid addresses that should not pass decoding
+           > Bip350 valid and invalid address test cases. 
+                - Cross check valid addresses with a script pub key
+                - Invalid addresses should return an error or panic
         
         
         - Custom SHA256 implementation using information from the learnmeabitcoin tutorial
