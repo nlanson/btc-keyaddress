@@ -42,6 +42,11 @@ impl RedeemScript {
         hash::hash160(&self.code)
     }
 
+    /// Return the underlying byte vector
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.code.clone()
+    }
+
     /**
         Creates a new witness program given a version and data.
 
