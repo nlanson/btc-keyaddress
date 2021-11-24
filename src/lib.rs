@@ -31,6 +31,7 @@
             
         
         - Taproot
+            > Implement implementable BIP-341 test vectors (https://github.com/bitcoin/bips/blob/master/bip-0341/wallet-test-vectors.json)
             > Script tree value use Enum instead of Option
             > Struct for spending data which consists of
                 - Internal Key

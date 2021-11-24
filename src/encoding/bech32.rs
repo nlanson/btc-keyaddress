@@ -109,18 +109,18 @@ impl Bech32 {
     ///   - Use of correct checksum for witness version (Bech32 for v0, Bech32m for v1+)
     pub fn to_witness_program(address: &str) -> Result<WitProg, Bech32Err> {        
         //Decode the address
-        let mut bech32 = Self::decode(address)?;
+        let mut decoded_address = Self::decode(address)?;
 
         //Check the HRP is valid for Bitcoin
-        match &bech32.hrp[..] {
+        match &decoded_address.hrp[..] {
             "bc" | "tb" => { },
             x => return Err(Bech32Err::InvalidHRP(x.to_string()))
         }
 
         //Check that the witness version is valid...
-        let witness_version = bech32.data[0];
-        bech32.data.remove(0);        // remove the witness version from the encoder as it is not packed
-        let witness_program = bech32.unwrap_data()?;
+        let witness_version = decoded_address.data[0];
+        decoded_address.data.remove(0); // remove the witness version from the encoder as it is not packed
+        let witness_program = decoded_address.unwrap_data()?;
         if witness_version > 16 { return Err(Bech32Err::InvalidWitnessVersion(witness_version)) }
         
         //Enforce known length restrictions and checksum requirements
@@ -144,8 +144,8 @@ impl Bech32 {
         }
 
         //Check if the checksum uses the correct format for the version
-        if Format::from_witness_version(witness_version) != bech32.format {
-            return Err(Bech32Err::IncorrectChecksum(bech32.format))
+        if Format::from_witness_version(witness_version) != decoded_address.format {
+            return Err(Bech32Err::IncorrectChecksum(decoded_address.format))
         }
 
         //If checks pass for the specific witness version, return the witness program
@@ -456,6 +456,7 @@ mod tests {
         assert_eq!(witness_program, decoded);
     }
 
+
     #[test]
     fn bip173_valid_strings() -> Result<(), Bech32Err> {
         let valid_bech32_strings = [
@@ -525,7 +526,6 @@ mod tests {
         ];
 
         for address in bech32_invalid_addresses {
-            println!("{}", address);
             let a = Bech32::to_witness_program(address);
             assert!(a.is_err());
         }
@@ -558,7 +558,7 @@ mod tests {
             "1qyrz8wqd2c9m",//empty hrp
             "y1b0jsk6g",    //invalid data char
             "in1muywd",     //checksum too short
-            "mm1crxm3i",     //invalid checksum char
+            "mm1crxm3i",    //invalid checksum char
             "16plkw9",      //empty hrp
             "1p2gdwpf"      //empty hrp
         ];
@@ -568,5 +568,47 @@ mod tests {
         }
         
         Ok(())
+    }
+
+    #[test]
+    fn bip350_valid_addresses() -> Result<(), Bech32Err> {
+        let bech32_valid_addresses = [
+            ("tb1pqqqqp399et2xygdj5xreqhjjvcmzhxw4aywxecjdzew6hylgvsesf3hn0c", "5120000000c4a5cad46221b2a187905e5266362b99d5e91c6ce24d165dab93e86433"), 
+            ("bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0", "512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"),
+        ];
+
+        for address in bech32_valid_addresses {
+            let script_pub_key = Bech32::to_witness_program(address.0)?.to_scriptpubkey();
+            assert_eq!(script_pub_key.to_vec(), decode_02x(address.1));
+        }
+
+
+        Ok(())
+    }
+
+    #[test]
+    #[should_panic]
+    fn bip350_invalid_addresses() -> () {
+        let bech32_invalid_addresses = [
+            "tc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vq5zuyut",               //invalid hrp
+            "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqh2y7hd",               //wrong checksum
+            "tb1z0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqglt7rf",               //wrong checksum
+            "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kemeawh",                                   //wrong checksum
+            "tb1q0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vq24jc47",               //wrong checksum
+            "bc1p38j9r5y49hruaue7wxjce0updqjuyyx0kh56v8s25huc6995vvpql3jow4",               //invalid chars in checksum
+            "bc1pw5dgrnzv",                                                                 //invalid program length
+            "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7v8n0nx0muaewav253zgeav", //invalid program length
+            "tb1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vq47Zagq",               //mixed case
+            "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7v07qwwzcrf",             //bad padding
+            "tb1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vpggkg4j",               //bad padding
+            "bc1gmk9yu"                                                                     //missing data
+        ];
+
+        for address in bech32_invalid_addresses {
+            let a = Bech32::to_witness_program(address);
+            assert!(a.is_err());
+        }
+    
+        ()
     }
 }
