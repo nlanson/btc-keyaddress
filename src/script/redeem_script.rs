@@ -47,6 +47,24 @@ impl RedeemScript {
         self.code.clone()
     }
 
+    /// Returns a byte vector of the script prefixed with it's length in compact size.
+    pub fn prefix_compactsize(&self) -> Vec<u8> {
+        let len = self.code.len();
+        let mut compact_size: Vec<u8> = vec![];
+        if len <= 252 {
+            compact_size = vec![len as u8];
+        } else if len <=0xffff {
+            compact_size = vec![0xfd];
+            let mut len = len.to_le_bytes().to_vec();
+            len.truncate(2);
+            compact_size.extend_from_slice(&len);
+        }
+        
+        let mut prefixed = compact_size;
+        prefixed.extend_from_slice(&self.code);
+        prefixed
+    }
+
     /**
         Creates a new witness program given a version and data.
 

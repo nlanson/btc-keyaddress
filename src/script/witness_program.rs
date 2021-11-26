@@ -7,7 +7,6 @@ use crate::{
     },
     encoding::bech32::{
         Bech32,
-        Format,
         Bech32Err
     },
     util::Network

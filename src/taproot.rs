@@ -45,11 +45,40 @@ macro_rules! taproot_tagged_hashes {
     }
 }
 
-taproot_tagged_hashes!(TapTweakHash, "TapTweak");
-taproot_tagged_hashes!(TapBranchHash, "TapBranch");
-taproot_tagged_hashes!(TapLeafHash, "TapLeaf");
+// Define the three taproot tagged hashes
+taproot_tagged_hashes!(TapTweakHash, "TapTweak");   // Used for the final key tweak
+taproot_tagged_hashes!(TapBranchHash, "TapBranch"); // Used to hash script tree nodes together into a single branch node
+taproot_tagged_hashes!(TapLeafHash, "TapLeaf");     // Used to hash script tree leaf nodes
 
+impl TapLeafHash {
+    /// Return the hash of a leaf node given it's info
+    pub fn from_leaf(leaf: &LeafInfo) -> [u8; 32] {
+        let mut data = vec![leaf.version];
+        data.extend_from_slice(&leaf.script.prefix_compactsize());
 
+        TapLeafHash::from_slice(&data)
+    }
+}
+
+impl TapBranchHash {
+    /// Return the hash of a branch node given two child nodes
+    pub fn from_nodes(left: &TreeNode, right: &TreeNode) -> [u8; 32] {
+        //Extract the hashes of the child nodes.
+        let (mut left_hash, mut right_hash) = (left.value.as_hash(), right.value.as_hash());
+
+        //Swap the hashes by value.
+        if right_hash < left_hash {
+            let temp = left_hash;
+            left_hash = right_hash;
+            right_hash = temp;
+        }
+
+        //Concatenate the hashes and TapBranchHash it
+        let mut hash_preimage = left_hash.to_vec();
+        hash_preimage.extend_from_slice(&right_hash);
+        TapBranchHash::from_slice(&hash_preimage)
+    }
+}
 
 /**
     TreeNode struct to create binary trees
@@ -61,28 +90,36 @@ pub struct TreeNode {
 
     //This value here could be an enum `TreeNodeInfo` which contains either a (leaf version, script) tuple or hash of children
     //By doing this, each node will contain a value whether it is a leaf or branch and removes the need for an Option
-    pub value: Option<LeafInfo>   
+    pub value: NodeValue  
 }
 
-pub enum TreeNodeValue {
-    Hash([u8; 32]),
+#[derive(Debug, Clone, PartialEq)]
+/// NodeValue struct stores the value of a node in a tree.
+/// Stores either the hash of it's children or the unhashed leaf info.
+pub enum NodeValue {
+    Branch([u8; 32]),
     Leaf(LeafInfo)
 }
 
+impl NodeValue {
+    /// Return the hash of the node's value.
+    pub fn as_hash(&self) -> [u8; 32] {
+        match self {
+            NodeValue::Branch(hash) => *hash,
+            NodeValue::Leaf(leaf) => leaf.tapleaf_hash()
+        }
+    }
+}
 
-/**
-    LeafInfo struct that stores the leaf version and script in a script tree leaf.
-*/
 #[derive(Debug, Clone, PartialEq)]
+/// LeafInfo struct that stores the leaf version and script in a script tree leaf.
 pub struct LeafInfo {
     version: u8,
     script: RedeemScript
 }
 
 impl LeafInfo {
-    /**
-        Creates a new leaf given a version and script
-    */
+    /// New leaf with a specified version and script
     pub fn new_with_version(version: u8, script: &RedeemScript) -> Self {
         Self {
             version,
@@ -90,11 +127,14 @@ impl LeafInfo {
         }
     }
 
-    /**
-        Creates a new leaf with default version 
-    */
+    /// New leaf with default version of 0xc0 and provided script
     pub fn new(script: &RedeemScript) -> Self {
         Self::new_with_version(0xc0, script)
+    }
+
+    /// TapLeafHash of the leaf
+    pub fn tapleaf_hash(&self) -> [u8; 32] {
+        TapLeafHash::from_leaf(self)
     }
 }
 
@@ -105,9 +145,7 @@ pub struct HuffmanCoding<T> {
 }
 
 impl HuffmanCoding<RedeemScript> {
-    /**
-        Create a new item to add to a huffman tree
-    */
+    /// New item to add to huffman tree given it's frequency and script
     pub fn new_item(freq: usize, script: &RedeemScript) -> Self {
         Self {
             freq,
@@ -164,7 +202,6 @@ impl HuffmanCoding<RedeemScript> {
             //This method of inserting the combined node might not be consistent. Later, a custom insertion method should
             //be written for consistency. 
             //But for now, it stays.
-            println!("{:?}\n", combined_node);
             table.push((sum, combined_node));
             table.sort_by(|a, b| b.0.cmp(&a.0)); 
         }
@@ -175,28 +212,35 @@ impl HuffmanCoding<RedeemScript> {
 
 
 impl TreeNode {
-    /**
-        Create a new node 
-    */
+    /// Create a new tree node given either a left and right child or a leaf value.
+    /// 
+    /// If left and right children are given, the node is interpreted to be a branch node.
+    /// The value stored in a branch node is the hash of the two child nodes.
+    /// 
+    /// If a leaf value is given, the node is interpreted to be a leaf node.
+    /// The value stored in a leaf node is the unhashed leaf information.
     pub fn new(left: Option<Self>, right: Option<Self>, value: Option<LeafInfo>) -> Result<Self, TaprootErr> {
         //Branch node | Has both branches and no value
         if left.is_some() && right.is_some() && value.is_none() {
+            // Get the hash of the two children
+            let branch_hash = TapBranchHash::from_nodes(&left.as_ref().unwrap(), &right.as_ref().unwrap());
+            
             Ok(
                 Self {
                     left: Some(Box::new(left.unwrap())),
                     right: Some(Box::new(right.unwrap())),
-                    value
+                    value: NodeValue::Branch(branch_hash)
                 }
             )
         }
 
         //Leaf node | Has no branches but has a value
-        else if left.is_none() && right.is_none() && value.is_some() {
+        else if left.is_none() && right.is_none() && value.is_some(){
             Ok(
                 Self {
                     left: None,
                     right: None,
-                    value
+                    value: NodeValue::Leaf(value.unwrap()) //Leaf is stored unhashed
                 }
             )
         }
@@ -205,11 +249,9 @@ impl TreeNode {
         else {
             Err(TaprootErr::InvalidNode)
         }
-    } 
+    }
     
-    /**
-        Create a new tree from a list of scripts 
-    */
+    /// Create a new tree from a list of scripts
     pub fn new_script_tree(scripts: &Vec<RedeemScript>) -> Self {
         //Create leaves from scripts
         let leaves: Vec<TreeNode> = scripts.iter().map(|x| {
@@ -250,6 +292,22 @@ impl TreeNode {
         //Call self again using parent level
         Self::construct_tree(parent_level)
     }
+
+    /// Returns the root hash of a given tree node.
+    pub fn merkle_root(&self) -> [u8; 32] {
+        self.value.as_hash()
+    }
+
+    /// Determine whether the current node is a leaf node or not.
+    pub fn is_leaf(&self) -> bool {
+        match self.value {
+            NodeValue::Leaf(_) => {
+                // If the node value stores a leaf and there are no children, then the node is a leaf node.
+                self.right.is_none() && self.left.is_none()
+            },
+            _ => false
+        }
+    }
 }
 
 
@@ -265,7 +323,7 @@ impl TreeNode {
     c is the commitment data
     G is the generator point
 
-    From BIP-341
+    Should be relocated into the key module...
 */
 pub fn taproot_tweak_pubkey(pubkey: &SchnorrPublicKey, h: &[u8]) -> Result<(bool, SchnorrPublicKey), KeyError> {
     //Extend pubkey by commitment
@@ -292,6 +350,8 @@ pub fn taproot_tweak_pubkey(pubkey: &SchnorrPublicKey, h: &[u8]) -> Result<(bool
     H is the hash function
     G is the generator point
     c is the commitment data
+
+    Should be relocated into the key module...
 */
 pub fn taproot_tweak_seckey(kp: &SchnorrKeyPair, h: &[u8]) -> Result<SchnorrKeyPair, KeyError> {
     //The tweak is the HashTapTweak of the secret_key multiplied by generator point G concatenated by the commitment data
@@ -304,86 +364,19 @@ pub fn taproot_tweak_seckey(kp: &SchnorrKeyPair, h: &[u8]) -> Result<SchnorrKeyP
 }
 
 /**
-  Script tree traversal method that obtains the merkle root of the script tree.
-
-  BIP-341 method
-*/
-pub fn taproot_tree_helper(script_tree: &TreeNode) -> (Vec<(LeafInfo, Vec<u8>)>, [u8; 32]) {
-    //If the current node is a leaf
-    if script_tree.value.is_some() {
-        let leaf_info = script_tree.value.clone().unwrap();
-
-        let mut h_data = vec![leaf_info.version];
-        h_data.extend_from_slice(&ser_script(&leaf_info.script));
-        let h = TapLeafHash::from_slice(&h_data);
-        return (vec![(leaf_info, vec![])], h)
-    }
-
-    //Recursion
-    let (left, mut left_h) = taproot_tree_helper(script_tree.left.as_ref().unwrap());
-    let (right, mut right_h) = taproot_tree_helper(script_tree.right.as_ref().unwrap());
-    
-    //Python reference:
-    //ret = [(l, c + right_h) for l, c in left] + [(l, c + left_h) for l, c in right]
-    let mut ret: Vec<(LeafInfo, Vec<u8>)> = vec![];
-    for (l, c) in left {
-        let mut c = c;
-        c.extend_from_slice(&right_h);
-        ret.push((l, c));
-    }
-    for (l, c) in right {
-        let mut c = c;
-        c.extend_from_slice(&left_h);
-        ret.push((l, c));
-    }
-    
-    //Swap
-    if right_h < left_h {
-        let temp = left_h;
-        left_h = right_h;
-        right_h = temp;
-    }
-    
-    //Concatenate left_h and right_h and hash
-    let mut lr = left_h.to_vec();
-    lr.extend_from_slice(&right_h);
-    return (ret, TapBranchHash::from_slice(&lr))
-}
-
-/**
-    Given a script, returns the script with a compact-size prefix indicating it's length.
-    
-    From BIP-341
-*/
-fn ser_script(script: &RedeemScript) -> Vec<u8> {
-    let len = script.code.len();
-    let mut compact_size: Vec<u8> = vec![];
-    if len <= 252 {
-        compact_size = vec![len as u8];
-    } else if len <=0xffff {
-        compact_size = vec![0xfd];
-        let mut len = len.to_le_bytes().to_vec();
-        len.truncate(2);
-        compact_size.extend_from_slice(&len);
-    }
-    
-    let mut prefixed = compact_size;
-    prefixed.extend_from_slice(&script.code);
-    prefixed
-}
-
-/**
     Given an internal key and an optional script tree,
     this method will return the tweaked key.
 
     From BIP-341
+
+    Should be relocated into the key OR script module...
 */
 pub fn taproot_output_script(internal_key: &SchnorrPublicKey, script_tree: Option<TreeNode>) -> Result<SchnorrPublicKey, KeyError> {
     let h: Vec<u8>;
     if script_tree.is_none() {
         h = vec![];
     } else {
-        let (_, merkle_root) = taproot_tree_helper(&script_tree.unwrap());
+        let merkle_root = script_tree.unwrap().merkle_root();
         h = merkle_root.to_vec();
     }
 
@@ -417,141 +410,14 @@ mod tests {
 
         //Calculate the merkle root of the script tree for testing purposes
         let tree = TreeNode::new_script_tree(&scripts);
-        let (_, h) = taproot_tree_helper(&tree);
-        let expected_h = "41646f8c1fe2a96ddad7f5471bc4fee7da98794ef8c45a4f4fc6a559d60c9f6b";
+        let h = tree.merkle_root();
+        let expected_h = "41646f8c1fe2a96ddad7f5471bc4fee7da98794ef8c45a4f4fc6a559d60c9f6b"; 
         assert_eq!(crate::util::encode_02x(&h), expected_h);
 
         //Tweak the internal key with the script tree
         let tweaked_key = taproot_output_script(&internal_pk, Some(tree)).unwrap();
         let expected_tweaked_key = "f128a8a8a636e19f00a80169550fedfc26b6f5dd04d935ec452894aad938ef0c";
         assert_eq!(tweaked_key.hex(), expected_tweaked_key);
-    }
-
-    #[test]
-    fn simple_script_tree() {
-        let scripts = vec![
-            RedeemScript::new(vec![1]),
-            RedeemScript::new(vec![2])
-        ];
-
-        let tree = TreeNode::new_script_tree(&scripts);
-        let expected_tree = TreeNode {
-            left: Some(Box::new(TreeNode { left: None, right: None, value: Some(LeafInfo::new(&scripts[0])) })),
-            right: Some(Box::new(TreeNode { left: None, right: None, value: Some(LeafInfo::new(&scripts[1])) })),
-            value: None
-        };
-        assert_eq!(tree, expected_tree);
-    }
-
-    #[test]
-    fn single_tree() {
-        let scripts = vec![
-            RedeemScript::new(vec![1])
-        ];
-        
-        let tree = TreeNode::new_script_tree(&scripts);
-        let expected_tree = TreeNode {
-            left: None,
-            right: None,
-            value: Some(LeafInfo::new(&scripts[0]))
-        };
-        assert_eq!(tree, expected_tree)
-    }
-
-    #[test]
-    fn huffman() {
-        //Expected result is a tree in this shape: https://imgur.com/a/VIJdsPD
-        let scripts = vec![
-            (3, RedeemScript::new(vec![1])),
-            (4, RedeemScript::new(vec![2])),
-            (1, RedeemScript::new(vec![3])),
-            (6, RedeemScript::new(vec![1])),
-            (1, RedeemScript::new(vec![2])),
-            (4, RedeemScript::new(vec![3]))
-        ];
-
-        let items: Vec<HuffmanCoding<RedeemScript>> = scripts.iter().map(|x| HuffmanCoding::new_item(x.0, &x.1)).collect();
-        let tree = HuffmanCoding::new_script_tree(&items);
-        let expected_tree = 
-        //19
-        TreeNode {
-            //11
-            left: Some(Box::new(
-                TreeNode {
-                    //6
-                    left: Some(Box::new(
-                            TreeNode {
-                                left: None,
-                                right: None,
-                                value: Some(LeafInfo::new(&scripts[3].1))
-                            }
-                    )),
-                    //5
-                    right: Some(Box::new(
-                            TreeNode {
-                                //3
-                                left: Some(Box::new(
-                                    TreeNode {
-                                        left: None,
-                                        right: None,
-                                        value: Some(LeafInfo::new(&scripts[0].1))
-                                    }
-                                )),
-                                //2
-                                right: Some(Box::new(
-                                    TreeNode {
-                                        //1
-                                        left: Some(Box::new(
-                                            TreeNode {
-                                                left: None,
-                                                right: None,
-                                                value: Some(LeafInfo::new(&scripts[2].1))
-                                            }
-                                        )),
-                                        //1
-                                        right: Some(Box::new(
-                                            TreeNode {
-                                                left: None,
-                                                right: None,
-                                                value: Some(LeafInfo::new(&scripts[4].1))
-                                            }
-                                        )),
-                                        value: None
-                                    }
-                                )),
-                                value: None
-                            }
-                    )),
-                    value: None
-                }
-            )),
-
-            //8
-            right: Some(Box::new(
-                TreeNode {
-                    //4
-                    left: Some(Box::new(
-                        TreeNode {
-                            left: None,
-                            right: None,
-                            value: Some(LeafInfo::new(&scripts[1].1))
-                        }
-                    )),
-                    //4
-                    right: Some(Box::new(
-                        TreeNode {
-                            left: None,
-                            right: None,
-                            value: Some(LeafInfo::new(&scripts[5].1))
-                        }
-                    )),
-                    value: None 
-                }
-            )),
-            value: None
-        };
-
-        assert_eq!(tree, expected_tree);
     }
 
     #[test]

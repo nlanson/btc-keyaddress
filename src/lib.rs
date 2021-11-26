@@ -31,13 +31,10 @@
             
         
         - Taproot
-            > Refactor and rework to make it more generic
+            > Move key related methods to key module
+            > DFS algorithm to extract leaf nodes
+            > Control block creation from internal key, script tree and selected script.
             > Implement implementable BIP-341 test vectors (https://github.com/bitcoin/bips/blob/master/bip-0341/wallet-test-vectors.json)
-            > Script tree value use Enum instead of Option
-            > Struct for spending data which consists of
-                - Internal Key
-                - Optional script tree and parity bit
-                - [...]
         
         
         - Custom SHA256 implementation using information from the learnmeabitcoin tutorial
