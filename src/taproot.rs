@@ -2,6 +2,7 @@
     This module implements methods relating to Taproot key and address computing.
 
     Most functions here are translated from the reference python code in BIP-340 and BIP-341.
+    The code works but is very spaghetti and needs a rework to be more readable and maintainable.
 
     Todo:
         - Huffman tree testing
@@ -26,6 +27,29 @@ pub enum TaprootErr {
     BadLeaves,
     InvalidNode
 }
+
+pub trait TaprootTaggedHash {
+    fn from_slice(slice: &[u8]) -> [u8; 32];
+}
+
+/// Macro to create tagged hash types
+macro_rules! taproot_tagged_hashes {
+    ($name: ident, $tag: expr) => {
+        pub struct $name;
+
+        impl TaprootTaggedHash for $name {
+            fn from_slice(slice: &[u8]) -> [u8; 32] {
+                tagged_hash($tag, slice)
+            }
+        }
+    }
+}
+
+taproot_tagged_hashes!(TapTweakHash, "TapTweak");
+taproot_tagged_hashes!(TapBranchHash, "TapBranch");
+taproot_tagged_hashes!(TapLeafHash, "TapLeaf");
+
+
 
 /**
     TreeNode struct to create binary trees
@@ -250,7 +274,7 @@ pub fn taproot_tweak_pubkey(pubkey: &SchnorrPublicKey, h: &[u8]) -> Result<(bool
     
 
     //Compute tweak which is the HashTapTweak of the committed puvkey
-    let tweak = tagged_hash("TapTweak", &pc);
+    let tweak = TapTweakHash::from_slice(&pc);
     
     //Compute the tweaked key
     let (parity, tweaked_key) = pubkey.tweak(&tweak)?;
@@ -275,7 +299,7 @@ pub fn taproot_tweak_seckey(kp: &SchnorrKeyPair, h: &[u8]) -> Result<SchnorrKeyP
     let mut data = p.as_bytes::<32>().to_vec();
     data.extend_from_slice(h);
 
-    let t = tagged_hash("TapTweak", &data);
+    let t = TapTweakHash::from_slice(&data);
     kp.tweak(&t)
 }
 
@@ -291,7 +315,7 @@ pub fn taproot_tree_helper(script_tree: &TreeNode) -> (Vec<(LeafInfo, Vec<u8>)>,
 
         let mut h_data = vec![leaf_info.version];
         h_data.extend_from_slice(&ser_script(&leaf_info.script));
-        let h = tagged_hash("TapLeaf", &h_data);
+        let h = TapLeafHash::from_slice(&h_data);
         return (vec![(leaf_info, vec![])], h)
     }
 
@@ -323,7 +347,7 @@ pub fn taproot_tree_helper(script_tree: &TreeNode) -> (Vec<(LeafInfo, Vec<u8>)>,
     //Concatenate left_h and right_h and hash
     let mut lr = left_h.to_vec();
     lr.extend_from_slice(&right_h);
-    return (ret, tagged_hash("TapBranch", &lr))
+    return (ret, TapBranchHash::from_slice(&lr))
 }
 
 /**

@@ -31,18 +31,13 @@
             
         
         - Taproot
+            > Refactor and rework to make it more generic
             > Implement implementable BIP-341 test vectors (https://github.com/bitcoin/bips/blob/master/bip-0341/wallet-test-vectors.json)
             > Script tree value use Enum instead of Option
             > Struct for spending data which consists of
                 - Internal Key
                 - Optional script tree and parity bit
                 - [...]
-
-
-        - Clean up Bech32 encoding implementation for ease of use with Bech32m
-           > Bip350 valid and invalid address test cases. 
-                - Cross check valid addresses with a script pub key
-                - Invalid addresses should return an error or panic
         
         
         - Custom SHA256 implementation using information from the learnmeabitcoin tutorial
