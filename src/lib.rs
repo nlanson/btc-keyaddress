@@ -30,8 +30,11 @@
             > Taproot standard HDMultisig (?)
             
         
+        - Key module
+            > Move methods shared between keys into the Key trait.
+
+        
         - Taproot
-            > Move key related methods to key module
             > DFS algorithm to extract leaf nodes
             > Control block creation from internal key, script tree and selected script.
             > Implement implementable BIP-341 test vectors (https://github.com/bitcoin/bips/blob/master/bip-0341/wallet-test-vectors.json)
@@ -42,7 +45,7 @@
             > https://www.youtube.com/watch?v=f9EbD6iY9zI
             > https://github.com/in3rsha/sha256-animation
           This may be good to implement as a seperate repo/crate with a VERY extensive test suite.
-                
+     
 
         - Automated github tests
 */

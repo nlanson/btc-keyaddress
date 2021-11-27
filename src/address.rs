@@ -124,12 +124,10 @@ mod tests {
         key::{
             KeyError,
             PrivKey,
-            SchnorrPublicKey
+            SchnorrPublicKey,
+            TapTweak
         },
         script::RedeemScript,
-        taproot::{
-            taproot_tweak_pubkey
-        },
         util::Network,
         util::decode_02x
     };
@@ -250,7 +248,7 @@ mod tests {
     #[test]
     fn p2tr() -> Result<(), KeyError> {
         let internal_key = SchnorrPublicKey::from_str("cc8a4bc64d897bddc5fbc2f670f7a8ba0b386779106cf1223c6fc5d7cd6fc115")?;
-        let (_, tweaked_key) = taproot_tweak_pubkey(&internal_key, b"").unwrap();
+        let tweaked_key = internal_key.tap_tweak(None)?;
         let address = Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap();
 
         assert_eq!(tweaked_key.hex(), "a60869f0dbcf1dc659c9cecbaf8050135ea9e8cdc487053f1dc6880949dc684c");

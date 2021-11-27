@@ -1,12 +1,9 @@
 /*
     This module implements methods relating to Taproot key and address computing.
 
-    Most functions here are translated from the reference python code in BIP-340 and BIP-341.
-    The code works but is very spaghetti and needs a rework to be more readable and maintainable.
-
     Todo:
-        - Huffman tree testing
-        - Organise information as taproot spending conditions
+        - Rework huffman coding implementation
+        - Control block creation
 */
 
 use crate::{
@@ -14,10 +11,8 @@ use crate::{
         tagged_hash
     }, 
     key::{
-        SchnorrKeyPair,
         SchnorrPublicKey,
         Key,
-        KeyError
     },
     script::RedeemScript
 };
@@ -77,6 +72,16 @@ impl TapBranchHash {
         let mut hash_preimage = left_hash.to_vec();
         hash_preimage.extend_from_slice(&right_hash);
         TapBranchHash::from_slice(&hash_preimage)
+    }
+}
+
+impl TapTweakHash {
+    /// Create the TapTweakHash from a schnorr public key and tweak value.
+    /// Tweak value is either the merkle root of a script tree or nothing.
+    pub fn from_key_and_tweak(key: &SchnorrPublicKey, tweak: Vec<u8>) -> [u8; 32] {
+        let mut data = key.as_bytes::<32>().to_vec();
+        data.extend_from_slice(&tweak);
+        TapTweakHash::from_slice(&data)
     }
 }
 
@@ -310,82 +315,6 @@ impl TreeNode {
     }
 }
 
-
-/**
-    Takes in a public key and tweak
-
-    Q = P + H(P|c)G
-    
-    where
-    Q is the tweaked key
-    P is the original public key
-    H is the hash function
-    c is the commitment data
-    G is the generator point
-
-    Should be relocated into the key module...
-*/
-pub fn taproot_tweak_pubkey(pubkey: &SchnorrPublicKey, h: &[u8]) -> Result<(bool, SchnorrPublicKey), KeyError> {
-    //Extend pubkey by commitment
-    let mut pc = pubkey.as_bytes::<32>().to_vec();
-    pc.extend_from_slice(h);
-    
-
-    //Compute tweak which is the HashTapTweak of the committed puvkey
-    let tweak = TapTweakHash::from_slice(&pc);
-    
-    //Compute the tweaked key
-    let (parity, tweaked_key) = pubkey.tweak(&tweak)?;
-    Ok((parity, tweaked_key))
-}
-
-/**
-    Tweak a private key with a hash
-
-    T = k + H(x(kG) | c)
-
-    where
-    T is the tweaked secret key
-    k is the original secret key
-    H is the hash function
-    G is the generator point
-    c is the commitment data
-
-    Should be relocated into the key module...
-*/
-pub fn taproot_tweak_seckey(kp: &SchnorrKeyPair, h: &[u8]) -> Result<SchnorrKeyPair, KeyError> {
-    //The tweak is the HashTapTweak of the secret_key multiplied by generator point G concatenated by the commitment data
-    let p = kp.get_pub();
-    let mut data = p.as_bytes::<32>().to_vec();
-    data.extend_from_slice(h);
-
-    let t = TapTweakHash::from_slice(&data);
-    kp.tweak(&t)
-}
-
-/**
-    Given an internal key and an optional script tree,
-    this method will return the tweaked key.
-
-    From BIP-341
-
-    Should be relocated into the key OR script module...
-*/
-pub fn taproot_output_script(internal_key: &SchnorrPublicKey, script_tree: Option<TreeNode>) -> Result<SchnorrPublicKey, KeyError> {
-    let h: Vec<u8>;
-    if script_tree.is_none() {
-        h = vec![];
-    } else {
-        let merkle_root = script_tree.unwrap().merkle_root();
-        h = merkle_root.to_vec();
-    }
-
-    let (_, output_key) = taproot_tweak_pubkey(internal_key, &h)?;
-    Ok(output_key)
-}
-
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -415,7 +344,7 @@ mod tests {
         assert_eq!(crate::util::encode_02x(&h), expected_h);
 
         //Tweak the internal key with the script tree
-        let tweaked_key = taproot_output_script(&internal_pk, Some(tree)).unwrap();
+        let tweaked_key = internal_pk.tap_tweak(Some(tree)).unwrap();
         let expected_tweaked_key = "f128a8a8a636e19f00a80169550fedfc26b6f5dd04d935ec452894aad938ef0c";
         assert_eq!(tweaked_key.hex(), expected_tweaked_key);
     }
@@ -429,10 +358,10 @@ mod tests {
     fn key_tweaking_test() {
         let key_pair = SchnorrKeyPair::from_priv_key(&PrivKey::new_rand()).unwrap();
         let pub_key = key_pair.get_pub();
+        let script_tree = TreeNode::new_script_tree(&vec![RedeemScript::new(vec![5, 29, 03])]);
 
-        let commitment_data = vec![5, 29, 03];
-        let tweaked_keypair = taproot_tweak_seckey(&key_pair, &commitment_data).unwrap();
-        let tweaked_pub_key = taproot_tweak_pubkey(&pub_key, &commitment_data).unwrap().1;
+        let tweaked_keypair = key_pair.tap_tweak(Some(script_tree.clone())).unwrap();
+        let tweaked_pub_key = pub_key.tap_tweak(Some(script_tree)).unwrap();
 
         assert_eq!(tweaked_keypair.get_pub(), tweaked_pub_key);
     }
