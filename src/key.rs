@@ -1,5 +1,4 @@
 use std::str::FromStr;
-
 use crate::{
     Secp256k1,
     PublicKey,
@@ -14,7 +13,11 @@ use crate::{
     util::Network,
     hash,
     lib_SchnorrPublicKey,
-    lib_SchnorrKeyPair
+    lib_SchnorrKeyPair,
+    taproot::{
+        TreeNode,
+        TapTweakHash
+    }
 };
 
 /**
@@ -28,37 +31,17 @@ pub enum KeyError {
     BadString()
 }
 
-/**
-    Define methods shared by Public and Private keys.
-*/
-pub trait Key {
-    /**
-        Create a new instance of Self from a u8 slice.
-    */
-    fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError>
-    where Self: Sized;
-
-    /**
-        Return self as a byte array.
-    */
-    fn as_bytes<const N: usize>(&self) -> [u8; N];
-}
 
 
-
-/*
-    Eliptic Curve Cryptography
-        Private and Public Keys
-
-    The structs are essentially a wrapper for SecretKey and PublicKey
-    structs in the Secp256k1 lirabry.
-*/
+//ECC Keys
 #[derive(Debug, Clone, Copy)]
 pub struct PrivKey(SecretKey);
 
 #[derive(Debug, Clone, Copy)]
 pub struct PubKey(PublicKey);
 
+
+// Schnorr Keys
 #[derive(Debug, Clone, Copy)]
 pub struct SchnorrPublicKey(lib_SchnorrPublicKey);
 
@@ -66,11 +49,24 @@ pub struct SchnorrPublicKey(lib_SchnorrPublicKey);
 pub struct SchnorrKeyPair(lib_SchnorrKeyPair);
 
 
+/// Methods shared in all key structs
+pub trait Key<T> {
+    /// Create a new instance of self from a slice
+    fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError>
+    where Self: Sized;
+
+    /// Return self as a byte array
+    fn as_bytes<const N: usize>(&self) -> [u8; N];
+
+    /// Return the underlying struct
+    fn raw(&self) -> T;
+}
+
+
 impl PrivKey {
     
-    /**
-        Generates an random number of entropic source using OsRng and uses it to create a secret key in the form of a u8 array.
-    */
+    
+    ///Generates an random number of entropic source using OsRng and uses it to create a secret key in the form of a u8 array.
     pub fn new_rand() -> Self {
         let mut rng = SecpOsRng::new().expect("OsRng");
         Self(SecretKey::new(&mut rng))
@@ -104,13 +100,8 @@ impl PrivKey {
         }
     }
 
-    pub fn raw(&self) -> SecretKey {
-        self.0
-    }
 
-    /**
-      Create a private key from wif
-    */
+    /// Create a private key from wif
     pub fn from_wif(wif: &str) -> Result<Self, KeyError> {
         let mut bytes = match Base58::decode(wif) {
             Ok(x) => x,
@@ -130,16 +121,18 @@ impl PrivKey {
         
     }
 
+    /// Get the public key of self
     pub fn get_pub(&self) -> PubKey {
         PubKey::from_priv_key(self)
     }
 
+    /// Get the schnorr equivalent of self
     pub fn schnorr(&self) -> SchnorrKeyPair {
         SchnorrKeyPair::from_priv_key(self).unwrap()
     }
 }
 
-impl Key for PrivKey {
+impl Key<SecretKey> for PrivKey {
     fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError> {
         match SecretKey::from_slice(byte_array) {
             Ok(x) => Ok(Self(x)),
@@ -147,13 +140,13 @@ impl Key for PrivKey {
         }
     }
 
-
-    /**
-        32 bytes
-    */
     fn as_bytes<const N: usize>(&self) -> [u8; N] {
         let hex = self.0.to_string();
         try_into(decode_02x(&hex[..]))
+    }
+
+    fn raw(&self) -> SecretKey {
+        self.0
     }
 }
 
@@ -186,21 +179,17 @@ impl PubKey {
         }
     }
 
-    pub fn raw(&self) -> PublicKey {
-        self.0
-    }
-
-    /**
-        Returns the Hash160 of the compressed public key
-    */
+    ///Returns the Hash160 of the compressed public key
     pub fn hash160(&self) -> Vec<u8> {
         hash::hash160(self.as_bytes::<33>()).to_vec()
     }
 
+    /// Return a hexadecimal string representation of self
     pub fn hex(&self) -> String {
         self.0.to_string()
     }
 
+    /// Create an instance of self from a hex string
     pub fn from_str(hex: &str) -> Result<Self, KeyError> {
         let pk = match PublicKey::from_str(hex) {
             Ok(x) => x,
@@ -218,7 +207,7 @@ impl PubKey {
     }
 }
 
-impl Key for PubKey {
+impl Key<PublicKey> for PubKey {
     fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError> {
         match PublicKey::from_slice(byte_array) {
             Ok(x) => Ok(Self(x)),
@@ -226,15 +215,68 @@ impl Key for PubKey {
         }
     }
 
-    /**
-        33 bytes
-    */
     fn as_bytes<const N: usize>(&self) -> [u8; N] {
         try_into(self.0.serialize()[0..N].to_vec())
     }
+
+    fn raw(&self) -> PublicKey {
+        self.0
+    }
 }
 
-impl Key for SchnorrPublicKey {
+
+pub trait TapTweak {
+    /// Taptweak a key given the key and optional script tree
+    fn tap_tweak(&self, merkle_root: Option<TreeNode>) -> Result<Self, KeyError>
+    where Self: Sized;
+}
+
+impl TapTweak for SchnorrPublicKey {
+    fn tap_tweak(&self, script_tree: Option<TreeNode>) -> Result<Self, KeyError> {
+        let secp = Secp256k1::new();
+        let commitment = if let Some(tree) = script_tree {
+            tree.merkle_root().to_vec()
+        } else {
+            vec![]
+        };
+        let tweak_value = TapTweakHash::from_key_and_tweak(self, commitment);
+
+        //Tweak the key
+        let mut tweaked_key = self.0; //clone removed
+        match tweaked_key.tweak_add_assign(&secp, &tweak_value) {
+            Ok(x) => {
+                //Check if tweaked successfully
+                let success = self.0.tweak_add_check(&secp, &tweaked_key, x, tweak_value);
+                if success { return Ok( Self(tweaked_key)) }
+                else { return Err(KeyError::BadArithmatic()) }
+            }
+
+            _ => Err(KeyError::BadArithmatic())
+        }
+    }
+}
+
+impl TapTweak for SchnorrKeyPair {
+    fn tap_tweak(&self, script_tree: Option<TreeNode>) -> Result<Self, KeyError> {
+        let secp = Secp256k1::new();
+        let commitment = if let Some(tree) = script_tree {
+            tree.merkle_root().to_vec()
+        } else {
+            vec![]
+        };
+        let tweak_value = TapTweakHash::from_key_and_tweak(&self.get_pub(), commitment);
+        
+        //Tweak the key
+        let mut tweaked_key = self.clone();
+        match tweaked_key.0.tweak_add_assign(&secp, &tweak_value) {
+            Ok(_) => Ok(tweaked_key),
+            Err(_) => Err(KeyError::BadArithmatic())
+        }
+    }
+}
+
+
+impl Key<lib_SchnorrPublicKey> for SchnorrPublicKey {
     //Schnorr public keys are serialized as 32 bytes
     fn as_bytes<const N: usize>(&self) -> [u8; N] {
         try_into(self.0.serialize()[0..N].to_vec())
@@ -250,6 +292,10 @@ impl Key for SchnorrPublicKey {
             Ok(x) => Ok(Self(x)),
             _ => Err(KeyError::BadSlice())
         }
+    }
+
+    fn raw(&self) -> lib_SchnorrPublicKey {
+        self.0
     }
 }
 
@@ -310,7 +356,7 @@ impl SchnorrPublicKey {
     }
 }
 
-impl Key for SchnorrKeyPair {
+impl Key<lib_SchnorrKeyPair> for SchnorrKeyPair {
     //Keypairs cannot be serialized
     fn as_bytes<const N: usize>(&self) -> [u8; N] { unimplemented!("Not supported") }
 
@@ -323,6 +369,10 @@ impl Key for SchnorrKeyPair {
             Ok(x) => Ok(Self(x)),
             _ => Err(KeyError::BadSlice())
         }
+    }
+
+    fn raw(&self) -> lib_SchnorrKeyPair {
+        self.0
     }
 }
 

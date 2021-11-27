@@ -7,21 +7,17 @@
 */
 
 use crate::{
+    SecretKey, PublicKey,
     key::{
         PrivKey,
         PubKey,
-        Key
+        Key,
+        TapTweak,
     },
     encoding::{
-        // check_encode,
-        // decode,
-        // validate_checksum,
-        // VersionPrefix,
-        // Bs58Error,
         base58::Base58,
         base58::Base58Error,
         version_prefix::VersionPrefix
-        
     },
     hdwallet::{
         ckd::{
@@ -41,8 +37,7 @@ use crate::{
         as_u32_be
     },
     util::Network,
-    script::RedeemScript,
-    taproot
+    script::RedeemScript
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -63,12 +58,12 @@ pub struct Xpub {
     pub index: [u8; 4]
 }
 
-pub trait ExtendedKey<T> where T: Key, Self: Copy {
+pub trait ExtendedKey<T, U> where T: Key<U>, Self: Copy {
     /**
         Constructs the Extended Key.
     */
     fn construct(key: T, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self
-    where T: Key;
+    where T: Key<U>;
 
     /**
         Import a extended key from a string.
@@ -120,7 +115,7 @@ pub trait ExtendedKey<T> where T: Key, Self: Copy {
             WalletType::P2TR => {
                 //Tweaking with no script tree
                 let internal_key = self.get_pub().schnorr();
-                let tweaked_key = taproot::taproot_output_script(&internal_key, None).unwrap();
+                let tweaked_key = internal_key.tap_tweak(None).unwrap();
                 Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap()
             }
         }
@@ -148,7 +143,7 @@ pub trait ExtendedKey<T> where T: Key, Self: Copy {
     }
 }
 
-impl ExtendedKey<PrivKey> for Xprv {
+impl ExtendedKey<PrivKey, SecretKey> for Xprv {
     fn construct(key: PrivKey, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self {
         Self {
             key: PrivKey::from_slice(&key.as_bytes::<32>()).unwrap(),
@@ -303,7 +298,7 @@ impl Xprv {
     
 }
 
-impl ExtendedKey<PubKey> for Xpub {
+impl ExtendedKey<PubKey, PublicKey> for Xpub {
     fn construct(key: PubKey, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self {
             return Self {
                 key: PubKey::from_slice(&key.as_bytes::<33>()).unwrap(),
