@@ -20,9 +20,8 @@ use crate::{
     }
 };
 
-/**
-    Enum to handle errors in the key module.
-*/
+
+/// Enum to handle errors in the key module
 #[derive(Debug)]
 pub enum KeyError {
     BadSlice(),
@@ -60,23 +59,23 @@ pub trait Key<T> {
 
     /// Return the underlying struct
     fn raw(&self) -> T;
+
+    /// Create self from a string
+    fn from_str(string: &str) -> Result<Self, KeyError>
+    where Self: Sized;
 }
 
 
 impl PrivKey {
-    
-    
     ///Generates an random number of entropic source using OsRng and uses it to create a secret key in the form of a u8 array.
     pub fn new_rand() -> Self {
         let mut rng = SecpOsRng::new().expect("OsRng");
         Self(SecretKey::new(&mut rng))
     }
 
-    /*
-        Export the private key a wallet-import-format (Base58Check Encoded with prefix)
-        * Use the parameter to indicate if WIF should include the compression byte.
-    */
-    pub fn export_as_wif(&self, compressed: bool, network: Network) -> String {
+    /// Returns a string representation of self. 
+    /// For private keys, this is a Base58 check encoded string.
+    pub fn to_string(&self, compressed: bool, network: Network) -> String {
         let mut key: Vec<u8> = self.as_bytes::<32>().to_vec();
         if compressed {
             key.append(&mut vec![0x01]);
@@ -89,36 +88,12 @@ impl PrivKey {
         
     }
 
-    /**
-        Takes in self and another slice and returns the sum of the values modulo
-        by the order of the SECP256K1 curve.
-    */
+    /// Adds other to self modulus SECP256K1 ORDER
     pub fn add_assign(&mut self, other: &[u8]) -> Result<(), KeyError> {
         match self.0.add_assign(other) {
             Ok(_) => Ok(()),
             Err(_) => Err(KeyError::BadArithmatic())
         }
-    }
-
-
-    /// Create a private key from wif
-    pub fn from_wif(wif: &str) -> Result<Self, KeyError> {
-        let mut bytes = match Base58::decode(wif) {
-            Ok(x) => x,
-            Err(_) => return Err(KeyError::BadWif())
-        };
-
-        bytes.remove(0); //remove the version prefix
-        bytes.splice(bytes.len()-4..bytes.len(), vec![]); //remove the checksum
-        if bytes.len() == 33 {
-            bytes.remove(bytes.len()-1); //remove the compression byte
-            return Ok(Self::from_slice(&bytes)?);
-        } else if bytes.len() == 32 {
-            return Ok(Self::from_slice(&bytes)?)
-        }
-        
-        return Err(KeyError::BadWif())
-        
     }
 
     /// Get the public key of self
@@ -148,30 +123,43 @@ impl Key<SecretKey> for PrivKey {
     fn raw(&self) -> SecretKey {
         self.0
     }
+
+    /// Private key string format is WIF format (Base58)
+    fn from_str(wif: &str) -> Result<Self, KeyError> {
+        let mut bytes = match Base58::decode(wif) {
+            Ok(x) => x,
+            Err(_) => return Err(KeyError::BadWif())
+        };
+
+        bytes.remove(0); //remove the version prefix
+        bytes.splice(bytes.len()-4..bytes.len(), vec![]); //remove the checksum
+        if bytes.len() == 33 {
+            bytes.remove(bytes.len()-1); //remove the compression byte
+            return Ok(Self::from_slice(&bytes)?);
+        } else if bytes.len() == 32 {
+            return Ok(Self::from_slice(&bytes)?)
+        }
+        
+        return Err(KeyError::BadWif())
+    }
 }
 
 impl PubKey {
     
-    /**
-        Finds the compressed public key from a secret key.
-
-        Is the result of static point G on the secp256k1 curve multipled k times, where k is the private key.
-    */
+    /// Create a public key from private key
     pub fn from_priv_key(k: &PrivKey) -> Self {
         Self(PublicKey::from_secret_key(&Secp256k1::new(),&k.0))
     }
 
 
-    /**
-        Extracts the uncompressed public key given the compressed (x-coord + prefix) public key.
-
-        Returns a byte aray.
-    */
+    
+    /// Extracts the uncompressed public key given the compressed (x-coord + prefix) public key.
     pub fn decompressed_bytes(&self) -> [u8; 65] {
         //(65 byte size = 64byte key + 1 byte uncompressed identifier)
         self.0.serialize_uncompressed()
     }
 
+    /// Adds other to self
     pub fn add_assign(&mut self, other: &[u8]) -> Result<(), KeyError> {
         match self.0.add_exp_assign(&Secp256k1::new(), other) {
             Ok(_) => Ok(()),
@@ -185,20 +173,11 @@ impl PubKey {
     }
 
     /// Return a hexadecimal string representation of self
-    pub fn hex(&self) -> String {
+    pub fn to_string(&self) -> String {
         self.0.to_string()
     }
 
-    /// Create an instance of self from a hex string
-    pub fn from_str(hex: &str) -> Result<Self, KeyError> {
-        let pk = match PublicKey::from_str(hex) {
-            Ok(x) => x,
-            Err(_) => return Err(KeyError::BadString())
-        };
-
-        Ok( Self( pk ) )
-    }
-
+    /// Convert self to a schnorr key by removing the oddity byte
     pub fn schnorr(&self) -> SchnorrPublicKey {
         let mut data = self.as_bytes::<33>().to_vec();
         data.remove(0); //Remove the oddity byte
@@ -221,6 +200,17 @@ impl Key<PublicKey> for PubKey {
 
     fn raw(&self) -> PublicKey {
         self.0
+    }
+
+    /// Return a string representation of self.
+    /// For ECC public keys, this is a hexadecimal representation.
+    fn from_str(hex: &str) -> Result<Self, KeyError> {
+        let pk = match PublicKey::from_str(hex) {
+            Ok(x) => x,
+            Err(_) => return Err(KeyError::BadString())
+        };
+
+        Ok( Self( pk ) )
     }
 }
 
@@ -297,61 +287,33 @@ impl Key<lib_SchnorrPublicKey> for SchnorrPublicKey {
     fn raw(&self) -> lib_SchnorrPublicKey {
         self.0
     }
-}
 
-impl SchnorrPublicKey {
-    /**
-        Tweak self by other. Returns the parity bit and tweaked key
-        
-        Other is multiplied by generator point G before being added to self.
-    */
-    pub fn tweak(&self, other: &[u8]) -> Result<(bool, Self), KeyError> {
-        let secp = Secp256k1::new();
-        let other: [u8; 32] = try_into::<u8, 32>(other.to_vec());
-
-        //Tweak the key
-        let mut tweaked_key = self.0; //clone removed
-        match tweaked_key.tweak_add_assign(&secp, &other) {
-            Ok(x) => {
-                //Check if tweaked successfully
-                let success = self.0.tweak_add_check(&secp, &tweaked_key, x, other);
-                if success { return Ok((x, Self(tweaked_key))) }
-                else { return Err(KeyError::BadArithmatic()) }
-            }
-
-            _ => Err(KeyError::BadArithmatic())
-        }
-    }
-
-    /**
-        Compute a schnorr public key from a private key
-    */
-    pub fn from_priv_key(key: &PrivKey) -> Self {
-        //Convertion method
-        key.get_pub().schnorr()
-    }
-
-    /**
-        Create a schnorr public key from a key pair
-    */
-    pub fn from_keypair(keypair: &lib_SchnorrKeyPair) -> Self {
-        Self(lib_SchnorrPublicKey::from_keypair(&Secp256k1::new(), &keypair))
-    }
-
-    /**
-        Create a schnorr public key from a hex string 
-    */
-    pub fn from_str(hex: &str) -> Result<Self, KeyError> {
+    /// Create self from a string representation
+    /// For schnorr keys, the string representation is a hexadecimal value
+    fn from_str(hex: &str) -> Result<Self, KeyError> {
         match lib_SchnorrPublicKey::from_str(hex) {
             Ok(x) => Ok(Self(x)),
             Err(_) => Err(KeyError::BadString())
         }
     }
+}
 
-    /**
-        Serialize schnorr public key as hex string
-    */
-    pub fn hex(&self) -> String {
+impl SchnorrPublicKey {
+    /// Compute a schnorr public key from a private key
+    pub fn from_priv_key(key: &PrivKey) -> Self {
+        //Convertion method
+        key.get_pub().schnorr()
+    }
+
+    
+    ///Create a schnorr public key from a key pair
+    pub fn from_keypair(keypair: &lib_SchnorrKeyPair) -> Self {
+        Self(lib_SchnorrPublicKey::from_keypair(&Secp256k1::new(), &keypair))
+    }
+
+
+    /// Serialize schnorr public key as hex string
+    pub fn to_string(&self) -> String {
         self.0.to_string()
     }
 }
@@ -374,25 +336,16 @@ impl Key<lib_SchnorrKeyPair> for SchnorrKeyPair {
     fn raw(&self) -> lib_SchnorrKeyPair {
         self.0
     }
+
+    /// Create self from a string representation
+    /// For SchnorrKeyPairs, the string representation is a Base58 WIF
+    fn from_str(wif: &str) -> Result<Self, KeyError> {
+        Self::from_priv_key(&PrivKey::from_str(wif)?)
+    }
 }
 
 impl SchnorrKeyPair {
-    /**
-        Tweak a schnorr key pair to use for signing. 
-    */
-    pub fn tweak(&self, other: &[u8]) -> Result<Self, KeyError> {
-        if other.len() != 32 { return Err(KeyError::BadSlice()) }
-
-        let mut tweaked_key = self.clone();
-        match tweaked_key.0.tweak_add_assign(&Secp256k1::new(), other) {
-            Ok(_) => Ok(tweaked_key),
-            Err(_) => Err(KeyError::BadArithmatic())
-        }
-    }
-
-    /**
-        Return the public key inside the key pair 
-    */
+    /// Return the public key within the key pair
     pub fn get_pub(&self) -> SchnorrPublicKey {
         SchnorrPublicKey::from_keypair(&self.0)
     }
@@ -419,7 +372,7 @@ impl PartialOrd for PubKey {
 impl Ord for PubKey {
     //Sort lexicographically
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.hex().cmp(&other.hex())
+        self.to_string().cmp(&other.to_string())
     }
 }
 
@@ -454,8 +407,8 @@ mod tests {
         let expected_uncompressed_wif = "5JU1qir5EqH6BF8Uu7ihFhxh5gGZ6qcA1hfN2mgpZ4taoTTWjzu".to_string();
 
         let derived_public_key = PubKey::from_priv_key(&test_key);
-        let derived_compressed_wif = test_key.export_as_wif(true, Network::Bitcoin);
-        let derived_uncompressed_wif = test_key.export_as_wif(false, Network::Bitcoin);
+        let derived_compressed_wif = test_key.to_string(true, Network::Bitcoin);
+        let derived_uncompressed_wif = test_key.to_string(false, Network::Bitcoin);
         
 
         //Is the derived public key the same as the expected public key?
@@ -516,7 +469,7 @@ mod tests {
         let expected_pk: PrivKey = PrivKey::from_slice(&[114, 38, 26, 249, 94, 159, 251, 207, 115, 108, 169, 140, 97, 249, 149, 161, 110, 42, 120, 163, 193, 164, 192, 248, 91, 30, 123, 98, 59, 24, 220, 54]).unwrap();
         
         for i in 0..testnet_wifs.len() {
-            assert!(PrivKey::from_wif(testnet_wifs[i]).unwrap().as_bytes() == expected_pk.as_bytes::<32>());
+            assert!(PrivKey::from_str(testnet_wifs[i]).unwrap().as_bytes() == expected_pk.as_bytes::<32>());
         }
 
         let mainnet_wifs: Vec<&str> = vec![
@@ -527,7 +480,7 @@ mod tests {
         let expected_pk: PrivKey = PrivKey::from_slice(&[181, 243, 36, 71, 85, 202, 145, 148, 138, 199, 106, 36, 223, 13, 86, 51, 15, 97, 88, 163, 177, 89, 167, 155, 157, 230, 44, 107, 160, 171, 46, 60]).unwrap();
         
         for i in 0..mainnet_wifs.len() {
-            assert!(PrivKey::from_wif(mainnet_wifs[i]).unwrap().as_bytes() == expected_pk.as_bytes::<32>());
+            assert!(PrivKey::from_str(mainnet_wifs[i]).unwrap().as_bytes() == expected_pk.as_bytes::<32>());
         }
     }
 }

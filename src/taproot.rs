@@ -346,7 +346,7 @@ mod tests {
         //Tweak the internal key with the script tree
         let tweaked_key = internal_pk.tap_tweak(Some(tree)).unwrap();
         let expected_tweaked_key = "f128a8a8a636e19f00a80169550fedfc26b6f5dd04d935ec452894aad938ef0c";
-        assert_eq!(tweaked_key.hex(), expected_tweaked_key);
+        assert_eq!(tweaked_key.to_string(), expected_tweaked_key);
     }
 
     #[test]

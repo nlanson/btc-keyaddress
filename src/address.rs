@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn testnet_p2pkh() {
         //Test data test
-        let private_key: PrivKey = PrivKey::from_wif("cNShtSaCAzPPSFgm5LiGUhkuyBhJyV4jQqYXP3asyXK9k8uhiZdx").unwrap();
+        let private_key: PrivKey = PrivKey::from_str("cNShtSaCAzPPSFgm5LiGUhkuyBhJyV4jQqYXP3asyXK9k8uhiZdx").unwrap();
         let public_key: PubKey = PubKey::from_priv_key(&private_key);
         let derived_address: String = Address::P2PKH(public_key, Network::Testnet).to_string().unwrap();
         let expected_address: String = "msSJzRfQb2T3hvws3vRhqtK2Ao39cabEa2".to_string();
@@ -220,13 +220,13 @@ mod tests {
 
     #[test]
     fn p2wpkh() {
-        let key_1: PrivKey = PrivKey::from_wif("cPYWWA7yv4ivb2ueWJP6SKr6rSJiT6JfGkdVrgvhrWR7soE8RxBG").unwrap();
+        let key_1: PrivKey = PrivKey::from_str("cPYWWA7yv4ivb2ueWJP6SKr6rSJiT6JfGkdVrgvhrWR7soE8RxBG").unwrap();
         let pk1 = PubKey::from_priv_key(&key_1);
         let derived_address_1 = Address::P2WPKH(pk1, Network::Testnet).to_string().unwrap();
         let expected_address_1 = "tb1qxauw2dslmtgdyzw73gtv9mzv5erp3xf7mt83vq".to_string();
         assert_eq!(derived_address_1, expected_address_1);
         
-        let key_2: PrivKey = PrivKey::from_wif("cRzmfLNVsbHp5MYJhY8xz6DaYJBUgSKQL8jwU2xL3su6GScPgxsb").unwrap();
+        let key_2: PrivKey = PrivKey::from_str("cRzmfLNVsbHp5MYJhY8xz6DaYJBUgSKQL8jwU2xL3su6GScPgxsb").unwrap();
         let pk2 = PubKey::from_priv_key(&key_2);
         let derived_address_2 = Address::P2WPKH(pk2, Network::Testnet).to_string().unwrap();
         let expected_address_2 = "tb1qj8rvxxnzkdapv3rueazzyn434duv5q5ep3ze5e".to_string();
@@ -251,7 +251,7 @@ mod tests {
         let tweaked_key = internal_key.tap_tweak(None)?;
         let address = Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap();
 
-        assert_eq!(tweaked_key.hex(), "a60869f0dbcf1dc659c9cecbaf8050135ea9e8cdc487053f1dc6880949dc684c");
+        assert_eq!(tweaked_key.to_string(), "a60869f0dbcf1dc659c9cecbaf8050135ea9e8cdc487053f1dc6880949dc684c");
         assert_eq!(address, "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr");
         Ok(())
     }
