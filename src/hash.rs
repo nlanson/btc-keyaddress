@@ -10,47 +10,34 @@ use crate::{
     util::try_into
 };
 
-/**
-    Takes in a byte array and returns ripemd160(sha256(input)) 
-*/
-pub fn hash160<T>(input: T) -> [u8; 20]
-where T: AsRef<[u8]>
-{
-    ripemd160(sha256(input))
+
+/// Macro to create hash functions
+/// Unique hash functions are implemented in their own function instead of a macro.
+macro_rules! hash_function {
+    // Hash function using dependencies
+    ($name: ident, $lib_: ident, $out_len: expr) => {
+        pub fn $name<T>(input: T) -> [u8; $out_len] 
+        where T: AsRef<[u8]> {
+            let mut r = $lib_::new();
+            r.update(input);
+            try_into(r.finalize().to_vec())
+        }
+    };
+
+    // Combined hash functions
+    ($name: ident, $outer: expr, $inner: expr, $out_len: expr) => {
+        pub fn $name<T>(input: T) -> [u8; $out_len] 
+        where T: AsRef<[u8]> {
+            $outer($inner(input))
+        }
+    }
 }
 
-/**
-    Takes in an byte array and returns the ripemd160 hash of it as a byte array of length 20
-*/
-pub fn ripemd160<T>(input: T) -> [u8; 20]
-where T: AsRef<[u8]>
-{
-    let mut r = Ripemd160::new();
-    r.update(input);
-    try_into(r.finalize().to_vec())
-}
+hash_function!(ripemd160, Ripemd160, 20);
+hash_function!(sha256, Sha256, 32);
+hash_function!(hash160, ripemd160, sha256, 20);
+hash_function!(sha256d, sha256, sha256, 32);
 
-/**
-    Takes in a byte array and returns the sha256 hash of it as a byte array of length 32
-*/
-pub fn sha256<T>(input: T) -> [u8; 32]
-where T: AsRef<[u8]>
-{
-    let mut r = Sha256::new();
-    r.update(input);
-    try_into(r.finalize().to_vec())
-                    
-}
-
-/**
-
-*/
-pub fn double_sha256<T>(input: T) -> [u8; 32]
-where T: AsRef<[u8]>
-{
-    let round1 = sha256(input);
-    sha256(round1)
-}
 
 /**
     Key deriveration function that takes in a mnemonic phrase and passphrase to produce

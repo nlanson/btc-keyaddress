@@ -58,7 +58,7 @@ impl Base58 {
             Vec::new()
         };
         bytes.extend_from_slice(&self.payload);
-        bytes.extend_from_slice(&hash::double_sha256(&bytes)[0..4]);
+        bytes.extend_from_slice(&hash::sha256d(&bytes)[0..4]);
         
         
 
@@ -203,7 +203,7 @@ impl Base58 {
         let bytes = Base58::decode(encoded)?;
 
         //Check derived_checksum == extracted_checksum
-        Ok(hash::double_sha256(&bytes[..bytes.len()-4])[0..4] == bytes[bytes.len()-4..])
+        Ok(hash::sha256d(&bytes[..bytes.len()-4])[0..4] == bytes[bytes.len()-4..])
     }
 
     /// Returns the decoded payload with the checksum removed.
