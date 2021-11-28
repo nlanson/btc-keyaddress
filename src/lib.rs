@@ -28,10 +28,6 @@
             > Better unlocker for multisig hd wallets
             > Custom path tests
             > Taproot standard HDMultisig (?)
-            
-        
-        - Key module
-            > Move methods shared between keys into the Key trait.
 
         
         - Taproot

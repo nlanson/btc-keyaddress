@@ -11,7 +11,9 @@ pub use crate::{
     key::{
         PubKey,
         PrivKey,
-        Key
+        Key,
+        TapTweak,
+        KeyError
     },
     
     address::Address,
@@ -43,9 +45,13 @@ pub use crate::{
             VersionPrefix,
             ToVersionPrefix
         },
-        base58::Base58,
+        base58::{
+            Base58,
+            Base58Error
+        },
         bech32::{
             Bech32,
+            Bech32Err,
             Format
         }
     },
@@ -57,7 +63,14 @@ pub use crate::{
         Network
     },
 
-    script::RedeemScript,
+    script::{
+        RedeemScript,
+        WitnessProgram,
+        ScriptBuilder,
+        ScriptErr,
+        opcodes,
+        Opcode
+    },
 
     taproot::*
 
