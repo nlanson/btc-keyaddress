@@ -219,20 +219,29 @@ pub trait TapTweak {
     /// Taptweak a key given the key and optional script tree
     fn tap_tweak(&self, merkle_root: Option<TreeNode>) -> Result<Self, KeyError>
     where Self: Sized;
+
+    /// Compute the tweak value given the internal key and merkle root
+    fn tweak_value(internal_key: &SchnorrPublicKey, merkle_root: Option<TreeNode>) -> [u8; 32] {
+        let commitment = if let Some(tree) = merkle_root {
+            tree.merkle_root().to_vec()
+        } else {
+            vec![]
+        };
+
+        TapTweakHash::from_key_and_tweak(internal_key, commitment)
+    }
+
+    /// Compute the output key's parity given the internal key and optional script tree
+    fn tweaked_parity(&self, merkle_root: Option<TreeNode>) -> Result<bool, KeyError>;
 }
 
 impl TapTweak for SchnorrPublicKey {
     fn tap_tweak(&self, script_tree: Option<TreeNode>) -> Result<Self, KeyError> {
         let secp = Secp256k1::new();
-        let commitment = if let Some(tree) = script_tree {
-            tree.merkle_root().to_vec()
-        } else {
-            vec![]
-        };
-        let tweak_value = TapTweakHash::from_key_and_tweak(self, commitment);
+        let tweak_value = Self::tweak_value(self, script_tree);
 
         //Tweak the key
-        let mut tweaked_key = self.0; //clone removed
+        let mut tweaked_key = self.0;
         match tweaked_key.tweak_add_assign(&secp, &tweak_value) {
             Ok(x) => {
                 //Check if tweaked successfully
@@ -244,17 +253,32 @@ impl TapTweak for SchnorrPublicKey {
             _ => Err(KeyError::BadArithmatic())
         }
     }
+
+    fn tweaked_parity(&self, merkle_root: Option<TreeNode>) -> Result<bool, KeyError> {
+        let secp = Secp256k1::new();
+        let tweak_value = Self::tweak_value(self, merkle_root);
+
+        //Tweak the key
+        let mut tweaked_key = self.0;
+        match tweaked_key.tweak_add_assign(&secp, &tweak_value) {
+            Ok(parity) => {
+                //Check if tweaked successfully
+                if self.0.tweak_add_check(&secp, &tweaked_key, parity, tweak_value) {
+                    return Ok( parity )
+                } else {
+                    return Err(KeyError::BadArithmatic())
+                }
+            }
+
+            _ => Err(KeyError::BadArithmatic())
+        }
+    }
 }
 
 impl TapTweak for SchnorrKeyPair {
     fn tap_tweak(&self, script_tree: Option<TreeNode>) -> Result<Self, KeyError> {
         let secp = Secp256k1::new();
-        let commitment = if let Some(tree) = script_tree {
-            tree.merkle_root().to_vec()
-        } else {
-            vec![]
-        };
-        let tweak_value = TapTweakHash::from_key_and_tweak(&self.get_pub(), commitment);
+        let tweak_value = Self::tweak_value(&self.get_pub(), script_tree);
         
         //Tweak the key
         let mut tweaked_key = self.clone();
@@ -262,6 +286,11 @@ impl TapTweak for SchnorrKeyPair {
             Ok(_) => Ok(tweaked_key),
             Err(_) => Err(KeyError::BadArithmatic())
         }
+    }
+
+    fn tweaked_parity(&self, merkle_root: Option<TreeNode>) -> Result<bool, KeyError> {
+        let public_key = self.get_pub();
+        public_key.tweaked_parity(merkle_root)
     }
 }
 
