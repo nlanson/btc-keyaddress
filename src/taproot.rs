@@ -4,6 +4,10 @@
     Todo:
         - Rework huffman coding implementation
         - Control block creation
+            > Given an internal key, script tree and selected leaf (script), create the control block by:
+                - Finding the parity bit by tweaking the internal key by the merkle root.
+                - Computing the merkle path by using depth first search.
+
 */
 
 use crate::{
@@ -314,6 +318,17 @@ impl TreeNode {
         }
     }
 }
+
+
+#[derive(Debug, Clone)]
+pub struct ControlBlock {
+    revealed_leaf: LeafInfo,
+    parity_bit: bool,
+    internal_key: SchnorrPublicKey,
+    merkle_path: Vec<[u8; 32]>
+}
+
+
 
 #[cfg(test)]
 mod tests {
