@@ -31,6 +31,16 @@
 
         
         - Taproot
+            > Script tree builder/editor mechanisms seperate from `TreeNode` struct.
+                - A temporary builder struct is requried since the TreeNode struct has strict
+                  rules to preserve the immutable nature of MAST trees.
+                - The builder struct should be able to create script trees by inserting scripts at
+                  certain levels of the tree and allowing adjacent leaves to be null during creation
+                  awaiting insertion.
+                - Once the tree structure is set, the builder will check if the tree is a valid MAST tree,
+                  and if it is, cast it over into the TreeNode struct where hashes, merkle paths and what not 
+                  can be extracted.
+                - The idea is to keep tree creation and tree use seperate.
             > DFS algorithm to extract leaf nodes
             > Control block creation from internal key, script tree and selected script.
             > Implement implementable BIP-341 test vectors (https://github.com/bitcoin/bips/blob/master/bip-0341/wallet-test-vectors.json)

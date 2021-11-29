@@ -3,6 +3,15 @@
 
     Todo:
         - Rework huffman coding implementation
+        - Seperate tree creation and tree application:
+            > Tree creation/builder struct
+                - Inserting new leaves    (given a leaf and level)
+                - Deleting leaves         (given a leaf, use DFS to find and delete)
+                - Editing existing leaves (given new leaf info and location, update leaf and parent hashes)
+                - Huffman and most balanced tree creation from a list of nodes can be moved into this struct
+            > Tree application struct
+                - Extracting hashes (merkle root)
+                - Merkle path computation (given a leaf, returns a vector of hashes)
         - Control block creation
             > Given an internal key, script tree and selected leaf (script), create the control block by:
                 - Finding the parity bit by tweaking the internal key by the merkle root.
@@ -315,6 +324,35 @@ impl TreeNode {
                 self.right.is_none() && self.left.is_none()
             },
             _ => false
+        }
+    }
+
+    /// Determine whether the current node is a branch node or not.
+    pub fn is_branch(&self) -> bool {
+        match self.value {
+            NodeValue::Branch(_) => {
+                // If the node value stores a branch hash and there are two children, it is a branch node.
+                self.left.is_some() && self.right.is_some()
+            },
+            _ => false
+        }
+    }
+
+    /// Update the hash stored in a branch node
+    pub fn update_hash(&mut self) -> Result<(), TaprootErr> {
+        if self.is_branch() {
+            self.value = NodeValue::Branch(
+                TapBranchHash::from_nodes(self.left.as_ref().unwrap(), self.right.as_ref().unwrap())
+            )
+        }
+
+        Ok(())
+    }
+
+    /// Update the leaf value in a leaf node
+    pub fn update_leaf(&mut self, new_value: &LeafInfo) {
+        if self.is_leaf() {
+            self.value = NodeValue::Leaf(new_value.to_owned())
         }
     }
 }
