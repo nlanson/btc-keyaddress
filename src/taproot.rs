@@ -86,7 +86,7 @@
                 - Computing the merkle path by using depth first search.
 
 */
-
+use std::collections::HashMap;
 use crate::{
     hash::{
         tagged_hash
@@ -173,6 +173,13 @@ impl TapLeafHash {
 
         TapLeafHash::from_slice(&data)
     }
+
+    pub fn from_builder_leaf(leaf: &Leaf) -> [u8; 32] {
+        let mut data = vec![leaf.version];
+        data.extend_from_slice(&leaf.script.prefix_compactsize());
+
+        TapLeafHash::from_slice(&data)
+    }
 }
 
 
@@ -180,14 +187,97 @@ impl TapLeafHash {
 /// Builder to create taproot script trees.
 pub struct TaprootScriptTreeBuilder {
     // The binary tree is represented as an array in the builder for ease of use and traversal.
-    nodes: Vec<Option<LeafInfo>>
+    nodes: Vec<Option<Node>>
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Node {
+    // The hash of this node.
+    // For leaf nodes, the hash is the TapLeaf hash of the single leaf.
+    // For branch nodes, the hash is the TapBranch hash of the child node hashes.
+    hash: [u8; 32],
+
+    // The leaves contained in this node.
+    leaves: Vec<Leaf>
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Leaf {
+    version: u8,
+    script: RedeemScript,
+    merkle_proof: MerkleProof
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MerkleProof(Vec<[u8; 32]>);
 
 impl TaprootScriptTreeBuilder {
     /// Return a new instance of the builder
     pub fn new() -> Self {
         Self { nodes: vec![] }
     }
+
+    // Methods required:
+    //  - Insert new node
+    //  - Complete tree and output spend info
+}
+
+impl Node {
+    // Methods required:
+    //  - New leaf node
+    //  - Combining nodes
+    //
+}
+
+impl Leaf {
+    /// New leaf with a specified version and script
+    pub fn new_with_version(version: u8, script: &RedeemScript) -> Self {
+        Self {
+            version,
+            script: script.clone(),
+            merkle_proof: MerkleProof(vec![])
+        }
+    }
+
+    /// New leaf with default version of 0xc0 and provided script
+    pub fn new(script: &RedeemScript) -> Self {
+        Self::new_with_version(0xc0, script)
+    }
+
+    /// TapLeafHash of the leaf
+    pub fn tapleaf_hash(&self) -> [u8; 32] {
+        TapLeafHash::from_builder_leaf(self)
+    }
+}
+
+impl MerkleProof {
+    // Methods required:
+    //  - New merkle proof
+    //  - Push new hash
+}
+
+
+#[derive(Debug, Clone)]
+pub struct SpendInfo {
+    internal_key: SchnorrPublicKey,
+    merkle_root: Option<[u8; 32]>,
+    parity: bool,
+    script_map: HashMap<Leaf, MerkleProof>
+}
+
+#[derive(Debug, Clone)]
+pub struct ScriptMap(HashMap<Leaf, MerkleProof>);
+
+impl SpendInfo {
+    // Methods required:
+    //  - Create new spend info struct from key and NodeInfo
+    //  - Control block creation from spend info
+}
+
+impl ScriptMap {
+    // Methods required:
+    //  - Create script map given a vector of leaves.
+    //  - Merkle proof verification given a merkle root and script map.
 }
 
 
