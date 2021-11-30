@@ -5,17 +5,21 @@
         - Rework huffman coding implementation
         - Seperate tree creation and tree application:
             > Tree creation/builder struct
-                - As an approach, leaves can be inserted at a given depth, then when a another leaf is added
-                  at the same depth, combine the two at the same level and move it to a level above. This can
-                  be done recursively so that every time a leaf is added the tree remains valid. 
+                - As a potential approach to the builder, an API could be provided to add leaves to the tree
+                  given the leaf and desired depth, then store the leaf at a position in the array reflecting
+                  the specified depth. When another leaf is added at the same depth, combine the existing leaf
+                  with the new leaf and place the new combined node at the current depth - 1. This can be done
+                  recursively each time there are two nodes at a specific depth.
                   The only limitation to this is that a leaves cannot be added when there are nodes at a lower
                   level that are not yet combined. If this happens, there could be a rogue node stuck deep in
                   the tree which makes MAST creation not possible until it gets combined upto to where it connects
                   with the root.
 
-                  Branch nodes will have to store an array of leaves which they are composed of following TapLeaf
-                  and TapBranch hashing rules.
-                  Eg..
+                  Nodes will have to store an array of leaves which they are composed of. Each leaf will 
+                  store the hashes required to construct the merkle path to the root from itself. This can be done
+                  by having the leaf store a vector of hashes and then when two nodes are combined, store the hash
+                  of the node being combined to self in each leaf in self.
+                  Eg.
                         For the tree:
                                             ROOT
                                          /        \
@@ -24,12 +28,31 @@
                                       A    B    C    B3
                                                     /  \
                                                    D    E
-                       B3 would store the leaves DE in the order of the TapLeaf hashes of leaves D and E.
-                       B2 would store the leaves CDE in the order of TapLeaf hash C and TapBranch hash B3
-                       while preserving the order stored in B3.
-                       B1 would sotre the leaves AB in the order of TapLEaf hashes of leaves A and B.
-                       ROOT would store the leaves ABCDE in the order of TapBranch hashes B1 and B2 whilst
-                       preserving the leaf order stored in B1 and B2.
+
+                       Leaf A would store:
+                        - The hash of leaf B
+                        - The hash of branch B2
+                       Leaf B would store:
+                        - The hash of leaf A
+                        - The hash of branch B2
+                       Leaf C would store:
+                        - The hash of branch B3
+                        - The hash of branch B1
+                       Leaf D would store:
+                        - The hash of leaf E
+                        - The hash of leaf C
+                        - The hash of branch B1
+                       Leaf E would store:
+                        - The hash of leaf D
+                        - The hash of leaf C
+                        - The hash of branch B1
+                      
+                       So when the tree is complete and exported as SpendInfo, the merkle path using A can is already pre
+                       stored as a vector of hashes. This removes the need to compute merkle paths every time it is
+                       requested as well as the need to store a script tree as a "tree".
+                       
+                       From the ROOT node containing every leaf (which contains the merkle proof of it self), the spend info
+                       struct can be constructed by creating a hash map containing the leaf as key and merkle path as value.
 
                        When creating this tree, it would have to be done in the order:
                         Leaf A, depth 2
@@ -119,18 +142,25 @@ impl TapBranchHash {
     /// Return the hash of a branch node given two child nodes
     pub fn from_nodes(left: &TreeNode, right: &TreeNode) -> [u8; 32] {
         //Extract the hashes of the child nodes.
-        let (mut left_hash, mut right_hash) = (left.value.as_hash(), right.value.as_hash());
+        let (left_hash, right_hash) = (left.value.as_hash(), right.value.as_hash());
 
+        Self::sort_hashes_then_hash(left_hash, right_hash)
+    }
+
+    pub fn sort_hashes_then_hash(hash_1: [u8; 32], hash_2: [u8; 32]) -> [u8; 32] {
+        let mut hash_1 = hash_1;
+        let mut hash_2 = hash_2;
+        
         //Swap the hashes by value.
-        if right_hash < left_hash {
-            let temp = left_hash;
-            left_hash = right_hash;
-            right_hash = temp;
+        if hash_2 < hash_1 {
+            let temp = hash_1;
+            hash_1 = hash_2;
+            hash_2 = temp;
         }
 
         //Concatenate the hashes and TapBranchHash it
-        let mut hash_preimage = left_hash.to_vec();
-        hash_preimage.extend_from_slice(&right_hash);
+        let mut hash_preimage = hash_1.to_vec();
+        hash_preimage.extend_from_slice(&hash_2);
         TapBranchHash::from_slice(&hash_preimage)
     }
 }
@@ -150,13 +180,13 @@ impl TapLeafHash {
 /// Builder to create taproot script trees.
 pub struct TaprootScriptTreeBuilder {
     // The binary tree is represented as an array in the builder for ease of use and traversal.
-    branch: Vec<Option<NodeValue>>
+    nodes: Vec<Option<LeafInfo>>
 }
 
 impl TaprootScriptTreeBuilder {
     /// Return a new instance of the builder
     pub fn new() -> Self {
-        Self { branch: vec![] }
+        Self { nodes: vec![] }
     }
 }
 
