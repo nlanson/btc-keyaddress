@@ -33,7 +33,9 @@ use crate::{
 #[derive(Debug)]
 pub enum TaprootErr {
     BadLeaves,
-    InvalidNode
+    InvalidNode,
+    MaxDepthExceeded,
+    InvalidInsertionDepth
 }
 
 pub trait TaprootTaggedHash {
@@ -58,13 +60,13 @@ taproot_tagged_hashes!(TapTweakHash, "TapTweak");   // Used for the final key tw
 taproot_tagged_hashes!(TapBranchHash, "TapBranch"); // Used to hash script tree nodes together into a single branch node
 taproot_tagged_hashes!(TapLeafHash, "TapLeaf");     // Used to hash script tree leaf nodes
 
-impl TapLeafHash {
-    /// Return the hash of a leaf node given it's info
-    pub fn from_leaf(leaf: &LeafInfo) -> [u8; 32] {
-        let mut data = vec![leaf.version];
-        data.extend_from_slice(&leaf.script.prefix_compactsize());
-
-        TapLeafHash::from_slice(&data)
+impl TapTweakHash {
+    /// Create the TapTweakHash from a schnorr public key and tweak value.
+    /// Tweak value is either the merkle root of a script tree or nothing.
+    pub fn from_key_and_tweak(key: &SchnorrPublicKey, tweak: Vec<u8>) -> [u8; 32] {
+        let mut data = key.as_bytes::<32>().to_vec();
+        data.extend_from_slice(&tweak);
+        TapTweakHash::from_slice(&data)
     }
 }
 
@@ -88,18 +90,35 @@ impl TapBranchHash {
     }
 }
 
-impl TapTweakHash {
-    /// Create the TapTweakHash from a schnorr public key and tweak value.
-    /// Tweak value is either the merkle root of a script tree or nothing.
-    pub fn from_key_and_tweak(key: &SchnorrPublicKey, tweak: Vec<u8>) -> [u8; 32] {
-        let mut data = key.as_bytes::<32>().to_vec();
-        data.extend_from_slice(&tweak);
-        TapTweakHash::from_slice(&data)
+impl TapLeafHash {
+    /// Return the hash of a leaf node given it's info
+    pub fn from_leaf(leaf: &LeafInfo) -> [u8; 32] {
+        let mut data = vec![leaf.version];
+        data.extend_from_slice(&leaf.script.prefix_compactsize());
+
+        TapLeafHash::from_slice(&data)
     }
 }
 
+
+#[derive(Debug, Clone, PartialEq)]
+/// Builder to create taproot script trees.
+pub struct TaprootScriptTreeBuilder {
+    // The binary tree is represented as an array in the builder for ease of use and traversal.
+    branch: Vec<Option<NodeValue>>
+}
+
+impl TaprootScriptTreeBuilder {
+    /// Return a new instance of the builder
+    pub fn new() -> Self {
+        Self { branch: vec![] }
+    }
+}
+
+
+
 /**
-    TreeNode struct to create binary trees
+    TreeNode struct for taproot application.
 */
 #[derive(Debug, Clone, PartialEq)]
 pub struct TreeNode {
@@ -112,11 +131,10 @@ pub struct TreeNode {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-/// NodeValue struct stores the value of a node in a tree.
-/// Stores either the hash of it's children or the unhashed leaf info.
+/// NodeValue struct stores the hash of a value in a tree.
 pub enum NodeValue {
     Branch([u8; 32]),
-    Leaf(LeafInfo)
+    Leaf([u8; 32])
 }
 
 impl NodeValue {
@@ -124,7 +142,7 @@ impl NodeValue {
     pub fn as_hash(&self) -> [u8; 32] {
         match self {
             NodeValue::Branch(hash) => *hash,
-            NodeValue::Leaf(leaf) => leaf.tapleaf_hash()
+            NodeValue::Leaf(leaf) => *leaf
         }
     }
 }
@@ -231,12 +249,8 @@ impl HuffmanCoding<RedeemScript> {
 
 impl TreeNode {
     /// Create a new tree node given either a left and right child or a leaf value.
-    /// 
     /// If left and right children are given, the node is interpreted to be a branch node.
-    /// The value stored in a branch node is the hash of the two child nodes.
-    /// 
     /// If a leaf value is given, the node is interpreted to be a leaf node.
-    /// The value stored in a leaf node is the unhashed leaf information.
     pub fn new(left: Option<Self>, right: Option<Self>, value: Option<LeafInfo>) -> Result<Self, TaprootErr> {
         //Branch node | Has both branches and no value
         if left.is_some() && right.is_some() && value.is_none() {
@@ -258,7 +272,7 @@ impl TreeNode {
                 Self {
                     left: None,
                     right: None,
-                    value: NodeValue::Leaf(value.unwrap()) //Leaf is stored unhashed
+                    value: NodeValue::Leaf(value.unwrap().tapleaf_hash())
                 }
             )
         }
@@ -352,7 +366,7 @@ impl TreeNode {
     /// Update the leaf value in a leaf node
     pub fn update_leaf(&mut self, new_value: &LeafInfo) {
         if self.is_leaf() {
-            self.value = NodeValue::Leaf(new_value.to_owned())
+            self.value = NodeValue::Leaf(new_value.tapleaf_hash())
         }
     }
 }
