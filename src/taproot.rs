@@ -5,10 +5,55 @@
         - Rework huffman coding implementation
         - Seperate tree creation and tree application:
             > Tree creation/builder struct
-                - Inserting new leaves    (given a leaf and level)
-                - Deleting leaves         (given a leaf, use DFS to find and delete)
-                - Editing existing leaves (given new leaf info and location, update leaf and parent hashes)
-                - Huffman and most balanced tree creation from a list of nodes can be moved into this struct
+                - As an approach, leaves can be inserted at a given depth, then when a another leaf is added
+                  at the same depth, combine the two at the same level and move it to a level above. This can
+                  be done recursively so that every time a leaf is added the tree remains valid. 
+                  The only limitation to this is that a leaves cannot be added when there are nodes at a lower
+                  level that are not yet combined. If this happens, there could be a rogue node stuck deep in
+                  the tree which makes MAST creation not possible until it gets combined upto to where it connects
+                  with the root.
+
+                  Branch nodes will have to store an array of leaves which they are composed of following TapLeaf
+                  and TapBranch hashing rules.
+                  Eg..
+                        For the tree:
+                                            ROOT
+                                         /        \
+                                        B1        B2
+                                       /  \      /  \
+                                      A    B    C    B3
+                                                    /  \
+                                                   D    E
+                       B3 would store the leaves DE in the order of the TapLeaf hashes of leaves D and E.
+                       B2 would store the leaves CDE in the order of TapLeaf hash C and TapBranch hash B3
+                       while preserving the order stored in B3.
+                       B1 would sotre the leaves AB in the order of TapLEaf hashes of leaves A and B.
+                       ROOT would store the leaves ABCDE in the order of TapBranch hashes B1 and B2 whilst
+                       preserving the leaf order stored in B1 and B2.
+
+                       When creating this tree, it would have to be done in the order:
+                        Leaf A, depth 2
+                        Leaf B, depth 2
+                        Leaf C, depth 2
+                        Leaf D, depth 3
+                        Leaf E, depth 3
+                       
+                       If depth 3 is created prior to depth 2, it will instead look like this:
+                                            ROOT
+                                         /        \
+                                        B1        B2
+                                       /  \      /  \
+                                      B2   A    B    C
+                                     /  \
+                                    D    E
+
+                        What cannot be done is to start creating depth 2 while depth 3 is still incomplete.
+                        It technically will still work for this case, but if this is allowed it can lead to
+                        bugs in other cases.
+                       
+                
+                - Existing huffman and most-balanced MAST tree creation methods should be migrated to the builder struct.
+
             > Tree application struct
                 - Extracting hashes (merkle root)
                 - Merkle path computation (given a leaf, returns a vector of hashes)
