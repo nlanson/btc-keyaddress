@@ -86,7 +86,9 @@
                 - Computing the merkle path by using depth first search.
 
 */
-use std::collections::HashMap;
+use std::collections::{
+    HashMap, HashSet
+};
 use crate::{
     hash::{
         tagged_hash
@@ -144,21 +146,21 @@ impl TapBranchHash {
         //Extract the hashes of the child nodes.
         let (left_hash, right_hash) = (left.value.as_hash(), right.value.as_hash());
 
-        Self::sort_hashes_then_hash(left_hash, right_hash)
+        Self::combined_hash(left_hash, right_hash)
     }
 
-    pub fn sort_hashes_then_hash(hash_1: [u8; 32], hash_2: [u8; 32]) -> [u8; 32] {
+    pub fn combined_hash(hash_1: [u8; 32], hash_2: [u8; 32]) -> [u8; 32] {
         let mut hash_1 = hash_1;
         let mut hash_2 = hash_2;
         
-        //Swap the hashes by value.
+        //Swap the hashes by value if needed
         if hash_2 < hash_1 {
             let temp = hash_1;
             hash_1 = hash_2;
             hash_2 = temp;
         }
 
-        //Concatenate the hashes and TapBranchHash it
+        //Concatenate the hashes starting with the smaller one and TapBranchHash it
         let mut hash_preimage = hash_1.to_vec();
         hash_preimage.extend_from_slice(&hash_2);
         TapBranchHash::from_slice(&hash_preimage)
@@ -167,7 +169,7 @@ impl TapBranchHash {
 
 impl TapLeafHash {
     /// Return the hash of a leaf node given it's info
-    pub fn from_leaf(leaf: &LeafInfo) -> [u8; 32] {
+    pub fn from_leaf(leaf: &Leaf) -> [u8; 32] {
         let mut data = vec![leaf.version];
         data.extend_from_slice(&leaf.script.prefix_compactsize());
 
@@ -190,6 +192,23 @@ pub struct TaprootScriptTreeBuilder {
     nodes: Vec<Option<Node>>
 }
 
+impl TaprootScriptTreeBuilder {
+    /// Return a new instance of the builder
+    pub fn new() -> Self {
+        Self { nodes: vec![] }
+    }
+
+    /// Insert a new leaf node to the script tree at a given depth
+    pub fn insert(mut self, leaf: Leaf, depth: usize) -> Result<Self, TaprootErr> {
+        todo!();
+    }
+
+    /// Turn a complete tree into spend info
+    pub fn complete(self) -> Result<SpendInfo, TaprootErr> {
+        todo!();
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     // The hash of this node.
@@ -201,32 +220,44 @@ pub struct Node {
     leaves: Vec<Leaf>
 }
 
-#[derive(Debug, Clone, PartialEq)]
+impl Node {
+    /// New leaf node
+    pub fn new_leaf(leaf: Leaf) -> Self {
+        Self {
+            hash: leaf.tapleaf_hash(),
+            leaves: vec![leaf]
+        }
+    }
+
+    /// Combine two nodes together, adding a new merkle proof hash to every leaf that is part
+    /// of the merger.
+    pub fn combine(a: Self, b: Self) -> Self {
+        // The new node will contain a vector of all the leaves in it's children.
+        // Each leaf will have a new merkle proof added being the other node they are being
+        // combined with.
+        let mut combined_leaves: Vec<Leaf> = vec![];
+        for mut leaf in a.leaves {
+            leaf.merkle_proof.push(b.hash);
+            combined_leaves.push(leaf);
+        }
+        for mut leaf in b.leaves {
+            leaf.merkle_proof.push(a.hash);
+            combined_leaves.push(leaf);
+        }
+
+
+        Self {
+            hash: TapBranchHash::combined_hash(a.hash, b.hash),
+            leaves: combined_leaves
+        }
+    }
+}
+
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct Leaf {
     version: u8,
     script: RedeemScript,
     merkle_proof: MerkleProof
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct MerkleProof(Vec<[u8; 32]>);
-
-impl TaprootScriptTreeBuilder {
-    /// Return a new instance of the builder
-    pub fn new() -> Self {
-        Self { nodes: vec![] }
-    }
-
-    // Methods required:
-    //  - Insert new node
-    //  - Complete tree and output spend info
-}
-
-impl Node {
-    // Methods required:
-    //  - New leaf node
-    //  - Combining nodes
-    //
 }
 
 impl Leaf {
@@ -250,10 +281,83 @@ impl Leaf {
     }
 }
 
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
+pub struct MerkleProof(Vec<[u8; 32]>);
+
+
 impl MerkleProof {
     // Methods required:
-    //  - New merkle proof
-    //  - Push new hash
+    pub fn new() -> Self {
+        Self(vec![])
+    }
+
+    /// Push a new hash in
+    pub fn push(&mut self, hash: [u8; 32]) {
+        self.0.push(hash)
+    }
+
+    /// Return the underlying hash vector
+    pub fn into_inner(&self) -> Vec<[u8; 32]> {
+        self.0.clone()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ScriptMap(HashMap<Leaf, HashSet<MerkleProof>>);
+
+impl ScriptMap {
+    // Methods required:
+    //  - Merkle proof verification given a merkle root and script map.
+
+    /// Create a new script map from a vector of leaves where each leaf 
+    /// contains the merkle proof for itself.
+    pub fn from_leaves(leaves: Vec<Leaf>) -> Self {
+        let mut map: HashMap<Leaf, HashSet<MerkleProof>> = HashMap::new();
+        for leaf in leaves {
+            match map.get_mut(&leaf) {
+                Some(set) => {
+                    // Leaf already exists in the map.
+                    // Push in the measured merkle proof for this script and go to the next leaf.
+                    set.insert(leaf.merkle_proof);
+                    continue;
+                },
+                None => {
+                    // Leaf does not exist in the map.
+                    // Create a new entry in the map for this leaf.
+                    let mut set: HashSet<MerkleProof> = HashSet::new();
+                    set.insert(leaf.merkle_proof.clone());
+                    map.insert(leaf, set);
+                }
+            }
+        }
+
+        Self(map)
+    }
+
+    /// Check if a script map's items all match up to a given merkle root hash.
+    pub fn verify_merkle_proof(&self, merkle_root: [u8; 32]) -> bool {
+        // For each leaf...
+        self.0.iter().all(|item| {
+            // for each proof...
+            let (leaf, merkle_proofs) = (item.0, item.1);
+            merkle_proofs.iter().all(|proof| {
+                // Recursively check if each proof reduces to the merkle root.
+                let mut hashes = vec![leaf.tapleaf_hash()]; 
+                hashes.extend_from_slice(&proof.into_inner());
+                
+                while hashes.len() != 1 {
+                    let combined_hash = TapBranchHash::combined_hash(hashes[0], hashes[1]);
+                    
+                    hashes.remove(0);
+                    hashes.remove(1);
+                    hashes.insert(0, combined_hash);
+                }
+
+                hashes[0] == merkle_root
+            })
+
+        })
+    }
 }
 
 
@@ -262,11 +366,8 @@ pub struct SpendInfo {
     internal_key: SchnorrPublicKey,
     merkle_root: Option<[u8; 32]>,
     parity: bool,
-    script_map: HashMap<Leaf, MerkleProof>
+    script_map: ScriptMap
 }
-
-#[derive(Debug, Clone)]
-pub struct ScriptMap(HashMap<Leaf, MerkleProof>);
 
 impl SpendInfo {
     // Methods required:
@@ -274,11 +375,6 @@ impl SpendInfo {
     //  - Control block creation from spend info
 }
 
-impl ScriptMap {
-    // Methods required:
-    //  - Create script map given a vector of leaves.
-    //  - Merkle proof verification given a merkle root and script map.
-}
 
 
 
@@ -312,32 +408,6 @@ impl NodeValue {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-/// LeafInfo struct that stores the leaf version and script in a script tree leaf.
-pub struct LeafInfo {
-    version: u8,
-    script: RedeemScript
-}
-
-impl LeafInfo {
-    /// New leaf with a specified version and script
-    pub fn new_with_version(version: u8, script: &RedeemScript) -> Self {
-        Self {
-            version,
-            script: script.clone()
-        }
-    }
-
-    /// New leaf with default version of 0xc0 and provided script
-    pub fn new(script: &RedeemScript) -> Self {
-        Self::new_with_version(0xc0, script)
-    }
-
-    /// TapLeafHash of the leaf
-    pub fn tapleaf_hash(&self) -> [u8; 32] {
-        TapLeafHash::from_leaf(self)
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct HuffmanCoding<T> {
@@ -373,7 +443,7 @@ impl HuffmanCoding<RedeemScript> {
     pub fn new_script_tree(items: &Vec<Self>) -> TreeNode {
         //Create a (frequency, leaf node) table from each item
         let mut table = items.iter().map(|x| {
-            let node = TreeNode::new(None, None, Some(LeafInfo::new(&x.val))).unwrap();
+            let node = TreeNode::new(None, None, Some(Leaf::new(&x.val))).unwrap();
             
             (x.freq, node)
         }).collect::<Vec<(usize, TreeNode)>>();
@@ -416,7 +486,7 @@ impl TreeNode {
     /// Create a new tree node given either a left and right child or a leaf value.
     /// If left and right children are given, the node is interpreted to be a branch node.
     /// If a leaf value is given, the node is interpreted to be a leaf node.
-    pub fn new(left: Option<Self>, right: Option<Self>, value: Option<LeafInfo>) -> Result<Self, TaprootErr> {
+    pub fn new(left: Option<Self>, right: Option<Self>, value: Option<Leaf>) -> Result<Self, TaprootErr> {
         //Branch node | Has both branches and no value
         if left.is_some() && right.is_some() && value.is_none() {
             // Get the hash of the two children
@@ -452,7 +522,7 @@ impl TreeNode {
     pub fn new_script_tree(scripts: &Vec<RedeemScript>) -> Self {
         //Create leaves from scripts
         let leaves: Vec<TreeNode> = scripts.iter().map(|x| {
-            TreeNode::new(None, None, Some(LeafInfo::new(x))).unwrap()
+            TreeNode::new(None, None, Some(Leaf::new(x))).unwrap()
         }).collect::<Vec<TreeNode>>();
 
         Self::construct_tree(leaves)
@@ -529,7 +599,7 @@ impl TreeNode {
     }
 
     /// Update the leaf value in a leaf node
-    pub fn update_leaf(&mut self, new_value: &LeafInfo) {
+    pub fn update_leaf(&mut self, new_value: &Leaf) {
         if self.is_leaf() {
             self.value = NodeValue::Leaf(new_value.tapleaf_hash())
         }
@@ -539,7 +609,7 @@ impl TreeNode {
 
 #[derive(Debug, Clone)]
 pub struct ControlBlock {
-    revealed_leaf: LeafInfo,
+    revealed_leaf: Leaf,
     parity_bit: bool,
     internal_key: SchnorrPublicKey,
     merkle_path: Vec<[u8; 32]>

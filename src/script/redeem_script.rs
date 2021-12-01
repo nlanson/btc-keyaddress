@@ -11,7 +11,7 @@ use crate::{
     }
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct RedeemScript {
     pub code: Vec<u8>     //Later this can be updated to use [Opcode]
 }
