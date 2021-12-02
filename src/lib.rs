@@ -32,13 +32,12 @@
         
         - Taproot
             > Taproot script tree mechanics refactor
-                - New tree builder struct to create script trees
-                - New spend info struct to store information necessary to spend taproot outputs.
-                  This includes information such as the merkle root and merkle path for every leaf using
-                  maps and hash sets.
-                - More details in taproot.rs header.
-            > DFS algorithm to extract leaf nodes
-            > Control block creation from internal key, script tree and selected script.
+                - Complete spend info struct to make it usable
+                - Merkle path extraction given a leaf
+                - Control block struct
+                - Extensive script tree builder tests.
+                - Use the new builder and spend info where the old TreeNode is used.
+            > Update the readme specs to show the tree builder.
             > Implement implementable BIP-341 test vectors (https://github.com/bitcoin/bips/blob/master/bip-0341/wallet-test-vectors.json)
         
         
