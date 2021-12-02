@@ -24,6 +24,7 @@ use crate::{
     key::{
         SchnorrPublicKey,
         Key,
+        TapTweak
     },
     script::RedeemScript
 };
@@ -73,11 +74,8 @@ impl TapTweakHash {
 
 impl TapBranchHash {
     /// Return the hash of a branch node given two child nodes
-    pub fn from_nodes(left: &TreeNode, right: &TreeNode) -> [u8; 32] {
-        //Extract the hashes of the child nodes.
-        let (left_hash, right_hash) = (left.value.as_hash(), right.value.as_hash());
-
-        Self::combined_hash(left_hash, right_hash)
+    pub fn from_nodes(a: Node, b: Node) -> [u8; 32] {
+        Self::combined_hash(a.hash, b.hash)
     }
 
     pub fn combined_hash(hash_1: [u8; 32], hash_2: [u8; 32]) -> [u8; 32] {
@@ -101,13 +99,6 @@ impl TapBranchHash {
 impl TapLeafHash {
     /// Return the hash of a leaf node given it's info
     pub fn from_leaf(leaf: &Leaf) -> [u8; 32] {
-        let mut data = vec![leaf.version];
-        data.extend_from_slice(&leaf.script.prefix_compactsize());
-
-        TapLeafHash::from_slice(&data)
-    }
-
-    pub fn from_builder_leaf(leaf: &Leaf) -> [u8; 32] {
         let mut data = vec![leaf.version];
         data.extend_from_slice(&leaf.script.prefix_compactsize());
 
@@ -280,18 +271,18 @@ impl Node {
         // Each leaf will have a new merkle proof added being the other node they are being
         // combined with.
         let mut combined_leaves: Vec<Leaf> = vec![];
-        for mut leaf in a.leaves {
+        for mut leaf in a.leaves.clone() {
             leaf.merkle_proof.push(b.hash);
             combined_leaves.push(leaf);
         }
-        for mut leaf in b.leaves {
+        for mut leaf in b.leaves.clone() {
             leaf.merkle_proof.push(a.hash);
             combined_leaves.push(leaf);
         }
 
 
         Self {
-            hash: TapBranchHash::combined_hash(a.hash, b.hash),
+            hash: TapBranchHash::from_nodes(a, b),
             leaves: combined_leaves
         }
     }
@@ -321,7 +312,7 @@ impl Leaf {
 
     /// TapLeafHash of the leaf
     pub fn tapleaf_hash(&self) -> [u8; 32] {
-        TapLeafHash::from_builder_leaf(self)
+        TapLeafHash::from_leaf(self)
     }
 }
 
@@ -408,11 +399,13 @@ impl ScriptMap {
 
 #[derive(Debug, Clone)]
 pub struct SpendInfo {
-    internal_key: SchnorrPublicKey,
-    parity: bool,
-    merkle_root: Option<[u8; 32]>,  // Only exists if there is a script tree
-    script_map: Option<ScriptMap>   // Only exists if there is a script tree
+    pub internal_key: SchnorrPublicKey,
+    pub parity: bool,
+    pub merkle_root: Option<MerkleRoot>,  // Only exists if there is a script tree
+    pub script_map: Option<ScriptMap>   // Only exists if there is a script tree
 }
+
+pub type MerkleRoot = [u8; 32];
 
 impl SpendInfo {
     // Create a new spend info struct from a given internal key and optional script tree.
@@ -422,13 +415,13 @@ impl SpendInfo {
             None => (None, None)
         };
 
-        // let parity = key.tweaked_parity(merkle_root).expect("TapTweak failed");
+        let parity = key.tweaked_parity(merkle_root).expect("TapTweak failed");
         
         
         Self {
             internal_key: key.clone(),
             merkle_root,
-            parity: true,
+            parity,
             script_map
         }
     }
@@ -453,236 +446,6 @@ impl SpendInfo {
 
 
 
-
-/**
-    TreeNode struct for taproot application.
-*/
-#[derive(Debug, Clone, PartialEq)]
-pub struct TreeNode {
-    pub left: Option<Box<TreeNode>>,
-    pub right: Option<Box<TreeNode>>,
-
-    //This value here could be an enum `TreeNodeInfo` which contains either a (leaf version, script) tuple or hash of children
-    //By doing this, each node will contain a value whether it is a leaf or branch and removes the need for an Option
-    pub value: NodeValue  
-}
-
-#[derive(Debug, Clone, PartialEq)]
-/// NodeValue struct stores the hash of a value in a tree.
-pub enum NodeValue {
-    Branch([u8; 32]),
-    Leaf([u8; 32])
-}
-
-impl NodeValue {
-    /// Return the hash of the node's value.
-    pub fn as_hash(&self) -> [u8; 32] {
-        match self {
-            NodeValue::Branch(hash) => *hash,
-            NodeValue::Leaf(leaf) => *leaf
-        }
-    }
-}
-
-
-#[derive(Debug, Clone)]
-pub struct HuffmanCoding<T> {
-    freq: usize,
-    val: T
-}
-
-impl HuffmanCoding<RedeemScript> {
-    /// New item to add to huffman tree given it's frequency and script
-    pub fn new_item(freq: usize, script: &RedeemScript) -> Self {
-        Self {
-            freq,
-            val: script.clone()
-        }
-    }
-    
-    /**
-        Creates a huffman tree given a vector of frequencies and items.
-        
-        Currently, the tree gets cconstructed by repeatedly combining the two least frequent items
-        into a single node. This node is placed back into list with it's frequency being the sum of
-        the combined items. 
-        When combining nodes, the least frequent (or the item at the end of the array) is placed into
-        the right hand side of the combined node.
-
-        When the nodes are combined and inserted back into the table, it is simply pushed into
-        the table vector and the table vector is sorted again. The sorting method, vec::sort_by()
-        DOES NOT reorder equal elements meaning the combined node stays at the end if there are any
-        other equally weighted elements.
-
-        Needs more test cases to check for stability and consistency.
-    */
-    pub fn new_script_tree(items: &Vec<Self>) -> TreeNode {
-        //Create a (frequency, leaf node) table from each item
-        let mut table = items.iter().map(|x| {
-            let node = TreeNode::new(None, None, Some(Leaf::new(&x.val))).unwrap();
-            
-            (x.freq, node)
-        }).collect::<Vec<(usize, TreeNode)>>();
-
-        //Sort the table in decending order of frequency
-        table.sort_by(|a, b| b.0.cmp(&a.0));
-        
-        //While the table does not consist of a single root node
-        while table.len() != 1 {
-            //Get the last two rows of the table
-            let l2i: Vec<(usize, TreeNode)> = table.iter().rev().take(2).map(|x|(x.0, x.1.clone())).collect();
-            //table[table.len()-2..table.len()-1].to_vec();
-
-            //Sum the frequencies
-            let sum: usize = l2i[0].0 + l2i[1].0;
-
-            //Combine the two nodes into a single Node with each as a branch
-            let right = l2i[0].1.clone();  //smaller
-            let left = l2i[1].1.clone();   //larger
-            let combined_node: TreeNode = TreeNode::construct_tree(vec![left, right]);
-
-            //Remove the last two items
-            table.remove(table.len()-1);
-            table.remove(table.len()-1);
-
-            //Push the combined node and sum of frequencies into the table and sort again.
-            //This method of inserting the combined node might not be consistent. Later, a custom insertion method should
-            //be written for consistency. 
-            //But for now, it stays.
-            table.push((sum, combined_node));
-            table.sort_by(|a, b| b.0.cmp(&a.0)); 
-        }
-
-        table[0].1.clone()
-    }
-}
-
-
-impl TreeNode {
-    /// Create a new tree node given either a left and right child or a leaf value.
-    /// If left and right children are given, the node is interpreted to be a branch node.
-    /// If a leaf value is given, the node is interpreted to be a leaf node.
-    pub fn new(left: Option<Self>, right: Option<Self>, value: Option<Leaf>) -> Result<Self, TaprootErr> {
-        //Branch node | Has both branches and no value
-        if left.is_some() && right.is_some() && value.is_none() {
-            // Get the hash of the two children
-            let branch_hash = TapBranchHash::from_nodes(&left.as_ref().unwrap(), &right.as_ref().unwrap());
-            
-            Ok(
-                Self {
-                    left: Some(Box::new(left.unwrap())),
-                    right: Some(Box::new(right.unwrap())),
-                    value: NodeValue::Branch(branch_hash)
-                }
-            )
-        }
-
-        //Leaf node | Has no branches but has a value
-        else if left.is_none() && right.is_none() && value.is_some(){
-            Ok(
-                Self {
-                    left: None,
-                    right: None,
-                    value: NodeValue::Leaf(value.unwrap().tapleaf_hash())
-                }
-            )
-        }
-
-        //Invalid node | Other combinations
-        else {
-            Err(TaprootErr::InvalidNode)
-        }
-    }
-    
-    /// Create a new tree from a list of scripts
-    pub fn new_script_tree(scripts: &Vec<RedeemScript>) -> Self {
-        //Create leaves from scripts
-        let leaves: Vec<TreeNode> = scripts.iter().map(|x| {
-            TreeNode::new(None, None, Some(Leaf::new(x))).unwrap()
-        }).collect::<Vec<TreeNode>>();
-
-        Self::construct_tree(leaves)
-    }
-
-    /**
-        Tries to create the most balanced tree from any amount of leaves.
-        Does this by combining left over leaves with the last parent.
-    */
-    pub fn construct_tree(leaves: Vec<TreeNode>) -> Self {
-        //If there is only one leaf left, return it
-        if leaves.len() == 1 { return leaves[0].clone() }
-
-        //Create new parent nodes by grouping two leaves together
-        let mut parent_level: Vec<TreeNode> = vec![];
-        for i in (0..leaves.len()).step_by(2) { //bug: loop fucks up with odd numbers
-            //If there is a left over node, push a parent combining the left over node and the last parent created.
-            if i+1 == leaves.len() { 
-                let last_parent = parent_level[parent_level.len() - 1].clone();
-                let left_over_child = leaves[leaves.len() - 1].clone();
-    
-                parent_level.remove(parent_level.len() - 1);
-                parent_level.push(Self::construct_tree(vec![last_parent, left_over_child]));    
-                
-                continue;
-            }
-            
-            //Push a parent node combining two child nodes
-            parent_level.push( 
-                TreeNode::new(Some(leaves[i].clone()), Some(leaves[i+1].clone()), None).unwrap()
-            )
-        }
-
-        //Call self again using parent level
-        Self::construct_tree(parent_level)
-    }
-
-    /// Returns the root hash of a given tree node.
-    pub fn merkle_root(&self) -> [u8; 32] {
-        self.value.as_hash()
-    }
-
-    /// Determine whether the current node is a leaf node or not.
-    pub fn is_leaf(&self) -> bool {
-        match self.value {
-            NodeValue::Leaf(_) => {
-                // If the node value stores a leaf and there are no children, then the node is a leaf node.
-                self.right.is_none() && self.left.is_none()
-            },
-            _ => false
-        }
-    }
-
-    /// Determine whether the current node is a branch node or not.
-    pub fn is_branch(&self) -> bool {
-        match self.value {
-            NodeValue::Branch(_) => {
-                // If the node value stores a branch hash and there are two children, it is a branch node.
-                self.left.is_some() && self.right.is_some()
-            },
-            _ => false
-        }
-    }
-
-    /// Update the hash stored in a branch node
-    pub fn update_hash(&mut self) -> Result<(), TaprootErr> {
-        if self.is_branch() {
-            self.value = NodeValue::Branch(
-                TapBranchHash::from_nodes(self.left.as_ref().unwrap(), self.right.as_ref().unwrap())
-            )
-        }
-
-        Ok(())
-    }
-
-    /// Update the leaf value in a leaf node
-    pub fn update_leaf(&mut self, new_value: &Leaf) {
-        if self.is_leaf() {
-            self.value = NodeValue::Leaf(new_value.tapleaf_hash())
-        }
-    }
-}
-
-
 #[derive(Debug, Clone)]
 pub struct ControlBlock {
     revealed_leaf: Leaf,
@@ -690,6 +453,235 @@ pub struct ControlBlock {
     internal_key: SchnorrPublicKey,
     merkle_path: Vec<[u8; 32]>
 }
+
+
+// /**
+//     TreeNode struct for taproot application.
+// */
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct TreeNode {
+//     pub left: Option<Box<TreeNode>>,
+//     pub right: Option<Box<TreeNode>>,
+
+//     //This value here could be an enum `TreeNodeInfo` which contains either a (leaf version, script) tuple or hash of children
+//     //By doing this, each node will contain a value whether it is a leaf or branch and removes the need for an Option
+//     pub value: NodeValue  
+// }
+
+// #[derive(Debug, Clone, PartialEq)]
+// /// NodeValue struct stores the hash of a value in a tree.
+// pub enum NodeValue {
+//     Branch([u8; 32]),
+//     Leaf([u8; 32])
+// }
+
+// impl NodeValue {
+//     /// Return the hash of the node's value.
+//     pub fn as_hash(&self) -> [u8; 32] {
+//         match self {
+//             NodeValue::Branch(hash) => *hash,
+//             NodeValue::Leaf(leaf) => *leaf
+//         }
+//     }
+// }
+
+
+// #[derive(Debug, Clone)]
+// pub struct HuffmanCoding<T> {
+//     freq: usize,
+//     val: T
+// }
+
+// impl HuffmanCoding<RedeemScript> {
+//     /// New item to add to huffman tree given it's frequency and script
+//     pub fn new_item(freq: usize, script: &RedeemScript) -> Self {
+//         Self {
+//             freq,
+//             val: script.clone()
+//         }
+//     }
+    
+//     /**
+//         Creates a huffman tree given a vector of frequencies and items.
+        
+//         Currently, the tree gets cconstructed by repeatedly combining the two least frequent items
+//         into a single node. This node is placed back into list with it's frequency being the sum of
+//         the combined items. 
+//         When combining nodes, the least frequent (or the item at the end of the array) is placed into
+//         the right hand side of the combined node.
+
+//         When the nodes are combined and inserted back into the table, it is simply pushed into
+//         the table vector and the table vector is sorted again. The sorting method, vec::sort_by()
+//         DOES NOT reorder equal elements meaning the combined node stays at the end if there are any
+//         other equally weighted elements.
+
+//         Needs more test cases to check for stability and consistency.
+//     */
+//     pub fn new_script_tree(items: &Vec<Self>) -> TreeNode {
+//         //Create a (frequency, leaf node) table from each item
+//         let mut table = items.iter().map(|x| {
+//             let node = TreeNode::new(None, None, Some(Leaf::new(&x.val))).unwrap();
+            
+//             (x.freq, node)
+//         }).collect::<Vec<(usize, TreeNode)>>();
+
+//         //Sort the table in decending order of frequency
+//         table.sort_by(|a, b| b.0.cmp(&a.0));
+        
+//         //While the table does not consist of a single root node
+//         while table.len() != 1 {
+//             //Get the last two rows of the table
+//             let l2i: Vec<(usize, TreeNode)> = table.iter().rev().take(2).map(|x|(x.0, x.1.clone())).collect();
+//             //table[table.len()-2..table.len()-1].to_vec();
+
+//             //Sum the frequencies
+//             let sum: usize = l2i[0].0 + l2i[1].0;
+
+//             //Combine the two nodes into a single Node with each as a branch
+//             let right = l2i[0].1.clone();  //smaller
+//             let left = l2i[1].1.clone();   //larger
+//             let combined_node: TreeNode = TreeNode::construct_tree(vec![left, right]);
+
+//             //Remove the last two items
+//             table.remove(table.len()-1);
+//             table.remove(table.len()-1);
+
+//             //Push the combined node and sum of frequencies into the table and sort again.
+//             //This method of inserting the combined node might not be consistent. Later, a custom insertion method should
+//             //be written for consistency. 
+//             //But for now, it stays.
+//             table.push((sum, combined_node));
+//             table.sort_by(|a, b| b.0.cmp(&a.0)); 
+//         }
+
+//         table[0].1.clone()
+//     }
+// }
+
+
+// impl TreeNode {
+//     /// Create a new tree node given either a left and right child or a leaf value.
+//     /// If left and right children are given, the node is interpreted to be a branch node.
+//     /// If a leaf value is given, the node is interpreted to be a leaf node.
+//     pub fn new(left: Option<Self>, right: Option<Self>, value: Option<Leaf>) -> Result<Self, TaprootErr> {
+//         //Branch node | Has both branches and no value
+//         if left.is_some() && right.is_some() && value.is_none() {
+//             // Get the hash of the two children
+//             let branch_hash = TapBranchHash::from_nodes(&left.as_ref().unwrap(), &right.as_ref().unwrap());
+            
+//             Ok(
+//                 Self {
+//                     left: Some(Box::new(left.unwrap())),
+//                     right: Some(Box::new(right.unwrap())),
+//                     value: NodeValue::Branch(branch_hash)
+//                 }
+//             )
+//         }
+
+//         //Leaf node | Has no branches but has a value
+//         else if left.is_none() && right.is_none() && value.is_some(){
+//             Ok(
+//                 Self {
+//                     left: None,
+//                     right: None,
+//                     value: NodeValue::Leaf(value.unwrap().tapleaf_hash())
+//                 }
+//             )
+//         }
+
+//         //Invalid node | Other combinations
+//         else {
+//             Err(TaprootErr::InvalidNode)
+//         }
+//     }
+    
+//     /// Create a new tree from a list of scripts
+//     pub fn new_script_tree(scripts: &Vec<RedeemScript>) -> Self {
+//         //Create leaves from scripts
+//         let leaves: Vec<TreeNode> = scripts.iter().map(|x| {
+//             TreeNode::new(None, None, Some(Leaf::new(x))).unwrap()
+//         }).collect::<Vec<TreeNode>>();
+
+//         Self::construct_tree(leaves)
+//     }
+
+//     /**
+//         Tries to create the most balanced tree from any amount of leaves.
+//         Does this by combining left over leaves with the last parent.
+//     */
+//     pub fn construct_tree(leaves: Vec<TreeNode>) -> Self {
+//         //If there is only one leaf left, return it
+//         if leaves.len() == 1 { return leaves[0].clone() }
+
+//         //Create new parent nodes by grouping two leaves together
+//         let mut parent_level: Vec<TreeNode> = vec![];
+//         for i in (0..leaves.len()).step_by(2) { //bug: loop fucks up with odd numbers
+//             //If there is a left over node, push a parent combining the left over node and the last parent created.
+//             if i+1 == leaves.len() { 
+//                 let last_parent = parent_level[parent_level.len() - 1].clone();
+//                 let left_over_child = leaves[leaves.len() - 1].clone();
+    
+//                 parent_level.remove(parent_level.len() - 1);
+//                 parent_level.push(Self::construct_tree(vec![last_parent, left_over_child]));    
+                
+//                 continue;
+//             }
+            
+//             //Push a parent node combining two child nodes
+//             parent_level.push( 
+//                 TreeNode::new(Some(leaves[i].clone()), Some(leaves[i+1].clone()), None).unwrap()
+//             )
+//         }
+
+//         //Call self again using parent level
+//         Self::construct_tree(parent_level)
+//     }
+
+//     /// Returns the root hash of a given tree node.
+//     pub fn merkle_root(&self) -> [u8; 32] {
+//         self.value.as_hash()
+//     }
+
+//     /// Determine whether the current node is a leaf node or not.
+//     pub fn is_leaf(&self) -> bool {
+//         match self.value {
+//             NodeValue::Leaf(_) => {
+//                 // If the node value stores a leaf and there are no children, then the node is a leaf node.
+//                 self.right.is_none() && self.left.is_none()
+//             },
+//             _ => false
+//         }
+//     }
+
+//     /// Determine whether the current node is a branch node or not.
+//     pub fn is_branch(&self) -> bool {
+//         match self.value {
+//             NodeValue::Branch(_) => {
+//                 // If the node value stores a branch hash and there are two children, it is a branch node.
+//                 self.left.is_some() && self.right.is_some()
+//             },
+//             _ => false
+//         }
+//     }
+
+//     /// Update the hash stored in a branch node
+//     pub fn update_hash(&mut self) -> Result<(), TaprootErr> {
+//         if self.is_branch() {
+//             self.value = NodeValue::Branch(
+//                 TapBranchHash::from_nodes(self.left.as_ref().unwrap(), self.right.as_ref().unwrap())
+//             )
+//         }
+
+//         Ok(())
+//     }
+
+//     /// Update the leaf value in a leaf node
+//     pub fn update_leaf(&mut self, new_value: &Leaf) {
+//         if self.is_leaf() {
+//             self.value = NodeValue::Leaf(new_value.tapleaf_hash())
+//         }
+//     }
+// }
 
 
 
@@ -706,23 +698,24 @@ mod tests {
         https://github.com/bitcoin-core/btcdeb/blob/master/doc/tapscript-example.md
     */
     fn btcdeb_twoleaf_test() {
-        //The public keys involved in the test scenario
-        let internal_pk = SchnorrPublicKey::from_str("5bf08d58a430f8c222bffaf9127249c5cdff70a2d68b2b45637eb662b6b88eb5").unwrap();
+        // Keys and scripts used in the test
+        let internal_key = SchnorrPublicKey::from_str("5bf08d58a430f8c222bffaf9127249c5cdff70a2d68b2b45637eb662b6b88eb5").unwrap();
+        let script_1 = RedeemScript::new(crate::util::decode_02x("029000b275209997a497d964fc1a62885b05a51166a65a90df00492c8d7cf61d6accf54803beac"));
+        let script_2 = RedeemScript::new(crate::util::decode_02x("a8206c60f404f8167a38fc70eaf8aa17ac351023bef86bcb9d1086a19afe95bd533388204edfcf9dfe6c0b5c83d1ab3f78d1b39a46ebac6798e08e19761f5ed89ec83c10ac"));
+    
+        // Build the script tree
+        let mut builder = TaprootScriptTreeBuilder::new();
+        builder.insert_leaf(Leaf::new(&script_1), 1).unwrap();
+        builder.insert_leaf(Leaf::new(&script_2), 1).unwrap();
+        let spend_info = builder.complete(&internal_key).unwrap();
 
-        //The scripts involved.
-        let scripts = vec![
-            RedeemScript::new(crate::util::decode_02x("029000b275209997a497d964fc1a62885b05a51166a65a90df00492c8d7cf61d6accf54803beac")),
-            RedeemScript::new(crate::util::decode_02x("a8206c60f404f8167a38fc70eaf8aa17ac351023bef86bcb9d1086a19afe95bd533388204edfcf9dfe6c0b5c83d1ab3f78d1b39a46ebac6798e08e19761f5ed89ec83c10ac"))
-        ];
+        // Verify merkle root and merkle paths
+        let merkle_root = crate::util::decode_02x("41646f8c1fe2a96ddad7f5471bc4fee7da98794ef8c45a4f4fc6a559d60c9f6b"); 
+        assert_eq!(spend_info.merkle_root.unwrap().to_vec(), merkle_root);
+        assert!(spend_info.verify_merkle_proof().unwrap());
 
-        //Calculate the merkle root of the script tree for testing purposes
-        let tree = TreeNode::new_script_tree(&scripts);
-        let h = tree.merkle_root();
-        let expected_h = "41646f8c1fe2a96ddad7f5471bc4fee7da98794ef8c45a4f4fc6a559d60c9f6b"; 
-        assert_eq!(crate::util::encode_02x(&h), expected_h);
-
-        //Tweak the internal key with the script tree
-        let tweaked_key = internal_pk.tap_tweak(Some(tree)).unwrap();
+        // Tweak the internal key by the merkle root
+        let tweaked_key = spend_info.internal_key.tap_tweak(spend_info.merkle_root).unwrap();
         let expected_tweaked_key = "f128a8a8a636e19f00a80169550fedfc26b6f5dd04d935ec452894aad938ef0c";
         assert_eq!(tweaked_key.to_string(), expected_tweaked_key);
     }
@@ -736,31 +729,16 @@ mod tests {
     fn key_tweaking_test() {
         let key_pair = SchnorrKeyPair::from_priv_key(&PrivKey::new_rand()).unwrap();
         let pub_key = key_pair.get_pub();
-        let script_tree = TreeNode::new_script_tree(&vec![RedeemScript::new(vec![5, 29, 03])]);
+        let mut builder  = TaprootScriptTreeBuilder::new();
+        builder.insert_leaf(
+            Leaf::new(&RedeemScript::new(vec![5, 29, 03])),
+            0
+        ).unwrap();
+        let spend_info = builder.complete(&pub_key).unwrap();
 
-        let tweaked_keypair = key_pair.tap_tweak(Some(script_tree.clone())).unwrap();
-        let tweaked_pub_key = pub_key.tap_tweak(Some(script_tree)).unwrap();
+        let tweaked_keypair = key_pair.tap_tweak(spend_info.merkle_root).unwrap();
+        let tweaked_pub_key = pub_key.tap_tweak(spend_info.merkle_root).unwrap();
 
         assert_eq!(tweaked_keypair.get_pub(), tweaked_pub_key);
-    }
-
-    #[test]
-    fn tree_builder_test() {
-        // Keys and scripts used in the test
-        let internal_key = SchnorrPublicKey::from_str("5bf08d58a430f8c222bffaf9127249c5cdff70a2d68b2b45637eb662b6b88eb5").unwrap();
-        let script_1 = RedeemScript::new(crate::util::decode_02x("029000b275209997a497d964fc1a62885b05a51166a65a90df00492c8d7cf61d6accf54803beac"));
-        let script_2 = RedeemScript::new(crate::util::decode_02x("a8206c60f404f8167a38fc70eaf8aa17ac351023bef86bcb9d1086a19afe95bd533388204edfcf9dfe6c0b5c83d1ab3f78d1b39a46ebac6798e08e19761f5ed89ec83c10ac"));
-    
-        // Build the script tree
-        let mut builder = TaprootScriptTreeBuilder::new();
-        builder.insert_leaf(Leaf::new(&script_1), 1).unwrap();
-        builder.insert_leaf(Leaf::new(&script_2), 1).unwrap();
-        let spend_info = builder.complete(&internal_key).unwrap();
-
-        // Compare the expected merkle root to the computed merkle root
-        let merkle_root = crate::util::decode_02x("41646f8c1fe2a96ddad7f5471bc4fee7da98794ef8c45a4f4fc6a559d60c9f6b"); 
-        assert_eq!(spend_info.merkle_root.unwrap().to_vec(), merkle_root);
-
-        println!("{:?}", spend_info.verify_merkle_proof());
     }
 }
