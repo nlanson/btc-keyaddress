@@ -15,8 +15,9 @@ use crate::{
     lib_SchnorrPublicKey,
     lib_SchnorrKeyPair,
     taproot::{
-        TreeNode,
-        TapTweakHash
+        SpendInfo,
+        TapTweakHash,
+        MerkleRoot
     }
 };
 
@@ -217,13 +218,13 @@ impl Key<PublicKey> for PubKey {
 
 pub trait TapTweak {
     /// Taptweak a key given the key and optional script tree
-    fn tap_tweak(&self, merkle_root: Option<TreeNode>) -> Result<Self, KeyError>
+    fn tap_tweak(&self, merkle_root: Option<MerkleRoot>) -> Result<Self, KeyError>
     where Self: Sized;
 
     /// Compute the tweak value given the internal key and merkle root
-    fn tweak_value(internal_key: &SchnorrPublicKey, merkle_root: Option<TreeNode>) -> [u8; 32] {
-        let commitment = if let Some(tree) = merkle_root {
-            tree.merkle_root().to_vec()
+    fn tweak_value(internal_key: &SchnorrPublicKey, merkle_root: Option<MerkleRoot>) -> [u8; 32] {
+        let commitment = if let Some(hash) = merkle_root {
+            hash.to_vec()
         } else {
             vec![]
         };
@@ -232,13 +233,13 @@ pub trait TapTweak {
     }
 
     /// Compute the output key's parity given the internal key and optional script tree
-    fn tweaked_parity(&self, merkle_root: Option<TreeNode>) -> Result<bool, KeyError>;
+    fn tweaked_parity(&self, merkle_root: Option<MerkleRoot>) -> Result<bool, KeyError>;
 }
 
 impl TapTweak for SchnorrPublicKey {
-    fn tap_tweak(&self, script_tree: Option<TreeNode>) -> Result<Self, KeyError> {
+    fn tap_tweak(&self, merkle_root: Option<MerkleRoot>) -> Result<Self, KeyError> {
         let secp = Secp256k1::new();
-        let tweak_value = Self::tweak_value(self, script_tree);
+        let tweak_value = Self::tweak_value(self, merkle_root);
 
         //Tweak the key
         let mut tweaked_key = self.0;
@@ -254,7 +255,7 @@ impl TapTweak for SchnorrPublicKey {
         }
     }
 
-    fn tweaked_parity(&self, merkle_root: Option<TreeNode>) -> Result<bool, KeyError> {
+    fn tweaked_parity(&self, merkle_root: Option<MerkleRoot>) -> Result<bool, KeyError> {
         let secp = Secp256k1::new();
         let tweak_value = Self::tweak_value(self, merkle_root);
 
@@ -276,7 +277,7 @@ impl TapTweak for SchnorrPublicKey {
 }
 
 impl TapTweak for SchnorrKeyPair {
-    fn tap_tweak(&self, script_tree: Option<TreeNode>) -> Result<Self, KeyError> {
+    fn tap_tweak(&self, script_tree: Option<MerkleRoot>) -> Result<Self, KeyError> {
         let secp = Secp256k1::new();
         let tweak_value = Self::tweak_value(&self.get_pub(), script_tree);
         
@@ -288,7 +289,7 @@ impl TapTweak for SchnorrKeyPair {
         }
     }
 
-    fn tweaked_parity(&self, merkle_root: Option<TreeNode>) -> Result<bool, KeyError> {
+    fn tweaked_parity(&self, merkle_root: Option<MerkleRoot>) -> Result<bool, KeyError> {
         let public_key = self.get_pub();
         public_key.tweaked_parity(merkle_root)
     }
