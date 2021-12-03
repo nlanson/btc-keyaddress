@@ -11,8 +11,8 @@ This library implements:
 - Extended public and private keys (with support for SLIP-0132 multi-sig keys)
 - Single-sig HD Wallets using BIP-44/49/84 derivation paths (or even a custom path for the crazy peeps)
 - Multi-sig HD Wallets using BIP-45 or 48 derivation paths
-- Nested and native segwit
-- Taproot address creation with or without a script tree. Script tree can be either a MAST or huffman tree
+- Segwit stuff (P2SH nested v0, native v0, taproot v1)
+- Taproot stuff (script trees, merkle paths, control blocks and more)
 - Base58 and Bech32 encoding and decoding
 
 ## Installation
@@ -117,15 +117,12 @@ let internal_key = public_key.schnorr();
 //Tweaking a public key to use for key path spending
 let tweaked_key = internal_key.tap_tweak(None).unwrap();
 
-//Tweaking a public key with a script tree
-let scripts: Vec<RedeemScript> = vec![<your scripts here>];
-let script_tree = TreeNode::new_script_tree(&scripts);
-let tweaked_key = internal_key.tap_tweak(Some(script_tree)).unwrap();
-
-//Huffman Tree (Spaghetti)
-let scripts: Vec<(usize, RedeemScript)> = vec![(<frequency>, <script>)];
-let items: Vec<HuffmanCoding<RedeemScript>> = scripts.iter().map(|x| HuffmanCoding::new_item(x.0, &x.1)).collect();
-let script_tree = HuffmanCoding::new_script_tree(&items);
+//Create a script tree
+let mut builder = TaprootScriptTreeBuilder::new();
+builder.insert_leaf(Leaf::new(&my_script_1), 1).unwrap();   // Adjust the depth to create different trees!
+builder.insert_leaf(Leaf::new(&my_script_2), 1).unwrap(); // This tree is a simple two leaf tree.
+let spend_info = builder.complete(&internal_key).unwrap();
+let tweaked_key = spend_info.internal_key.tap_tweak(spend_info.merkle_root).unwrap();
 
 //Control block implementation coming soon...
 ```
