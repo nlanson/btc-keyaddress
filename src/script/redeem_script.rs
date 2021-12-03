@@ -65,6 +65,10 @@ impl RedeemScript {
         prefixed
     }
 
+    pub fn to_string(&self) -> String {
+        crate::util::encode_02x(&self.code)
+    }
+
     /**
         Creates a new witness program given a version and data.
 

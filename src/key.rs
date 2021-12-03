@@ -15,7 +15,6 @@ use crate::{
     lib_SchnorrPublicKey,
     lib_SchnorrKeyPair,
     taproot::{
-        SpendInfo,
         TapTweakHash,
         MerkleRoot
     }

@@ -37,7 +37,8 @@ use crate::{
         as_u32_be
     },
     util::Network,
-    script::RedeemScript
+    script::RedeemScript,
+    taproot::SpendInfo
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -113,9 +114,9 @@ pub trait ExtendedKey<T, U> where T: Key<U>, Self: Copy {
                 Address::P2SH(script, network).to_string().unwrap()
             },
             WalletType::P2TR => {
-                //Tweaking with no script tree
-                let internal_key = self.get_pub().schnorr();
-                let tweaked_key = internal_key.tap_tweak(None).unwrap();
+                // Create a new spend info struct from the public key with no merkle root.
+                let spend_info = SpendInfo::new(&self.get_pub().schnorr(), None);
+                let tweaked_key = spend_info.internal_key.tap_tweak(None).unwrap();
                 Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap()
             }
         }

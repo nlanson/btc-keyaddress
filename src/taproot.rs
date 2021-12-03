@@ -8,6 +8,7 @@
             > SpendInfo struct
                 - Organise logic for key path spending and script path spending.
                 - Extracting tweak values
+                - Unit tests
         - Control block creation
             > Given the spend info struct, create a control block by either using key path spending or script path
               spending. If script path spending is used, the code needs to extract the markle path of the selected
@@ -37,7 +38,11 @@ pub enum TaprootErr {
     InvalidInsertionDepth,
     IncompleteTree,
     NoTree,
-    OverCompleteTree
+    OverCompleteTree,
+    MissingMerkleRoot,
+    MissingScriptMap,
+    InvalidMerkleProof,
+    NoLeaf
 }
 
 pub trait TaprootTaggedHash {
@@ -335,6 +340,11 @@ impl MerkleProof {
     pub fn into_inner(&self) -> Vec<[u8; 32]> {
         self.0.clone()
     }
+
+    /// Return the length of the peth in self.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -348,7 +358,7 @@ impl ScriptMap {
     /// contains the merkle proof for itself.
     pub fn from_leaves(leaves: Vec<Leaf>) -> Self {
         let mut map: HashMap<Leaf, HashSet<MerkleProof>> = HashMap::new();
-        for leaf in leaves {
+        for mut leaf in leaves {
             match map.get_mut(&leaf) {
                 Some(set) => {
                     // Leaf already exists in the map.
@@ -361,6 +371,7 @@ impl ScriptMap {
                     // Create a new entry in the map for this leaf.
                     let mut set: HashSet<MerkleProof> = HashSet::new();
                     set.insert(leaf.merkle_proof.clone());
+                    leaf.merkle_proof = MerkleProof(vec![]); //Set the merkle proof inside the leaf to empty since it is already stored in the HashSet.
                     map.insert(leaf, set);
                 }
             }
@@ -394,6 +405,29 @@ impl ScriptMap {
 
         })
     }
+
+    /// Get the shortest merkle proof for a leaf in a script map.
+    /// If the leaf does not exist, return an error.
+    /// 
+    /// get() is not working given a random leaf becase the leaf stored in here contains the merkle proof which we do not know.
+    pub fn merkle_proof_for_leaf(&self, leaf: Leaf) -> Result<MerkleProof, TaprootErr> {
+        return match self.0.get(&leaf) {
+            Some(set) => {
+                // Return the shortest merkle proof by comparing the length of every merkle proof the leaf has.
+                Ok(
+                    set
+                        .iter()
+                        .min_by(
+                            |a, b| 
+                            a.len().cmp(&b.len())
+                        )
+                        .expect("Merkle proof missing")
+                        .clone()
+                )
+            },
+            None => Err(TaprootErr::NoLeaf)
+        }
+    }
 }
 
 
@@ -402,7 +436,7 @@ pub struct SpendInfo {
     pub internal_key: SchnorrPublicKey,
     pub parity: bool,
     pub merkle_root: Option<MerkleRoot>,  // Only exists if there is a script tree
-    pub script_map: Option<ScriptMap>   // Only exists if there is a script tree
+    pub script_map: Option<ScriptMap>     // Only exists if there is a script tree
 }
 
 pub type MerkleRoot = [u8; 32];
@@ -426,19 +460,27 @@ impl SpendInfo {
         }
     }
 
-    // Verify the merkle proof stored in self using the merkle root stored in self.
+    /// Verify the merkle proof stored in self using the merkle root stored in self.
+    /// If a script map, merkle root or both are missing, an error is returned.
     pub fn verify_merkle_proof(&self) -> Result<bool, TaprootErr> {
         match &self.script_map {
             Some(map) => {
                 match self.merkle_root {
                     Some(root) => return Ok(map.verify_merkle_proof(root)),
-                    None => return Err(TaprootErr::NoTree)
+                    None => return Err(TaprootErr::MissingMerkleRoot)
                 }
             },
-            None => return Err(TaprootErr::NoTree)
+            None => {
+                match self.merkle_root {
+                    Some(_) => return Err(TaprootErr::MissingScriptMap),
+                    None => return Err(TaprootErr::NoTree)
+                }
+            }
         }
     }
 
+    /// Creates a taproot control block that must be present in the witness stack when spending using the
+    /// script path.
     pub fn control_block(&self) -> ControlBlock {
         todo!();
     }
@@ -451,237 +493,8 @@ pub struct ControlBlock {
     revealed_leaf: Leaf,
     parity_bit: bool,
     internal_key: SchnorrPublicKey,
-    merkle_path: Vec<[u8; 32]>
+    merkle_path: MerkleProof
 }
-
-
-// /**
-//     TreeNode struct for taproot application.
-// */
-// #[derive(Debug, Clone, PartialEq)]
-// pub struct TreeNode {
-//     pub left: Option<Box<TreeNode>>,
-//     pub right: Option<Box<TreeNode>>,
-
-//     //This value here could be an enum `TreeNodeInfo` which contains either a (leaf version, script) tuple or hash of children
-//     //By doing this, each node will contain a value whether it is a leaf or branch and removes the need for an Option
-//     pub value: NodeValue  
-// }
-
-// #[derive(Debug, Clone, PartialEq)]
-// /// NodeValue struct stores the hash of a value in a tree.
-// pub enum NodeValue {
-//     Branch([u8; 32]),
-//     Leaf([u8; 32])
-// }
-
-// impl NodeValue {
-//     /// Return the hash of the node's value.
-//     pub fn as_hash(&self) -> [u8; 32] {
-//         match self {
-//             NodeValue::Branch(hash) => *hash,
-//             NodeValue::Leaf(leaf) => *leaf
-//         }
-//     }
-// }
-
-
-// #[derive(Debug, Clone)]
-// pub struct HuffmanCoding<T> {
-//     freq: usize,
-//     val: T
-// }
-
-// impl HuffmanCoding<RedeemScript> {
-//     /// New item to add to huffman tree given it's frequency and script
-//     pub fn new_item(freq: usize, script: &RedeemScript) -> Self {
-//         Self {
-//             freq,
-//             val: script.clone()
-//         }
-//     }
-    
-//     /**
-//         Creates a huffman tree given a vector of frequencies and items.
-        
-//         Currently, the tree gets cconstructed by repeatedly combining the two least frequent items
-//         into a single node. This node is placed back into list with it's frequency being the sum of
-//         the combined items. 
-//         When combining nodes, the least frequent (or the item at the end of the array) is placed into
-//         the right hand side of the combined node.
-
-//         When the nodes are combined and inserted back into the table, it is simply pushed into
-//         the table vector and the table vector is sorted again. The sorting method, vec::sort_by()
-//         DOES NOT reorder equal elements meaning the combined node stays at the end if there are any
-//         other equally weighted elements.
-
-//         Needs more test cases to check for stability and consistency.
-//     */
-//     pub fn new_script_tree(items: &Vec<Self>) -> TreeNode {
-//         //Create a (frequency, leaf node) table from each item
-//         let mut table = items.iter().map(|x| {
-//             let node = TreeNode::new(None, None, Some(Leaf::new(&x.val))).unwrap();
-            
-//             (x.freq, node)
-//         }).collect::<Vec<(usize, TreeNode)>>();
-
-//         //Sort the table in decending order of frequency
-//         table.sort_by(|a, b| b.0.cmp(&a.0));
-        
-//         //While the table does not consist of a single root node
-//         while table.len() != 1 {
-//             //Get the last two rows of the table
-//             let l2i: Vec<(usize, TreeNode)> = table.iter().rev().take(2).map(|x|(x.0, x.1.clone())).collect();
-//             //table[table.len()-2..table.len()-1].to_vec();
-
-//             //Sum the frequencies
-//             let sum: usize = l2i[0].0 + l2i[1].0;
-
-//             //Combine the two nodes into a single Node with each as a branch
-//             let right = l2i[0].1.clone();  //smaller
-//             let left = l2i[1].1.clone();   //larger
-//             let combined_node: TreeNode = TreeNode::construct_tree(vec![left, right]);
-
-//             //Remove the last two items
-//             table.remove(table.len()-1);
-//             table.remove(table.len()-1);
-
-//             //Push the combined node and sum of frequencies into the table and sort again.
-//             //This method of inserting the combined node might not be consistent. Later, a custom insertion method should
-//             //be written for consistency. 
-//             //But for now, it stays.
-//             table.push((sum, combined_node));
-//             table.sort_by(|a, b| b.0.cmp(&a.0)); 
-//         }
-
-//         table[0].1.clone()
-//     }
-// }
-
-
-// impl TreeNode {
-//     /// Create a new tree node given either a left and right child or a leaf value.
-//     /// If left and right children are given, the node is interpreted to be a branch node.
-//     /// If a leaf value is given, the node is interpreted to be a leaf node.
-//     pub fn new(left: Option<Self>, right: Option<Self>, value: Option<Leaf>) -> Result<Self, TaprootErr> {
-//         //Branch node | Has both branches and no value
-//         if left.is_some() && right.is_some() && value.is_none() {
-//             // Get the hash of the two children
-//             let branch_hash = TapBranchHash::from_nodes(&left.as_ref().unwrap(), &right.as_ref().unwrap());
-            
-//             Ok(
-//                 Self {
-//                     left: Some(Box::new(left.unwrap())),
-//                     right: Some(Box::new(right.unwrap())),
-//                     value: NodeValue::Branch(branch_hash)
-//                 }
-//             )
-//         }
-
-//         //Leaf node | Has no branches but has a value
-//         else if left.is_none() && right.is_none() && value.is_some(){
-//             Ok(
-//                 Self {
-//                     left: None,
-//                     right: None,
-//                     value: NodeValue::Leaf(value.unwrap().tapleaf_hash())
-//                 }
-//             )
-//         }
-
-//         //Invalid node | Other combinations
-//         else {
-//             Err(TaprootErr::InvalidNode)
-//         }
-//     }
-    
-//     /// Create a new tree from a list of scripts
-//     pub fn new_script_tree(scripts: &Vec<RedeemScript>) -> Self {
-//         //Create leaves from scripts
-//         let leaves: Vec<TreeNode> = scripts.iter().map(|x| {
-//             TreeNode::new(None, None, Some(Leaf::new(x))).unwrap()
-//         }).collect::<Vec<TreeNode>>();
-
-//         Self::construct_tree(leaves)
-//     }
-
-//     /**
-//         Tries to create the most balanced tree from any amount of leaves.
-//         Does this by combining left over leaves with the last parent.
-//     */
-//     pub fn construct_tree(leaves: Vec<TreeNode>) -> Self {
-//         //If there is only one leaf left, return it
-//         if leaves.len() == 1 { return leaves[0].clone() }
-
-//         //Create new parent nodes by grouping two leaves together
-//         let mut parent_level: Vec<TreeNode> = vec![];
-//         for i in (0..leaves.len()).step_by(2) { //bug: loop fucks up with odd numbers
-//             //If there is a left over node, push a parent combining the left over node and the last parent created.
-//             if i+1 == leaves.len() { 
-//                 let last_parent = parent_level[parent_level.len() - 1].clone();
-//                 let left_over_child = leaves[leaves.len() - 1].clone();
-    
-//                 parent_level.remove(parent_level.len() - 1);
-//                 parent_level.push(Self::construct_tree(vec![last_parent, left_over_child]));    
-                
-//                 continue;
-//             }
-            
-//             //Push a parent node combining two child nodes
-//             parent_level.push( 
-//                 TreeNode::new(Some(leaves[i].clone()), Some(leaves[i+1].clone()), None).unwrap()
-//             )
-//         }
-
-//         //Call self again using parent level
-//         Self::construct_tree(parent_level)
-//     }
-
-//     /// Returns the root hash of a given tree node.
-//     pub fn merkle_root(&self) -> [u8; 32] {
-//         self.value.as_hash()
-//     }
-
-//     /// Determine whether the current node is a leaf node or not.
-//     pub fn is_leaf(&self) -> bool {
-//         match self.value {
-//             NodeValue::Leaf(_) => {
-//                 // If the node value stores a leaf and there are no children, then the node is a leaf node.
-//                 self.right.is_none() && self.left.is_none()
-//             },
-//             _ => false
-//         }
-//     }
-
-//     /// Determine whether the current node is a branch node or not.
-//     pub fn is_branch(&self) -> bool {
-//         match self.value {
-//             NodeValue::Branch(_) => {
-//                 // If the node value stores a branch hash and there are two children, it is a branch node.
-//                 self.left.is_some() && self.right.is_some()
-//             },
-//             _ => false
-//         }
-//     }
-
-//     /// Update the hash stored in a branch node
-//     pub fn update_hash(&mut self) -> Result<(), TaprootErr> {
-//         if self.is_branch() {
-//             self.value = NodeValue::Branch(
-//                 TapBranchHash::from_nodes(self.left.as_ref().unwrap(), self.right.as_ref().unwrap())
-//             )
-//         }
-
-//         Ok(())
-//     }
-
-//     /// Update the leaf value in a leaf node
-//     pub fn update_leaf(&mut self, new_value: &Leaf) {
-//         if self.is_leaf() {
-//             self.value = NodeValue::Leaf(new_value.tapleaf_hash())
-//         }
-//     }
-// }
 
 
 
@@ -702,7 +515,7 @@ mod tests {
         let internal_key = SchnorrPublicKey::from_str("5bf08d58a430f8c222bffaf9127249c5cdff70a2d68b2b45637eb662b6b88eb5").unwrap();
         let script_1 = RedeemScript::new(crate::util::decode_02x("029000b275209997a497d964fc1a62885b05a51166a65a90df00492c8d7cf61d6accf54803beac"));
         let script_2 = RedeemScript::new(crate::util::decode_02x("a8206c60f404f8167a38fc70eaf8aa17ac351023bef86bcb9d1086a19afe95bd533388204edfcf9dfe6c0b5c83d1ab3f78d1b39a46ebac6798e08e19761f5ed89ec83c10ac"));
-    
+
         // Build the script tree
         let mut builder = TaprootScriptTreeBuilder::new();
         builder.insert_leaf(Leaf::new(&script_1), 1).unwrap();
