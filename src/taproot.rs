@@ -2,17 +2,11 @@
     This module implements methods relating to Taproot key and address computing.
 
     Todo:
-        - Rework huffman coding implementation
-        - Seperate tree creation and tree application:
-            > Existing huffman and most-balanced MAST tree creation methods should be migrated to the builder struct.
-            > SpendInfo struct
-                - Organise logic for key path spending and script path spending.
-                - Extracting tweak values
-                - Unit tests
-        - Control block creation
-            > Given the spend info struct, create a control block by either using key path spending or script path
-              spending. If script path spending is used, the code needs to extract the markle path of the selected
-              leaf.
+        - SpendInfo struct:
+            > Extracting tweak values
+        - Tree builder
+            > Huffman coding reimplementation using the tree builder
+            > Unit tests!
 
 */
 use std::collections::{
@@ -326,7 +320,7 @@ pub struct MerkleProof(Vec<[u8; 32]>);
 
 
 impl MerkleProof {
-    // Methods required:
+    /// Create a new empty merkle proof vector
     pub fn new() -> Self {
         Self(vec![])
     }
@@ -351,8 +345,15 @@ impl MerkleProof {
 pub struct ScriptMap(HashMap<Leaf, HashSet<MerkleProof>>);
 
 impl ScriptMap {
-    // Methods required:
-    //  - Merkle proof verification given a merkle root and script map.
+    /// Returns a new empty script map
+    pub fn new() -> ScriptMap {
+        ScriptMap(HashMap::new())
+    }
+
+    /// Checks if the script map contains any elements.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 
     /// Create a new script map from a vector of leaves where each leaf 
     /// contains the merkle proof for itself.
@@ -410,7 +411,7 @@ impl ScriptMap {
     /// If the leaf does not exist, return an error.
     /// 
     /// get() is not working given a random leaf becase the leaf stored in here contains the merkle proof which we do not know.
-    pub fn merkle_proof_for_leaf(&self, leaf: Leaf) -> Result<MerkleProof, TaprootErr> {
+    pub fn merkle_proof(&self, leaf: Leaf) -> Result<MerkleProof, TaprootErr> {
         return match self.0.get(&leaf) {
             Some(set) => {
                 // Return the shortest merkle proof by comparing the length of every merkle proof the leaf has.
@@ -436,7 +437,7 @@ pub struct SpendInfo {
     pub internal_key: SchnorrPublicKey,
     pub parity: bool,
     pub merkle_root: Option<MerkleRoot>,  // Only exists if there is a script tree
-    pub script_map: Option<ScriptMap>     // Only exists if there is a script tree
+    pub script_map: ScriptMap             // Will be empty if no script tree is present.
 }
 
 pub type MerkleRoot = [u8; 32];
@@ -445,8 +446,8 @@ impl SpendInfo {
     // Create a new spend info struct from a given internal key and optional script tree.
     pub fn new(key: &SchnorrPublicKey, node: Option<Node>) -> Self {
         let (merkle_root, script_map) = match node {
-            Some(x) => (Some(x.hash), Some(ScriptMap::from_leaves(x.leaves))),
-            None => (None, None)
+            Some(x) => (Some(x.hash), ScriptMap::from_leaves(x.leaves)),
+            None => (None, ScriptMap::new())
         };
 
         let parity = key.tweaked_parity(merkle_root).expect("TapTweak failed");
@@ -463,17 +464,19 @@ impl SpendInfo {
     /// Verify the merkle proof stored in self using the merkle root stored in self.
     /// If a script map, merkle root or both are missing, an error is returned.
     pub fn verify_merkle_proof(&self) -> Result<bool, TaprootErr> {
-        match &self.script_map {
-            Some(map) => {
-                match self.merkle_root {
-                    Some(root) => return Ok(map.verify_merkle_proof(root)),
-                    None => return Err(TaprootErr::MissingMerkleRoot)
+        match self.merkle_root {
+            Some(hash) => {
+                if !self.script_map.is_empty() {
+                    return Ok(self.script_map.verify_merkle_proof(hash))
+                } else {
+                    return Err(TaprootErr::MissingScriptMap)
                 }
             },
             None => {
-                match self.merkle_root {
-                    Some(_) => return Err(TaprootErr::MissingScriptMap),
-                    None => return Err(TaprootErr::NoTree)
+                if !self.script_map.is_empty() {
+                    return Err(TaprootErr::MissingMerkleRoot)
+                } else {
+                    return Err(TaprootErr::NoTree)
                 }
             }
         }
@@ -481,19 +484,58 @@ impl SpendInfo {
 
     /// Creates a taproot control block that must be present in the witness stack when spending using the
     /// script path.
-    pub fn control_block(&self) -> ControlBlock {
-        todo!();
+    pub fn control_block(&self, leaf: Leaf) -> Result<ControlBlock, TaprootErr> {
+        Ok(
+            ControlBlock::new(
+                leaf.version,
+                self.parity,
+                self.internal_key,
+                self.script_map.merkle_proof(leaf)?  // If the script map fails to find a merkle proof for the given leaf, it will return an error.
+            )
+        )
     }
 }
 
 
-
+/// The control block contains information required when spending a Taproot UTXO using the script path.
+/// It resides on the witness stack as the final element for a taproot script spend.
+/// The witness stack for a taproot script path spend consists of:
+///     1. The inputs required to satisfy the script conditions
+///     2. The revealed script itself
+///     3. The control block which consists of all other information requried.
+/// 
+/// The block provides necesary information for validators to recompute the tweak applied to the internal key.
+/// This is done hashing the provided merkle path until the merkle root is reached and then using the root to 
+/// compute the tweak which is then applied to the internal key.
 #[derive(Debug, Clone)]
 pub struct ControlBlock {
-    revealed_leaf: Leaf,
-    parity_bit: bool,
+    leaf_version: u8,
+    parity: bool,
     internal_key: SchnorrPublicKey,
-    merkle_path: MerkleProof
+    merkle_proof: MerkleProof
+}
+
+impl ControlBlock {
+    /// Return a control block struct from provided information.
+    pub fn new(
+        leaf_version: u8,
+        parity: bool,
+        internal_key: SchnorrPublicKey,
+        merkle_proof: MerkleProof
+    ) -> Self {
+        ControlBlock {
+            leaf_version,
+            parity,
+            internal_key,
+            merkle_proof
+        }
+    }
+
+
+    /// Serialize the control block.
+    pub fn serialize(&self) -> Vec<u8> {
+        unimplemented!("Serialization for transactions is outside the scope of this library.")
+    }
 }
 
 
