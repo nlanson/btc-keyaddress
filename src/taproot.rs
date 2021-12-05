@@ -494,6 +494,11 @@ impl SpendInfo {
             )
         )
     }
+
+    /// Return the value of the tweak that should be applied to get from the internal key to the output key
+    pub fn tweak_value(&self) -> [u8; 32] {
+        SchnorrPublicKey::tweak_value(&self.internal_key, self.merkle_root)
+    }
 }
 
 
@@ -544,7 +549,9 @@ impl ControlBlock {
 mod tests {
     use super::*;
     use crate::{
-        key::*
+        key::*,
+        address::Address,
+        util::{Network, decode_02x}
     };
 
     #[test]
@@ -573,6 +580,87 @@ mod tests {
         let tweaked_key = spend_info.internal_key.tap_tweak(spend_info.merkle_root).unwrap();
         let expected_tweaked_key = "f128a8a8a636e19f00a80169550fedfc26b6f5dd04d935ec452894aad938ef0c";
         assert_eq!(tweaked_key.to_string(), expected_tweaked_key);
+    }
+
+    #[test]
+    fn bip_341_test_vectors() -> Result<(), TaprootErr> {
+        // This tests is composed of 7 seperate test cases from the BIP-341 test vectors.
+        // Each case starts with an internal key and optional script tree and tests whether
+        // the code can reach the final script pub key using the given information.
+        //
+        // Test keys:
+        let internal_keys = [
+            SchnorrPublicKey::from_str("d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d").unwrap(),
+            SchnorrPublicKey::from_str("187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27").unwrap(),
+            SchnorrPublicKey::from_str("93478e9488f956df2396be2ce6c5cced75f900dfa18e7dabd2428aae78451820").unwrap(),
+            SchnorrPublicKey::from_str("ee4fe085983462a184015d1f782d6a5f8b9c2b60130aff050ce221ecf3786592").unwrap(),
+            SchnorrPublicKey::from_str("f9f400803e683727b14f463836e1e78e1c64417638aa066919291a225f0e8dd8").unwrap(),
+            SchnorrPublicKey::from_str("e0dfe2300b0dd746a3f8674dfd4525623639042569d829c7f0eed9602d263e6f").unwrap(),
+            SchnorrPublicKey::from_str("55adf4e8967fbd2e29f20ac896e60c3b0f1d5b0efa9d34941b5958c7b0a0312d").unwrap()
+        ];
+
+        // Test cases:
+        // #1
+        let spend_info = SpendInfo::new(&internal_keys[0], None);
+        let tweaked_key = spend_info.internal_key.tap_tweak(None).unwrap();
+        assert_eq!(tweaked_key, SchnorrPublicKey::from_str("53a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343").unwrap());
+        assert_eq!(Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap(), "bc1p2wsldez5mud2yam29q22wgfh9439spgduvct83k3pm50fcxa5dps59h4z5");
+
+        // #2
+        let mut builder = TaprootScriptTreeBuilder::new();
+        builder.insert_leaf(Leaf::new(&RedeemScript::from_str("20d85a959b0290bf19bb89ed43c916be835475d013da4b362117393e25a48229b8ac")), 0).unwrap();
+        let spend_info = builder.complete(&internal_keys[1]).unwrap();
+        assert_eq!(spend_info.merkle_root.unwrap().to_vec(), decode_02x("5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21"));
+        let tweaked_key = spend_info.internal_key.tap_tweak(spend_info.merkle_root).unwrap();
+        assert_eq!(Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap(), "bc1pz37fc4cn9ah8anwm4xqqhvxygjf9rjf2resrw8h8w4tmvcs0863sa2e586");
+        
+        // #3
+        let mut builder = TaprootScriptTreeBuilder::new();
+        builder.insert_leaf(Leaf::new(&RedeemScript::from_str("20b617298552a72ade070667e86ca63b8f5789a9fe8731ef91202a91c9f3459007ac")), 0).unwrap();
+        let spend_info = builder.complete(&internal_keys[2]).unwrap();
+        assert_eq!(spend_info.merkle_root.unwrap().to_vec(), decode_02x("c525714a7f49c28aedbbba78c005931a81c234b2f6c99a73e4d06082adc8bf2b"));
+        let tweaked_key = spend_info.internal_key.tap_tweak(spend_info.merkle_root).unwrap();
+        assert_eq!(Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap(), "bc1punvppl2stp38f7kwv2u2spltjuvuaayuqsthe34hd2dyy5w4g58qqfuag5");
+
+        // #4
+        let mut builder = TaprootScriptTreeBuilder::new();
+        builder.insert_leaf(Leaf::new(&RedeemScript::from_str("20387671353e273264c495656e27e39ba899ea8fee3bb69fb2a680e22093447d48ac")), 1).unwrap();
+        builder.insert_leaf(Leaf::new_with_version(250, &RedeemScript::from_str("06424950333431")), 1).unwrap();
+        let spend_info = builder.complete(&internal_keys[3]).unwrap();
+        assert_eq!(spend_info.merkle_root.unwrap().to_vec(), decode_02x("6c2dc106ab816b73f9d07e3cd1ef2c8c1256f519748e0813e4edd2405d277bef"));
+        let tweaked_key = spend_info.internal_key.tap_tweak(spend_info.merkle_root).unwrap();
+        assert_eq!(Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap(), "bc1pwyjywgrd0ffr3tx8laflh6228dj98xkjj8rum0zfpd6h0e930h6saqxrrm");
+
+        // #5
+        let mut builder = TaprootScriptTreeBuilder::new();
+        builder.insert_leaf(Leaf::new(&RedeemScript::from_str("2044b178d64c32c4a05cc4f4d1407268f764c940d20ce97abfd44db5c3592b72fdac")), 1).unwrap();
+        builder.insert_leaf(Leaf::new(&RedeemScript::from_str("07546170726f6f74")), 1).unwrap();
+        let spend_info = builder.complete(&internal_keys[4]).unwrap();
+        assert_eq!(spend_info.merkle_root.unwrap().to_vec(), decode_02x("ab179431c28d3b68fb798957faf5497d69c883c6fb1e1cd9f81483d87bac90cc"));
+        let tweaked_key = spend_info.internal_key.tap_tweak(spend_info.merkle_root).unwrap();
+        assert_eq!(Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap(), "bc1pwl3s54fzmk0cjnpl3w9af39je7pv5ldg504x5guk2hpecpg2kgsqaqstjq");
+
+        // #6
+        let mut builder = TaprootScriptTreeBuilder::new();
+        builder.insert_leaf(Leaf::new(&RedeemScript::from_str("2072ea6adcf1d371dea8fba1035a09f3d24ed5a059799bae114084130ee5898e69ac")), 1).unwrap();
+        builder.insert_leaf(Leaf::new(&RedeemScript::from_str("202352d137f2f3ab38d1eaa976758873377fa5ebb817372c71e2c542313d4abda8ac")), 2).unwrap();
+        builder.insert_leaf(Leaf::new(&RedeemScript::from_str("207337c0dd4253cb86f2c43a2351aadd82cccb12a172cd120452b9bb8324f2186aac")), 2).unwrap();
+        let spend_info = builder.complete(&internal_keys[5]).unwrap();
+        assert_eq!(spend_info.merkle_root.unwrap().to_vec(), decode_02x("ccbd66c6f7e8fdab47b3a486f59d28262be857f30d4773f2d5ea47f7761ce0e2"));
+        let tweaked_key = spend_info.internal_key.tap_tweak(spend_info.merkle_root).unwrap();
+        assert_eq!(Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap(), "bc1pjxmy65eywgafs5tsunw95ruycpqcqnev6ynxp7jaasylcgtcxczs6n332e");
+
+        // #7
+        let mut builder = TaprootScriptTreeBuilder::new();
+        builder.insert_leaf(Leaf::new(&RedeemScript::from_str("2071981521ad9fc9036687364118fb6ccd2035b96a423c59c5430e98310a11abe2ac")), 1).unwrap();
+        builder.insert_leaf(Leaf::new(&RedeemScript::from_str("20d5094d2dbe9b76e2c245a2b89b6006888952e2faa6a149ae318d69e520617748ac")), 2).unwrap();
+        builder.insert_leaf(Leaf::new(&RedeemScript::from_str("20c440b462ad48c7a77f94cd4532d8f2119dcebbd7c9764557e62726419b08ad4cac")), 2).unwrap();
+        let spend_info = builder.complete(&internal_keys[6]).unwrap();
+        assert_eq!(spend_info.merkle_root.unwrap().to_vec(), decode_02x("2f6b2c5397b6d68ca18e09a3f05161668ffe93a988582d55c6f07bd5b3329def"));
+        let tweaked_key = spend_info.internal_key.tap_tweak(spend_info.merkle_root).unwrap();
+        assert_eq!(Address::P2TR(tweaked_key, Network::Bitcoin).to_string().unwrap(), "bc1pw5tf7sqp4f50zka7629jrr036znzew70zxyvvej3zrpf8jg8hqcssyuewe");
+
+        Ok(())
     }
 
     #[test]

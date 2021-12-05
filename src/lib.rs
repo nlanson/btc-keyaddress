@@ -33,7 +33,6 @@
         - Taproot
             > Taproot script tree mechanics refactor
                 - Extensive script tree builder tests.
-            > Implement implementable BIP-341 test vectors (https://github.com/bitcoin/bips/blob/master/bip-0341/wallet-test-vectors.json)
         
         
         - Custom SHA256 implementation using information from the learnmeabitcoin tutorial
