@@ -305,11 +305,11 @@ impl Key<lib_SchnorrPublicKey> for SchnorrPublicKey {
     //Fail if slice is not 32 bytes long of lib returns a failure
     fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError>
     where Self: Sized {
-        if byte_array.len() != 32 { println!("HERE");return Err(KeyError::BadSlice()) }
+        if byte_array.len() != 32 { return Err(KeyError::BadSlice()) }
 
         match lib_SchnorrPublicKey::from_slice(byte_array) {
             Ok(x) => Ok(Self(x)),
-            _ => Err(KeyError::BadSlice())
+            Err(y) => Err(KeyError::BadSlice())
         }
     }
 
