@@ -232,7 +232,8 @@ impl TaprootScriptTreeBuilder {
     pub fn complete(self, internal_key: &SchnorrPublicKey) -> Result<SpendInfo, TaprootErr> {
         // The tree needs to consist of a single node to be considered complete.
         // In this case, the first node needs to be some and the rest of the nodes array needs to be none.
-        if self.nodes[0].is_none() && self.nodes.iter().skip(1).any(|x| x.is_some()) {
+        let non_root_nodes = &self.nodes[1..];
+        if self.nodes[0].is_none() || !non_root_nodes.iter().all(|x| x.is_none()) {
             return Err(TaprootErr::IncompleteTree)
         }
 
@@ -562,8 +563,8 @@ mod tests {
     fn btcdeb_twoleaf_test() {
         // Keys and scripts used in the test
         let internal_key = SchnorrPublicKey::from_str("5bf08d58a430f8c222bffaf9127249c5cdff70a2d68b2b45637eb662b6b88eb5").unwrap();
-        let script_1 = RedeemScript::new(crate::util::decode_02x("029000b275209997a497d964fc1a62885b05a51166a65a90df00492c8d7cf61d6accf54803beac"));
-        let script_2 = RedeemScript::new(crate::util::decode_02x("a8206c60f404f8167a38fc70eaf8aa17ac351023bef86bcb9d1086a19afe95bd533388204edfcf9dfe6c0b5c83d1ab3f78d1b39a46ebac6798e08e19761f5ed89ec83c10ac"));
+        let script_1 = RedeemScript::from_str("029000b275209997a497d964fc1a62885b05a51166a65a90df00492c8d7cf61d6accf54803beac");
+        let script_2 = RedeemScript::from_str("a8206c60f404f8167a38fc70eaf8aa17ac351023bef86bcb9d1086a19afe95bd533388204edfcf9dfe6c0b5c83d1ab3f78d1b39a46ebac6798e08e19761f5ed89ec83c10ac");
 
         // Build the script tree
         let mut builder = TaprootScriptTreeBuilder::new();
@@ -683,5 +684,39 @@ mod tests {
         let tweaked_pub_key = pub_key.tap_tweak(spend_info.merkle_root).unwrap();
 
         assert_eq!(tweaked_keypair.get_pub(), tweaked_pub_key);
+    }
+
+    #[test]
+    fn tree_builder_should_fail() {
+        // This tree fails when inserting the fourth leaf at depth 1 beacuse it tries to combine the third 
+        // and fourth leaf together and propagate it to a level above but the level above (root) is already
+        // full.
+        let mut builder = TaprootScriptTreeBuilder::new();
+        let leaf = Leaf::new(&RedeemScript::new(vec![0]));
+        builder.insert_leaf(leaf.clone(), 1).unwrap();
+        builder.insert_leaf(leaf.clone(), 1).unwrap();
+        builder.insert_leaf(leaf.clone(), 1).unwrap();
+        assert!(match builder.insert_leaf(leaf.clone(), 1) {
+            Ok(_) => false,
+            Err(x) => match x {
+                TaprootErr::OverCompleteTree => true,
+                _ => false
+            }
+        });
+
+        
+        // This tree fails because there is a dangling leaf. It is incomplete.
+        let mut builder = TaprootScriptTreeBuilder::new();
+        builder.insert_leaf(leaf.clone(), 1).unwrap();
+        builder.insert_leaf(leaf.clone(), 1).unwrap();
+        builder.insert_leaf(leaf.clone(), 2).unwrap();
+        let key = SchnorrPublicKey::from_str("d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d").unwrap();
+        assert!(match builder.complete(&key) {
+            Ok(_) => false,
+            Err(x) => match x {
+                TaprootErr::IncompleteTree => true,
+                _ => false
+            }
+        })
     }
 }
