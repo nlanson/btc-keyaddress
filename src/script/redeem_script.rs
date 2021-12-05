@@ -8,7 +8,8 @@ use crate::{
         ScriptBuilder,
         Opcode,
         opcodes
-    }
+    },
+    util::decode_02x
 };
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
@@ -22,7 +23,8 @@ pub enum ScriptErr {
     KeyCountDoesNotMatch(),
     MaxKeyCountExceeded(),
     HashLenIncorrect(usize),
-    BadVersion(u8)
+    BadVersion(u8),
+    InvalidString
 }
 
 impl RedeemScript {
@@ -45,6 +47,11 @@ impl RedeemScript {
     /// Return the underlying byte vector
     pub fn to_vec(&self) -> Vec<u8> {
         self.code.clone()
+    }
+
+    /// Create a new instance of self from a hexadecimal string
+    pub fn from_str(hex: &str) -> Self {
+        Self::new(decode_02x(hex))
     }
 
     /// Returns a byte vector of the script prefixed with it's length in compact size.
