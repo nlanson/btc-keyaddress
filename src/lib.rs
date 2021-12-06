@@ -15,7 +15,7 @@
         - The Rust-Bitcoin repository (https://github.com/rust-bitcoin/rust-bitcoin)
             for providing clear reference code to work against, especially with bip32.
         
-        - The gods of the Bitcoin Stackexchange and Stackoverflow.
+        - The gods of the Bitcoin Stackexchange.
 
     Todo:
         - Unit tests for:
@@ -32,7 +32,7 @@
         
         - Taproot
             > Taproot script tree mechanics refactor
-                - Extensive script tree builder tests.
+                - Reimplement simple most balanced tree building.
         
         
         - Custom SHA256 implementation using information from the learnmeabitcoin tutorial

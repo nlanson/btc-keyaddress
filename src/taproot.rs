@@ -5,7 +5,7 @@
         - SpendInfo struct:
             > Extracting tweak values
         - Tree builder
-            > Huffman coding reimplementation using the tree builder
+            > Reimplement simple most balanced tree builder
             > Unit tests!
 
 */
@@ -36,7 +36,8 @@ pub enum TaprootErr {
     MissingMerkleRoot,
     MissingScriptMap,
     InvalidMerkleProof,
-    NoLeaf
+    NoLeaf,
+    InsufficientScripts
 }
 
 pub trait TaprootTaggedHash {
@@ -241,6 +242,44 @@ impl TaprootScriptTreeBuilder {
         Ok(
             SpendInfo::new(internal_key, node)
         )
+    }
+
+    /// Create a tree using huffman encoding.
+    /// A vector of (frequency, script) tuple needs to be provided.
+    pub fn with_huffman_coding(&mut self, scripts: Vec<(u64, RedeemScript)>) -> Result<(), TaprootErr> {
+        // early error if no scripts are provided
+        if scripts.len() < 1 {
+            return Err(TaprootErr::InsufficientScripts)
+        }
+        
+        // sort the scripts in descending order of frequency
+        let mut nodes: Vec<(u64, Node)> = vec![];
+        for (frequency, script) in scripts {
+            let node = Node::new_leaf(Leaf::new(&script));
+            nodes.push((frequency, node));
+        }
+        nodes.sort_by(|a, b| b.0.cmp(&a.0));
+
+        while nodes.len() != 1 {
+            // combine the lowest frequency nodes together
+            let a = nodes.pop().expect("There must be at least two nodes present");
+            let b = nodes.pop().expect("There must be at least two nodes present");
+            let c = (a.0 + b.0, Node::combine(a.1, b.1));
+            
+            // place the combined node in a position reflecting the combined frequencies.
+            // this is done by inserting at the very end and then using the sort_by method
+            // to sort without reordering equal elements.
+            nodes.push(c);
+            nodes.sort_by(|a, b| b.0.cmp(&a.0));
+        }
+        
+        // extract the root node and set it to the root node on self.nodes so it can be
+        // converted to a SpendInfo struct
+        let root = nodes
+            .pop()
+            .expect("There must be at least one node left").1;
+        self.nodes.push(Some(root));
+        Ok(())
     }
 }
 
@@ -552,7 +591,10 @@ mod tests {
     use crate::{
         key::*,
         address::Address,
-        util::{Network, decode_02x}
+        util::{
+            Network,
+            decode_02x
+        }
     };
 
     #[test]
@@ -710,7 +752,7 @@ mod tests {
         builder.insert_leaf(leaf.clone(), 1).unwrap();
         builder.insert_leaf(leaf.clone(), 1).unwrap();
         builder.insert_leaf(leaf.clone(), 2).unwrap();
-        let key = SchnorrPublicKey::from_str("d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d").unwrap();
+        let key = SchnorrPublicKey::from_str("0000000000000000000000000000000000000000000000000000000000000001").unwrap();
         assert!(match builder.complete(&key) {
             Ok(_) => false,
             Err(x) => match x {
@@ -718,5 +760,37 @@ mod tests {
                 _ => false
             }
         })
+    }
+
+    #[test]
+    fn huffman_coding_tests() {
+        // build the huffman tree with the tree builder...
+        let mut builder = TaprootScriptTreeBuilder::new();
+        let scripts = vec![
+            (1, RedeemScript::from_str("01")),
+            (1, RedeemScript::from_str("02")),
+            (2, RedeemScript::from_str("03")),
+            (2, RedeemScript::from_str("04")),
+            (3, RedeemScript::from_str("05"))
+        ];
+        builder.with_huffman_coding(scripts).unwrap();
+        let key = SchnorrPublicKey::from_str("0000000000000000000000000000000000000000000000000000000000000001").unwrap();
+        let spend_info = builder.complete(&key).unwrap();
+
+        // build the huffman tree manually...
+        // test diagram: https://imgur.com/a/R2yUBno
+        // elements here are ordered how they would be in the builder (descending)
+        let l5 = Node::new_leaf(Leaf::new(&RedeemScript::from_str("05")));  // 3
+        let l4 = Node::new_leaf(Leaf::new(&RedeemScript::from_str("03")));  // 2 
+        let l3 = Node::new_leaf(Leaf::new(&RedeemScript::from_str("04")));  // 2
+        let l2 = Node::new_leaf(Leaf::new(&RedeemScript::from_str("01")));  // 1
+        let l1 = Node::new_leaf(Leaf::new(&RedeemScript::from_str("02")));  // 1
+        let b1 = Node::combine(l1, l2); // 2
+        let b2 = Node::combine(b1, l3); // 4
+        let b3 = Node::combine(l4, l5); // 5
+        let r0 = Node::combine(b2, b3); // 9
+
+        // compare the tree builder's merkle root to the manually combined tree's merkle root
+        assert_eq!(r0.hash, spend_info.merkle_root.expect("Missing merkle root"));
     }
 }
