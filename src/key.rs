@@ -309,7 +309,7 @@ impl Key<lib_SchnorrPublicKey> for SchnorrPublicKey {
 
         match lib_SchnorrPublicKey::from_slice(byte_array) {
             Ok(x) => Ok(Self(x)),
-            Err(y) => Err(KeyError::BadSlice())
+            Err(_) => Err(KeyError::BadSlice())
         }
     }
 
