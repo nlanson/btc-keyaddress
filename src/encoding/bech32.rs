@@ -343,30 +343,30 @@ impl Bech32 {
      
         Less complicated and much easier to read but uses more resources than bitwise operations.
     */
-    fn to_u5_str(data: &Vec<u8>) -> Vec<u8> {
-        //Convert bytes to a string of bits.
-        let mut bit_string = data.iter().map(|x| format!("{:08b}", x)).collect::<String>();
-        while bit_string.len()%5 != 0 {
-            bit_string+="0";
-        }
+    // fn to_u5_str(data: &Vec<u8>) -> Vec<u8> {
+    //     //Convert bytes to a string of bits.
+    //     let mut bit_string = data.iter().map(|x| format!("{:08b}", x)).collect::<String>();
+    //     while bit_string.len()%5 != 0 {
+    //         bit_string+="0";
+    //     }
 
-        //Split bit string into groups of five
-        let mut squashed_bytes = vec![];
-        for i in (0..bit_string.len()-bit_string.len()%5).step_by(5) {
-            let bits = &bit_string[i..i+5];
-            squashed_bytes.push( decode_binary_string(bits) as u8 );
-        }
+    //     //Split bit string into groups of five
+    //     let mut squashed_bytes = vec![];
+    //     for i in (0..bit_string.len()-bit_string.len()%5).step_by(5) {
+    //         let bits = &bit_string[i..i+5];
+    //         squashed_bytes.push( decode_binary_string(bits) as u8 );
+    //     }
 
-        squashed_bytes
-    }
+    //     squashed_bytes
+    // }
 
     /**
         Converts a 5 bit int array to a 8 bit int array using bitwise operations.
         Unimplemented as it is too complicated and there is an alternative.
     */
-    fn try_from_u5(data: &Vec<u8>) -> Result<Vec<u8>, Bech32Err> {
-        unimplemented!("Use to_u5_str() method");
-    }
+    // fn try_from_u5(data: &Vec<u8>) -> Result<Vec<u8>, Bech32Err> {
+    //     unimplemented!("Use to_u5_str() method");
+    // }
 
     /**
         Converts an array of 5 bit ints into an array of 8 bit ints using string manipulation.
@@ -422,22 +422,22 @@ mod tests {
         // u5 -> u8 with string manipulation
         let data  = vec![2, 45, 70, 25, 125, 0, 255];
         assert_eq!(Bech32::to_u5(&data), [0, 8, 22, 20, 12, 6, 11, 29, 0, 3, 31, 16]);
-        assert_eq!(Bech32::to_u5(&data), Bech32::to_u5_str(&data));
+        //assert_eq!(Bech32::to_u5(&data), Bech32::to_u5_str(&data));
         assert_eq!(Bech32::try_from_u5_str(&Bech32::to_u5(&data))?, data);
 
         let data = vec![2, 45];
         assert_eq!(Bech32::to_u5(&data), [0b00000, 0b01000, 0b10110, 0b10000]);
-        assert_eq!(Bech32::to_u5(&data), Bech32::to_u5_str(&data));
+        //assert_eq!(Bech32::to_u5(&data), Bech32::to_u5_str(&data));
         assert_eq!(Bech32::try_from_u5_str(&Bech32::to_u5(&data))?, data);
 
         let data = vec![255; 5];
         assert_eq!(Bech32::to_u5(&data), [31; 8]);
-        assert_eq!(Bech32::to_u5(&data), Bech32::to_u5_str(&data));
+        //assert_eq!(Bech32::to_u5(&data), Bech32::to_u5_str(&data));
         assert_eq!(Bech32::try_from_u5_str(&Bech32::to_u5(&data))?, data);
 
         let data = vec![0; 5];
         assert_eq!(Bech32::to_u5(&data), [0; 8]);
-        assert_eq!(Bech32::to_u5(&data), Bech32::to_u5_str(&data));
+        //assert_eq!(Bech32::to_u5(&data), Bech32::to_u5_str(&data));
         assert_eq!(Bech32::try_from_u5_str(&Bech32::to_u5(&data))?, data);
 
 
