@@ -18,7 +18,7 @@ use crate::{
         PubKey,
         PrivKey
     },
-    util::try_into
+    util::try_into,
 };
 
 /**
@@ -30,136 +30,149 @@ pub enum ChildOptions {
     Hardened(u32)
 }
 
-/**
-    Function to derive new child xprv keys from parent xprv keys.
-    Use the hardened bool to generated hardened child xprv.
+pub trait ChildKeyDerivation<T> where T: Key {
+    /// Derive the child key
+    fn derive_child(&self, options: ChildOptions) -> Result<Self, HDWError> 
+    where Self: ExtendedKey<T>;
 
-    Xprv -> Xprv
-*/
-pub fn derive_xprv(parent: &Xprv, options: ChildOptions) -> Result<Xprv, HDWError> {
-    //Assign the index and data based on ChildOptions
-    let (index, data): (u32, Vec<u8>) = match options {
-        ChildOptions::Normal(x) => {
-            let index: u32 = x;
-            if index >= (2 as u32).pow(31) { //If index is larger than 2^31, then return an error as those indexes are reserved for hardened keys.
-                return Err(HDWError::IndexReserved(index)) 
-            }
-            
-            //Normal private key child is [0x00 || parent pub bytes || index bytes]
-            let mut data: Vec<u8> = vec![];
-            parent.get_pub().as_bytes::<33>().iter().for_each(|x| data.push(*x) );
-            index.to_be_bytes().iter().for_each(|x| data.push(*x) );
-
-            (index, data)
-        },
-        ChildOptions::Hardened(x) => {       
-            if x >= (2 as u32).pow(31) { //If provided index is larger than 2^31, then return an error since 2^31 + 2^31 wont fit in a u32 int
-                return Err(HDWError::IndexTooLarge(x)) 
-            }
-            let index: u32 = x + (2 as u32).pow(31);
-            
-
-            //Hardened private key child is [parent priv bytes || index bytes]
-            let mut data: Vec<u8> = vec![0x00];
-            parent.key::<32>().to_vec().iter().for_each(|x| data.push(*x) );
-            index.to_be_bytes().iter().for_each(|x| data.push(*x) );
-
-            (index, data)
-        }
-    };
-    
-    //Hash the data with the parent chaincode as the key
-    let hash: [u8; 64] = hmac_sha512(&data, &parent.chaincode());
-
-    //Split the hash into two halves. The right half is the child chaincode.
-    let left_bytes: [u8; 32] = try_into(hash[0..32].to_vec());
-    let child_chaincode: [u8; 32] = try_into(hash[32..64].to_vec());
-
-    //Calculate the child private key from the left bytes and parent private key. 
-    //Return an error if this cannot be done
-    let mut child_key: PrivKey = match PrivKey::from_slice(&parent.key::<32>()) {
-        Ok(x) => x,
-        Err(_) => return Err(HDWError::BadKey())
-    };
-    match child_key.add_assign(&left_bytes) {
-        Ok(_) => { },
-        Err(_) => return Err(HDWError::BadArithmatic())
-    }
-
-    //Set the remaining meta data
-    let depth: u8 = parent.depth + 1;
-    let fingerprint: [u8; 4] = try_into(parent.get_pub().hash160()[0..4].to_vec());
-    let index = index.to_be_bytes();
-
-    //Return the new Xpriv
-    Ok(
-        Xprv::construct(
-            child_key,
-            child_chaincode,
-            depth,
-            fingerprint,
-            index
-        )
-    )
+    /// Unpack the parameters for key derivation
+    fn unpack_options(&self, options: ChildOptions) -> Result<(u32, Vec<u8>), HDWError>;
 }
 
-/** 
-    Function to derive new chilc xpub keys from parnent xpub keys.
+impl ChildKeyDerivation<PrivKey> for Xprv {
+    fn derive_child(&self, options: ChildOptions) -> Result<Self, HDWError> {
+        // Extract the index and data to be hashed from the child options
+        let (index, data) = self.unpack_options(options)?;
 
-    Xpub -> Xpub
-*/
-pub fn derive_xpub(parent: &Xpub, options: ChildOptions) -> Result<Xpub, HDWError> {
-    //Extract the index from the options.
-    //if the options specify hardened, then return an error
-    let index: u32 = match options {
-        ChildOptions::Hardened(_) => return Err(HDWError::CantHarden()),
-        ChildOptions::Normal(x) => {
-            if x >= (2 as u32).pow(31) {
-                return Err(HDWError::IndexTooLarge(x));
-            }
-            x
+        //Hash the data with the parent chaincode as the key
+        let hash: [u8; 64] = hmac_sha512(&data, &self.chaincode());
+
+        //Split the hash into two halves. The right half is the child chaincode.
+        let left_bytes: [u8; 32] = try_into(hash[0..32].to_vec());
+        let child_chaincode: [u8; 32] = try_into(hash[32..64].to_vec());
+
+        //Calculate the child private key from the left bytes and parent private key. 
+        //Return an error if this cannot be done
+        let mut child_key: PrivKey = match PrivKey::from_slice(&self.key::<32>()) {
+            Ok(x) => x,
+            Err(_) => return Err(HDWError::BadKey())
+        };
+        match child_key.add_assign(&left_bytes) {
+            Ok(_) => { },
+            Err(_) => return Err(HDWError::BadArithmatic())
         }
-    };
 
-    //Create the data Vec from the parent public key and index
-    let mut data: Vec<u8> = vec![];
-    parent.key::<33>().iter().for_each(|x| data.push(*x));
-    index.to_be_bytes().iter().for_each(|x| data.push(*x));
+        //Set the remaining meta data
+        let depth: u8 = self.depth + 1;
+        let fingerprint: [u8; 4] = try_into(self.get_pub().hash160()[0..4].to_vec());
+        let index = index.to_be_bytes();
 
-    //hash the data with the parent chaincode as the key
-    let hash: [u8; 64] = hmac_sha512(&data, &parent.chaincode());
-
-    //split the hash into two halves. The right half is the child chaincode.
-    let left_bytes: [u8; 32] = try_into(hash[0..32].to_vec());
-    let child_chaincode: [u8; 32] = try_into(hash[32..64].to_vec());
-
-    //Add the parent public key to the left bytes to get the final child key
-    //Return appropriate error if unable to do so
-    let mut child_key: PubKey =  PubKey::from_slice(&parent.key::<33>()).unwrap();
-    let sk: PrivKey = match PrivKey::from_slice(&left_bytes) {
-        Ok(x) => x,
-        Err(_) => return Err(HDWError::BadKey())
-    };
-    match child_key.add_assign(&sk.as_bytes::<32>()[..]) {
-        Ok(_) => { },
-        Err(_) => return Err(HDWError::BadArithmatic())
+        //Return the new Xpriv
+        Ok(
+            Xprv::construct(
+                child_key,
+                child_chaincode,
+                depth,
+                fingerprint,
+                index
+            )
+        )
     }
 
+    fn unpack_options(&self, options: ChildOptions) -> Result<(u32, Vec<u8>), HDWError> {
+        match options {
+            ChildOptions::Normal(x) => {
+                let index: u32 = x;
+                //If index is larger than 2^31, then return an error as those indexes are reserved for hardened keys.
+                if index >= (2 as u32).pow(31) { 
+                    return Err(HDWError::IndexReserved(index)) 
+                }
+                
+                //Normal private key child is [0x00 || parent pub bytes || index bytes]
+                let mut data: Vec<u8> = vec![];
+                self.get_pub().as_bytes::<33>().iter().for_each(|x| data.push(*x) );
+                index.to_be_bytes().iter().for_each(|x| data.push(*x) );
+    
+                Ok((index, data))
+            },
+            ChildOptions::Hardened(x) => {     
+                //If provided index is larger than 2^31, then return an error since 2^31 + 2^31 wont fit in a u32 int  
+                if x >= (2 as u32).pow(31) { 
+                    return Err(HDWError::IndexTooLarge(x)) 
+                }
+                let index: u32 = x + (2 as u32).pow(31);
+                
+    
+                //Hardened private key child is [parent priv bytes || index bytes]
+                let mut data: Vec<u8> = vec![0x00];
+                self.key::<32>().to_vec().iter().for_each(|x| data.push(*x) );
+                index.to_be_bytes().iter().for_each(|x| data.push(*x) );
+    
+                Ok((index, data))
+            }
+        }
+    }
+}
 
-    //Set the remaining meta data
-    let depth = parent.depth + 1;
-    let fingerprint: [u8; 4] = try_into(parent.get_pub().hash160()[0..4].to_vec());
-    let index = index.to_be_bytes();
+impl ChildKeyDerivation<PubKey> for Xpub {
+    fn derive_child(&self, options: ChildOptions) -> Result<Self, HDWError> {
+        let (index, data) = self.unpack_options(options)?;
+        
+        //hash the data with the parent chaincode as the key
+        let hash: [u8; 64] = hmac_sha512(&data, &self.chaincode());
 
-    Ok(
-        Xpub::construct(
-            child_key,
-            child_chaincode,
-            depth,
-            fingerprint,
-            index
+        //split the hash into two halves. The right half is the child chaincode.
+        let left_bytes: [u8; 32] = try_into(hash[0..32].to_vec());
+        let child_chaincode: [u8; 32] = try_into(hash[32..64].to_vec());
+
+        //Add the parent public key to the left bytes to get the final child key
+        //Return appropriate error if unable to do so
+        let mut child_key: PubKey =  match PubKey::from_slice(&self.key::<33>()) {
+            Ok(x) => x,
+            Err(_) => return Err(HDWError::BadKey())
+        };
+        match child_key.add_assign(&left_bytes) {
+            Ok(_) => { },
+            Err(_) => return Err(HDWError::BadArithmatic())
+        }
+
+
+        //Set the remaining meta data
+        let depth = self.depth + 1;
+        let fingerprint: [u8; 4] = try_into(self.get_pub().hash160()[0..4].to_vec());
+        let index = index.to_be_bytes();
+
+        Ok(
+            Xpub::construct(
+                child_key,
+                child_chaincode,
+                depth,
+                fingerprint,
+                index
+            )
         )
-    )
+    }
+
+    fn unpack_options(&self, options: ChildOptions) -> Result<(u32, Vec<u8>), HDWError> {
+        // When deriving child keys from Xpub, we cannot use hardened derivation 
+        // since the secret key portion is unknown.
+        let index: u32 = match options {
+            ChildOptions::Hardened(_) => return Err(HDWError::CantHarden()),
+            ChildOptions::Normal(x) => {
+                if x >= (2 as u32).pow(31) {
+                    return Err(HDWError::IndexTooLarge(x));
+                }
+                x
+            }
+        };
+    
+        //Create the data Vec from the parent public key and index
+        let mut data: Vec<u8> = vec![];
+        self.key::<33>().iter().for_each(|x| data.push(*x));
+        index.to_be_bytes().iter().for_each(|x| data.push(*x));
+
+        Ok((index, data))
+    }
 }
 
 #[allow(non_snake_case, non_upper_case_globals)]

@@ -13,7 +13,8 @@ pub use crate::{
         PrivKey,
         Key,
         TapTweak,
-        KeyError
+        KeyError,
+        RawKey
     },
     
     address::Address,

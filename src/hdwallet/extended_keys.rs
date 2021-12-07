@@ -7,7 +7,6 @@
 */
 
 use crate::{
-    SecretKey, PublicKey,
     key::{
         PrivKey,
         PubKey,
@@ -21,8 +20,7 @@ use crate::{
     },
     hdwallet::{
         ckd::{
-            derive_xprv,
-            derive_xpub,
+            ChildKeyDerivation,
             ChildOptions,
         },
         HDWError,
@@ -59,12 +57,12 @@ pub struct Xpub {
     pub index: [u8; 4]
 }
 
-pub trait ExtendedKey<T, U> where T: Key<U>, Self: Copy {
+pub trait ExtendedKey<T> where T: Key, Self: Copy {
     /**
         Constructs the Extended Key.
     */
     fn construct(key: T, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self
-    where T: Key<U>;
+    where T: Key;
 
     /**
         Import a extended key from a string.
@@ -95,7 +93,10 @@ pub trait ExtendedKey<T, U> where T: Key<U>, Self: Copy {
         Derives the child key of self
     */
     fn get_xchild(&self, options: ChildOptions) -> Result<Self, HDWError>
-    where Self: Sized;
+    where Self: Sized + ChildKeyDerivation<T>
+    {
+        self.derive_child(options)
+    }
 
     /**
         Return the non extended public key of self.
@@ -128,7 +129,7 @@ pub trait ExtendedKey<T, U> where T: Key<U>, Self: Copy {
         eg. [44', 0', 0', 0] would represent the path m/44'/0'/0'/0
     */
     fn derive_from_path(&self, path: &Path) -> Result<Self, HDWError>
-    where Self: Sized + Clone
+    where Self: Sized + Clone + ChildKeyDerivation<T>
     {
 
         let mut current_key: Self = self.clone();
@@ -144,7 +145,7 @@ pub trait ExtendedKey<T, U> where T: Key<U>, Self: Copy {
     }
 }
 
-impl ExtendedKey<PrivKey, SecretKey> for Xprv {
+impl ExtendedKey<PrivKey> for Xprv {
     fn construct(key: PrivKey, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self {
         Self {
             key: PrivKey::from_slice(&key.as_bytes::<32>()).unwrap(),
@@ -259,14 +260,6 @@ impl ExtendedKey<PrivKey, SecretKey> for Xprv {
         Base58::new(Some(*v_prefix), &payload).check_encode()
     }
 
-    fn get_xchild(&self, options: ChildOptions) -> Result<Xprv, HDWError> {
-        match derive_xprv(self, options) {
-            Ok(x) => Ok(x),
-            Err(x) => Err(x)
-        }
-    }
-
-
     fn get_pub(&self) -> PubKey {
         PubKey::from_priv_key(&PrivKey::from_slice(&self.key::<32>()).unwrap())
     }
@@ -299,7 +292,7 @@ impl Xprv {
     
 }
 
-impl ExtendedKey<PubKey, PublicKey> for Xpub {
+impl ExtendedKey<PubKey> for Xpub {
     fn construct(key: PubKey, chaincode: [u8; 32], depth: u8, pf: [u8; 4], index: [u8; 4]) -> Self {
             return Self {
                 key: PubKey::from_slice(&key.as_bytes::<33>()).unwrap(),
@@ -412,13 +405,6 @@ impl ExtendedKey<PubKey, PublicKey> for Xpub {
 
         
         Base58::new(Some(*v_prefix), &payload).check_encode()
-    }
-
-    fn get_xchild(&self, options: ChildOptions) -> Result<Xpub, HDWError> {
-        match derive_xpub(self, options) {
-            Ok(x) => Ok(x),
-            Err(x) => Err(x)
-        }
     }
 
     fn get_pub(&self) -> PubKey {
