@@ -49,7 +49,7 @@ pub struct SchnorrKeyPair(lib_SchnorrKeyPair);
 
 
 /// Methods shared in all key structs
-pub trait Key<T> {
+pub trait Key {
     /// Create a new instance of self from a slice
     fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError>
     where Self: Sized;
@@ -57,12 +57,19 @@ pub trait Key<T> {
     /// Return self as a byte array
     fn as_bytes<const N: usize>(&self) -> [u8; N];
 
-    /// Return the underlying struct
-    fn raw(&self) -> T;
+    /// Return the underlying struct wrapped in an enum (use a match statement to extract)
+    fn into_inner(&self) -> RawKey;
 
     /// Create self from a string
     fn from_str(string: &str) -> Result<Self, KeyError>
     where Self: Sized;
+}
+
+pub enum RawKey {
+    SecretKey(SecretKey),
+    ECCPublicKey(PublicKey),
+    SchnorrKeyPair(lib_SchnorrKeyPair),
+    SchnorrPublicKey(lib_SchnorrPublicKey)
 }
 
 
@@ -107,7 +114,7 @@ impl PrivKey {
     }
 }
 
-impl Key<SecretKey> for PrivKey {
+impl Key for PrivKey {
     fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError> {
         match SecretKey::from_slice(byte_array) {
             Ok(x) => Ok(Self(x)),
@@ -120,8 +127,8 @@ impl Key<SecretKey> for PrivKey {
         try_into(decode_02x(&hex[..]))
     }
 
-    fn raw(&self) -> SecretKey {
-        self.0
+    fn into_inner(&self) -> RawKey {
+        RawKey::SecretKey(self.0)
     }
 
     /// Private key string format is WIF format (Base58)
@@ -186,7 +193,7 @@ impl PubKey {
     }
 }
 
-impl Key<PublicKey> for PubKey {
+impl Key for PubKey {
     fn from_slice(byte_array: &[u8]) -> Result<Self, KeyError> {
         match PublicKey::from_slice(byte_array) {
             Ok(x) => Ok(Self(x)),
@@ -198,8 +205,8 @@ impl Key<PublicKey> for PubKey {
         try_into(self.0.serialize()[0..N].to_vec())
     }
 
-    fn raw(&self) -> PublicKey {
-        self.0
+    fn into_inner(&self) -> RawKey {
+        RawKey::ECCPublicKey(self.0)
     }
 
     /// Return a string representation of self.
@@ -295,7 +302,7 @@ impl TapTweak for SchnorrKeyPair {
 }
 
 
-impl Key<lib_SchnorrPublicKey> for SchnorrPublicKey {
+impl Key for SchnorrPublicKey {
     //Schnorr public keys are serialized as 32 bytes
     fn as_bytes<const N: usize>(&self) -> [u8; N] {
         try_into(self.0.serialize()[0..N].to_vec())
@@ -313,8 +320,8 @@ impl Key<lib_SchnorrPublicKey> for SchnorrPublicKey {
         }
     }
 
-    fn raw(&self) -> lib_SchnorrPublicKey {
-        self.0
+    fn into_inner(&self) -> RawKey {
+        RawKey::SchnorrPublicKey(self.0)
     }
 
     /// Create self from a string representation
@@ -347,7 +354,7 @@ impl SchnorrPublicKey {
     }
 }
 
-impl Key<lib_SchnorrKeyPair> for SchnorrKeyPair {
+impl Key for SchnorrKeyPair {
     //Keypairs cannot be serialized
     fn as_bytes<const N: usize>(&self) -> [u8; N] { unimplemented!("Not supported") }
 
@@ -362,8 +369,8 @@ impl Key<lib_SchnorrKeyPair> for SchnorrKeyPair {
         }
     }
 
-    fn raw(&self) -> lib_SchnorrKeyPair {
-        self.0
+    fn into_inner(&self) -> RawKey {
+        RawKey::SchnorrKeyPair(self.0)
     }
 
     /// Create self from a string representation
