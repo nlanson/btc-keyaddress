@@ -188,6 +188,11 @@ impl TaprootScriptTreeBuilder {
         Self { nodes: vec![] }
     }
 
+    /// Return if there are any nodes inside the builder already
+    fn is_clean(&self) -> bool {
+        self.nodes.len() == 0
+    }
+
     /// Insert a leaf at a given depth
     pub fn insert_leaf(&mut self, leaf: Leaf, depth: usize) -> Result<(), TaprootErr> {
         let node = Node::new_leaf(leaf);
@@ -279,6 +284,31 @@ impl TaprootScriptTreeBuilder {
             .pop()
             .expect("There must be at least one node left").1;
         self.nodes.push(Some(root));
+        Ok(())
+    }
+
+    /// Create the most balanced tree given a vector of scripts
+    pub fn from_scripts(&mut self, scripts: Vec<RedeemScript>) -> Result<(), TaprootErr> {
+        if !self.is_clean() {
+            return Err(TaprootErr::OverCompleteTree)
+        }
+        
+        let base_depth = ((scripts.len() as f32).log10() / (2 as f32).log10()).floor() as usize;
+        let deeper_nodes = (scripts.len() - 2usize.pow(base_depth as u32))*2;
+        let shallow_nodes = scripts.len() - deeper_nodes;
+        assert!(deeper_nodes+shallow_nodes == scripts.len());
+
+        let mut i = 0;
+        while i < scripts.len() {
+            if i < shallow_nodes {
+                self.insert_leaf(Leaf::new(&scripts[i]), base_depth)?;
+            } else {
+                self.insert_leaf(Leaf::new(&scripts[i]), base_depth+1)?;
+            }
+            i+=1;
+        }
+
+
         Ok(())
     }
 }
@@ -792,5 +822,57 @@ mod tests {
 
         // compare the tree builder's merkle root to the manually combined tree's merkle root
         assert_eq!(r0.hash, spend_info.merkle_root.expect("Missing merkle root"));
+    }
+
+    #[test]
+    fn balanced_tree() -> Result<(), TaprootErr> {
+        //build the tree with the builder...
+        let mut builder = TaprootScriptTreeBuilder::new();
+        let scripts = vec![
+            RedeemScript::from_str("01"),
+            RedeemScript::from_str("02"),
+            RedeemScript::from_str("03"),
+            RedeemScript::from_str("04"),
+            RedeemScript::from_str("05"),
+            RedeemScript::from_str("06"),
+            RedeemScript::from_str("07"),
+        ];
+        builder.from_scripts(scripts)?;
+        let key = SchnorrPublicKey::from_str("0000000000000000000000000000000000000000000000000000000000000001").unwrap();
+        let spend_info = builder.complete(&key).unwrap();
+        
+
+        // calculate merkle root manually...
+        let l1 = Node::new_leaf(Leaf::new(&RedeemScript::from_str("01")));
+        let l2 = Node::new_leaf(Leaf::new(&RedeemScript::from_str("02")));
+        let l3 = Node::new_leaf(Leaf::new(&RedeemScript::from_str("03")));
+        let l4 = Node::new_leaf(Leaf::new(&RedeemScript::from_str("04")));
+        let l5 = Node::new_leaf(Leaf::new(&RedeemScript::from_str("05")));
+        let l6 = Node::new_leaf(Leaf::new(&RedeemScript::from_str("06")));
+        let l7 = Node::new_leaf(Leaf::new(&RedeemScript::from_str("07")));
+        let b1 = Node::combine(l2, l3);
+        let b2 = Node::combine(l4, l5);
+        let b3 = Node::combine(l6, l7);
+        let b4 = Node::combine(l1, b1);
+        let b5 = Node::combine(b2, b3);
+        let r0 = Node::combine(b4, b5);
+
+        // compare the merkle roots
+        assert_eq!(r0.hash, spend_info.merkle_root.expect("Missing merkle root"));
+
+
+
+        //tests to check if tree builder wont fail
+        let mut scripts = vec![
+            RedeemScript::from_str("01")
+        ];
+        for _ in 0..10 {
+            let mut builder = TaprootScriptTreeBuilder::new();
+            builder.from_scripts(scripts.clone())?;
+            builder.complete(&key)?;
+            scripts.push(RedeemScript::from_str("01"));
+        }
+        
+        Ok(())
     }
 }
