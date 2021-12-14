@@ -68,5 +68,6 @@ use secp256k1::{ PublicKey, Secp256k1, SecretKey };
 use secp256k1::schnorrsig::{ KeyPair as lib_SchnorrKeyPair, PublicKey as lib_SchnorrPublicKey };
 use hmac::{ Mac, NewMac, Hmac };
 use pbkdf2::pbkdf2;
-use sha2::{ Sha256, Sha512, Digest };
+use sha2::{ /*Sha256,*/ Sha512, Digest };
 use ripemd160::Ripemd160;
+use sha2n::{Sha256 as nSha256, HashEngine as nHashEngine};
