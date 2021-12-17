@@ -5,10 +5,6 @@ edition = "2018"
 
 [dependencies]
 secp256k1 = {version="0.20.3", features = ["rand"]}
-rand = {version = "0.6", features = ["std"]}
-bitcoin_hashes = { version = "0.10", features = ["std"] }
-sha2 = "0.9.8"
-sha2n = { package = "sha2", git = "https://github.com/nlanson/sha2" }
-hmac = "0.11.0"
-pbkdf2 = "0.9.0"
+rand = {version = "0.6"}
+btc-hashes = { git = "https://github.com/nlanson/btc-hashes" }
 ripemd160 = "0.9.1"

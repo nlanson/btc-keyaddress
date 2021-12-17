@@ -4,11 +4,9 @@
 */
 
 use crate::{
-    Digest,
-    Ripemd160, /*Sha256,*/ Sha512, pbkdf2,
-    NewMac, Hmac, Mac, 
-    util::try_into,
-    nSha256, nHashEngine
+    Digest, Ripemd160, 
+    Sha256, Hmac, Sha512, PBKDF2, KeyBasedHashEngine, HashEngine,
+    util::try_into
 };
 
 
@@ -35,14 +33,13 @@ macro_rules! hash_function {
 }
 
 hash_function!(ripemd160, Ripemd160, 20);
-//hash_function!(sha256, Sha256, 32);
 hash_function!(hash160, ripemd160, sha256, 20);
 hash_function!(sha256d, sha256, sha256, 32);
 
 // SHA256 is not implemented as a macro because it uses my own implementation instead of using a dependency.
 pub fn sha256<T>(input: T) -> [u8; 32]
 where T: AsRef<[u8]> {
-    let mut hasher = nSha256::new();
+    let mut hasher = Sha256::new();
     let input = input.as_ref();
     hasher.input(input);
     hasher.hash()
@@ -52,8 +49,7 @@ where T: AsRef<[u8]> {
 /**
     Key deriveration function that takes in a mnemonic phrase and passphrase to produce
     a 512 bit seed.
-*/ 
-type HmacSha512 = Hmac<Sha512>; 
+*/
 pub fn pbkdf2_hmacsha512(phrase: &Vec<String>, passphrase: &str) -> [u8; 64] {
     /*
         PBKDF2 Params:
@@ -62,25 +58,21 @@ pub fn pbkdf2_hmacsha512(phrase: &Vec<String>, passphrase: &str) -> [u8; 64] {
             - rounds = 2048
             - Algorithm = HmacSha512
     */
-    let mnemonic_sentence: String = phrase.join(" ");
-    let mut res: [u8; 64] = [0; 64];
-    pbkdf2::<HmacSha512>(
-        mnemonic_sentence.as_bytes(),
-        format!("mnemonic{}", passphrase).as_bytes(),
-        2048,
-        &mut res
-    );
-    res
+    let mut e: PBKDF2<Hmac<Sha512>> = PBKDF2::new();
+    e.input(phrase.join(" "));
+    e.salt(format!("mnemonic{}", passphrase).as_bytes());
+    e.iter(2048);
+    e.hash()
 }
 
 /**
     Takes in an byte array input and returns the HMAC-SHA512 hash of it.
 */
 pub fn hmac_sha512(data: &[u8], key: &[u8]) -> [u8; 64] {
-    let mut hmac = HmacSha512::new_from_slice(key).expect("Hmac error");
-    hmac.update(data);
-
-    try_into(hmac.finalize().into_bytes().to_vec())
+    let mut e: Hmac<Sha512> = Hmac::new();
+    e.input(data);
+    e.key(key);
+    e.hash()
 }
 
 /**
