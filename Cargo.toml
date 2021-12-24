@@ -7,4 +7,3 @@ edition = "2018"
 secp256k1 = {version="0.20.3", features = ["rand"]}
 rand = {version = "0.6"}
 btc-hashes = { git = "https://github.com/nlanson/btc-hashes" }
-ripemd160 = "0.9.1"

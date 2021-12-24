@@ -4,9 +4,9 @@
 */
 
 use crate::{
-    Digest, Ripemd160, 
-    Sha256, Hmac, Sha512, PBKDF2, KeyBasedHashEngine, HashEngine,
-    util::try_into
+    HashEngine, KeyBasedHashEngine,
+    Sha256, Sha512, Ripemd160,
+    Hmac, PBKDF2
 };
 
 
@@ -18,8 +18,8 @@ macro_rules! hash_function {
         pub fn $name<T>(input: T) -> [u8; $out_len] 
         where T: AsRef<[u8]> {
             let mut r = $lib_::new();
-            r.update(input);
-            try_into(r.finalize().to_vec())
+            r.input(input);
+            r.hash()
         }
     };
 
@@ -33,17 +33,10 @@ macro_rules! hash_function {
 }
 
 hash_function!(ripemd160, Ripemd160, 20);
+hash_function!(sha256, Sha256, 32);
 hash_function!(hash160, ripemd160, sha256, 20);
 hash_function!(sha256d, sha256, sha256, 32);
 
-// SHA256 is not implemented as a macro because it uses my own implementation instead of using a dependency.
-pub fn sha256<T>(input: T) -> [u8; 32]
-where T: AsRef<[u8]> {
-    let mut hasher = Sha256::new();
-    let input = input.as_ref();
-    hasher.input(input);
-    hasher.hash()
-}
 
 
 /**
